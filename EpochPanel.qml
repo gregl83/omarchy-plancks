@@ -17,6 +17,14 @@ Panel {
     confirmingReset = false
     resetButton.forceActiveFocus()
   }
+  function revealButton(button) {
+    Qt.callLater(function() {
+      var top = button.mapToItem(scroll.contentItem, 0, 0).y
+      var bottom = top + button.height
+      if (top < scroll.contentY) scroll.contentY = top
+      else if (bottom > scroll.contentY + scroll.height) scroll.contentY = bottom - scroll.height
+    })
+  }
   property bool detailSubscription: false
   onOpenedChanged: {
     confirmingReset = false
@@ -139,6 +147,7 @@ Panel {
           }
           Button {
             id: actionButton
+            onActiveFocusChanged: if (activeFocus) root.revealButton(actionButton)
             KeyNavigation.tab: retryButton.visible ? retryButton : resetButton
             width: parent.width
             text: EpochController.busy ? "Saving…" : root.epoch.phase === "active" ? "End epoch" : "Start epoch"
@@ -207,6 +216,7 @@ Panel {
           }
           Button {
             id: retryButton
+            onActiveFocusChanged: if (activeFocus) root.revealButton(retryButton)
             KeyNavigation.tab: resetButton
             visible: EpochController.error !== ""
             text: "Retry"
@@ -220,6 +230,7 @@ Panel {
           PanelSeparator { foreground: root.foreground }
           Button {
             id: resetButton
+            onActiveFocusChanged: if (activeFocus) root.revealButton(resetButton)
             anchors.right: parent.right
             text: "Reset all data…"
             visible: !root.confirmingReset
@@ -254,6 +265,7 @@ Panel {
             }
             Button {
               id: cancelButton
+              onActiveFocusChanged: if (activeFocus) root.revealButton(cancelButton)
               text: "Cancel"
               width: parent.width
               focusable: true
@@ -266,6 +278,7 @@ Panel {
             }
             Button {
               id: confirmButton
+              onActiveFocusChanged: if (activeFocus) root.revealButton(confirmButton)
               text: "Delete all data and reset"
               width: parent.width
               enabled: !EpochController.busy

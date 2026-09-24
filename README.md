@@ -29,7 +29,7 @@ Starting or ending an epoch changes its active/off-time appearance; passing an e
 
 ## Install
 
-Requires an Omarchy release with the Quickshell plugin system and shared `qs.Ui` components, plus Python 3. The plugin uses only Python's standard library. It does not support the older Waybar shell.
+Requires an Omarchy release with the Quickshell plugin system and shared `qs.Ui` components, plus Python 3.9 or later. The plugin uses only Python's standard library. It does not support the older Waybar shell.
 
 Install through Omarchy:
 
@@ -39,6 +39,17 @@ omarchy bar move gregl83.plancks --after omarchy.clock
 ```
 
 Omarchy creates the plugin directory, clones the repository, validates it, and enables the widget. Plancks creates its runtime storage automatically. There are no directories to create manually. The manifest defaults to the center section; the second command places the widget immediately after the clock.
+
+### Update
+
+For a Git-based installation:
+
+```bash
+omarchy plugin update gregl83.plancks
+omarchy restart shell
+```
+
+Restarting the shell loads the updated shared controller and Python helper. Your saved history survives the restart. Copy-only development installations use the copy procedure below instead.
 
 ### Try a local checkout without publishing
 
@@ -92,7 +103,7 @@ Settings live inline on the widget's entry in Omarchy's `shell.json`. To supply 
 omarchy bar set gregl83.plancks initialSeconds 28800 --json
 ```
 
-The default `initialSeconds` is `0` (learn first). Changing it affects future starts without history; it does not change an active epoch. The optional `rotateBytes` setting defaults to `5242880` (5 MiB).
+The default `initialSeconds` is `0` (learn first); an initial estimate must be at least one second. Changing it affects future starts without history; it does not change an active epoch. The optional `rotateBytes` setting defaults to `5242880` (5 MiB).
 
 ## Optional keyboard shortcut
 
@@ -116,7 +127,7 @@ Choose an unused combination, or explicitly unbind an existing assignment before
 
 Open the widget panel and select **Reset all data…**. A warning explains what will be deleted; **Cancel** is focused by default. Select **Delete all data and reset** to permanently delete recorded epochs, off-time intervals, and learned predictions and discard any active epoch. Escape cancels the confirmation. Reset cannot be undone; back up the [storage directory](#persistence-and-recovery) first if you want to keep your history.
 
-The widget returns to its initial off-time state and learns again from new epochs. Widget settings (`initialSeconds`, `rotateBytes`, and bar placement) stay intact. Reset is also available when damaged history prevents starting or ending an epoch. Other instances of the widget refresh automatically.
+The widget returns to its initial off-time state and learns again from new epochs. Widget settings (`initialSeconds`, `rotateBytes`, and bar placement) stay intact. Reset is also available when damaged history prevents starting or ending an epoch. Other instances of the widget refresh automatically. Reset requires writable storage and valid reset metadata; it cannot repair filesystem permissions or a damaged `events/.reset.json` file.
 
 ## Remove
 
@@ -136,6 +147,8 @@ hyprctl configerrors
 ```
 
 ## Persistence and recovery
+
+Plancks stores data locally and makes no network requests. It starts one Python helper shared by the widget instances; it requires no account or elevated permissions.
 
 Runtime history lives at `$XDG_STATE_HOME/omarchy/gregl83.plancks/`, falling back to `~/.local/state/omarchy/gregl83.plancks/`. A relative XDG path is ignored.
 

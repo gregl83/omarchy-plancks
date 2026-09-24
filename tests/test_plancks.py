@@ -265,6 +265,39 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(replies[1]['view']['sequence'], 0)
         self.assertEqual(replies[2]['view']['phase'], 'active')
 
+    def test_invalid_transition_does_not_append_unreplayable_record(self):
+        with self.assertRaisesRegex(ValueError, 'Invalid journal clock'):
+            self.store.transition('start', 'invalid', 0, now={'utcMs': 0})
+        self.assertEqual(list(self.store.events.glob('*.jsonl')), [])
+        self.assertEqual(self.store.recover()['sequence'], 0)
+
+    def test_invalid_reset_metadata_never_deletes_history(self):
+        self.transition('start', 7)
+        segment = next(self.store.events.glob('*.jsonl'))
+        original = segment.read_bytes()
+        for marker in [None, [], {}, {'generation': 'bad', 'pending': 'false'},
+                       {'generation': '', 'pending': True}]:
+            with self.subTest(marker=marker):
+                (self.store.events / '.reset.json').write_text(json.dumps(marker))
+                with self.assertRaisesRegex(ValueError, 'Invalid reset metadata'):
+                    p.Store(self.temp.name).recover()
+                self.assertEqual(segment.read_bytes(), original)
+
+    def test_invalid_journal_values_block_replay_but_allow_reset(self):
+        for field, value in [('clock', {}), ('clock', {'bootId': 'test', 'utcMs': 'bad', 'bootMs': 0}),
+                             ('predictionMs', float('nan')), ('predictionMs', -1),
+                             ('completedSample', {'eventId': 'sample', 'durationMs': float('inf')})]:
+            with self.subTest(field=field, value=value), tempfile.TemporaryDirectory() as directory:
+                store = p.Store(directory)
+                store.transition('start', 'start', 0, now=at(7))
+                segment = next(store.events.glob('*.jsonl'))
+                event = json.loads(segment.read_text())
+                event[field] = value
+                segment.write_text(json.dumps(event) + '\n')
+                with self.assertRaisesRegex(ValueError, 'Invalid record'):
+                    p.Store(directory).recover()
+                self.assertEqual(store.reset('reset', '', 0)['sequence'], 0)
+
     def test_xdg_root(self):
         with patch.dict(os.environ, {'XDG_STATE_HOME': self.temp.name}):
             self.assertEqual(p.state_root(), Path(self.temp.name) / 'omarchy/gregl83.plancks')
@@ -336,6 +369,16 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(self.read()['view']['generation'], 'reset-1')
         store.transition('start', 'new', 0, now=p.clock(), expected_generation='reset-1')
         self.assertEqual(self.read()['view']['phase'], 'active')
+
+    def test_invalid_initial_duration_does_not_kill_helper(self):
+        for value in [0.5, -1, True, 1e308]:
+            self.send({'action': 'configure', 'initialSeconds': value})
+            self.assertFalse(self.read()['ok'])
+            self.assertTrue(self.read()['ok'])  # Existing state is still readable.
+        self.send({'action': 'configure', 'initialSeconds': 3600})
+        self.assertTrue(self.read()['ok'])
+        self.send({'action': 'start', 'sequence': 0, 'requestId': 'valid-start'})
+        self.assertEqual(self.read()['view']['timer'], '−01:00:00')
 
     def test_removing_history_reports_failure_instead_of_stale_state(self):
         Path(self.temp.name, 'events').rmdir()

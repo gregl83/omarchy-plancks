@@ -62,6 +62,19 @@ def blank_state():
 
 
 def apply(state, event):
+    # Validate values consumed by the display before accepting a replayed record.
+    # Otherwise a syntactically valid but damaged record can masquerade as state.
+    stamp = event["clock"]
+    if (not isinstance(stamp, dict) or not isinstance(stamp.get("bootId"), str)
+            or not stamp["bootId"] or any(type(stamp.get(key)) is not int
+            or abs(stamp[key]) > 2**53 - 1 for key in ("utcMs", "bootMs"))):
+        raise ValueError("Invalid journal clock")
+    prediction = event["predictionMs"]
+    if prediction is not None and (type(prediction) not in (int, float)
+            or not 1000 <= prediction <= 2**53 - 1):
+        raise ValueError("Invalid journal prediction")
+    if not isinstance(event["eventId"], str) or not event["eventId"]:
+        raise ValueError("Invalid journal event ID")
     if event.get("schemaVersion") != VERSION or event.get("sequence") != state["sequence"] + 1:
         raise ValueError("Unsupported journal version or missing/out-of-order event")
     starting = event["type"] == "epoch_started"
@@ -72,7 +85,11 @@ def apply(state, event):
     if not starting and event["epochId"] != state["epochId"]:
         raise ValueError("End event does not match the active epoch")
     sample = event.get("completedSample")
-    if sample:
+    if sample is not None:
+        if (not isinstance(sample, dict) or not isinstance(sample.get("eventId"), str)
+                or type(sample.get("durationMs")) not in (int, float)
+                or not -(2**53 - 1) <= sample["durationMs"] <= 2**53 - 1):
+            raise ValueError("Invalid journal sample")
         if sample["durationMs"] < 0:
             state["warnings"] = ["The clock moved backwards during an interval. That interval was excluded from predictions."]
         else:
@@ -120,6 +137,10 @@ class Store:
     def reset_marker(self):
         try:
             marker = json.loads((self.events / ".reset.json").read_text())
+            if (not isinstance(marker, dict) or type(marker.get("pending")) is not bool
+                    or not isinstance(marker.get("generation"), str)
+                    or not 1 <= len(marker["generation"]) <= 128):
+                raise ValueError("Invalid reset metadata; restore .reset.json from a backup before continuing")
             self._generation = marker["generation"]
             return marker
         except FileNotFoundError:
@@ -287,8 +308,8 @@ class Store:
                      "completedSample": sample, "predictionMs": prediction,
                      "deadlineUtcMs": now["utcMs"] + prediction if prediction is not None else None,
                      "predictionSampleIds": [s["eventId"] for s in samples]}
-            cursor = self.append(event, rotate_bytes)
             apply(state, event)
+            cursor = self.append(event, rotate_bytes)
             state["cursor"] = cursor
             warning = None
             try:
@@ -456,8 +477,9 @@ def serve(store):
             action = request["action"]
             if action == "configure":
                 value = request.get("initialSeconds", 0)
-                if not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
-                    raise ValueError("Initial duration must be a nonnegative number of seconds")
+                if (type(value) not in (int, float)
+                        or not (value == 0 or 1 <= value <= (2**53 - 1) / 1000)):
+                    raise ValueError("Initial duration must be 0 (learn first) or at least one second, within the supported clock range")
                 initial_ms = value * 1000 if value > 0 else None
             elif action == "panel":
                 if not isinstance(request.get("open"), bool):
