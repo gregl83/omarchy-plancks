@@ -1,6 +1,8 @@
 # Plancks
 
-Plancks is an Omarchy bar widget for your daily opportunity window. An **epoch** is the window from when you start to when you end; **off-time** is the interval between epochs. Start an epoch when you get out of bed or sign in to work, and end it when you go to bed or sign out—usually once each per day.
+Plancks is an Omarchy bar widget for your daily opportunity window. Standard clocks keep people in sync; Plancks helps you understand your own daily rhythm.
+
+An **epoch** is your window of available opportunity; **off-time** is the interval between epochs. Start an epoch when you get out of bed or sign in to work, and end it when you go to bed or sign out—usually once each per day.
 
 Plancks learns from recent epochs and off-time intervals to predict when your current epoch will end and when the next one will start. The window includes normal breaks and interruptions; it measures available opportunity, not continuous productive effort.
 
@@ -17,7 +19,7 @@ The bar uses normal text for an active epoch and Omarchy's standard dimmed styli
 
 The timer descriptions use **Until expected epoch end** / **Since expected epoch end** while an epoch is active, and **Until expected next epoch start** / **Since expected next epoch start** during off-time.
 
-Starting or ending an epoch changes its active/off-time appearance; passing a expected time does not. Resetting also returns the widget to off-time. Storage errors show an undimmed `!` marker. Click the widget to open its panel, then use **Start epoch** / **End epoch**. The panel shows actual timestamps, elapsed time, expected durations, and the next expected start/end. Tab moves between buttons, and Enter or Space activates the focused button. With focus on the panel itself, Enter or Space starts or ends an epoch (or retries a storage error). Escape closes the panel, or cancels an open reset confirmation.
+Starting or ending an epoch changes its active/off-time appearance; passing an expected time does not. Resetting also returns the widget to off-time. Storage errors show an undimmed `!` marker. Click the widget to open its panel, then use **Start epoch** / **End epoch**. The panel shows actual timestamps, elapsed time, expected durations, and the next expected start/end. Tab moves between buttons, and Enter or Space activates the focused button. With focus on the panel itself, Enter or Space starts or ends an epoch (or retries a storage error). Escape closes the panel, or cancels an open reset confirmation.
 
 ## Install
 
