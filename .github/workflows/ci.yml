@@ -1,0 +1,131 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  python:
+    name: Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.9', '3.14']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Validate package metadata
+        run: python scripts/ci/validate.py
+      - name: Test storage, predictions, and helper protocol
+        run: python -m unittest discover -s tests -v
+
+  qml:
+    name: Omarchy package and QML
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read pinned Omarchy revision
+        id: omarchy
+        run: |
+          revision=$(cat scripts/ci/omarchy-ref)
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]]
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: omacom/omarchy
+          ref: ${{ steps.omarchy.outputs.revision }}
+          path: .ci-omarchy
+          persist-credentials: false
+      - name: Build Arch test environment
+        run: docker build -t plancks-ci -f scripts/ci/Containerfile scripts/ci
+      - name: Validate clean package and run headless QML smoke test
+        run: |
+          package_dir=$(mktemp -d)
+          trap 'rm -rf "$package_dir"' EXIT
+          git archive HEAD | tar -x -C "$package_dir"
+          chmod -R a+rX "$package_dir"
+          docker run --rm \
+            --mount "type=bind,source=$package_dir,target=/package,readonly" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE/.ci-omarchy,target=/omarchy,readonly" \
+            --env OMARCHY_PATH=/omarchy plancks-ci
+
+  release-check:
+    name: Release version and ancestry
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      commit: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate release tag
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python3 scripts/ci/validate.py --tag "$RELEASE_TAG"
+      - name: Record tested commit
+        id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  all-go:
+    name: all systems go
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [python, qml, release-check]
+    if: ${{ always() }}
+    steps:
+      - name: Require every validation job to pass
+        env:
+          PYTHON_RESULT: ${{ needs.python.result }}
+          QML_RESULT: ${{ needs.qml.result }}
+          RELEASE_RESULT: ${{ needs.release-check.result }}
+        run: |
+          test "$PYTHON_RESULT" = success
+          test "$QML_RESULT" = success
+          test "$RELEASE_RESULT" = success
+
+  release:
+    name: Publish release
+    needs: [all-go, release-check]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Publish the validated tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          TESTED_COMMIT: ${{ needs.release-check.outputs.commit }}
+        run: |
+          actual_commit=$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq .sha)
+          test "$actual_commit" = "$TESTED_COMMIT"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release already exists; leaving it unchanged."
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --generate-notes --title "Plancks $RELEASE_TAG"
+          fi

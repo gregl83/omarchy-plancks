@@ -1,0 +1,9 @@
+FROM docker.io/library/archlinux:base
+RUN pacman -Syu --noconfirm --needed python quickshell sway jq git dbus ttf-dejavu \
+    && pacman -Scc --noconfirm \
+    && setcap -r /usr/bin/sway \
+    && useradd --create-home tester
+USER tester
+WORKDIR /package
+ENV QT_QPA_PLATFORM=wayland QT_QUICK_BACKEND=software WLR_BACKENDS=headless WLR_RENDERER=pixman
+ENTRYPOINT ["dbus-run-session", "--", "bash", "/package/scripts/ci/check-qml.sh"]

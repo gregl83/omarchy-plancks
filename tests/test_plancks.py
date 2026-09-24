@@ -48,7 +48,8 @@ class ModelTests(unittest.TestCase):
                 self.assertEqual(result['indicator'], indicator)
             state['predictionMs'] = None
             result = p.view(state, at(1))
-            self.assertEqual(result['timer'], '+01:00:00' if phase == 'active' else '--:--:--')
+            self.assertEqual(result['timer'], '+01:00:00')
+            self.assertIn('elapsed · learning your rhythm', result['status'])
 
     def test_display_ticks_do_not_read_files_copy_state_or_reestimate(self):
         state = p.blank_state()
@@ -94,6 +95,26 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(end2['workSamples'][-1]['durationMs'], 18 * HOUR)
         self.assertEqual(p.view(end2, at(50))['predictedStartUtcMs'], at(57)['utcMs'])
 
+    def test_first_off_time_counts_up_until_a_prediction_is_learned(self):
+        initial = p.Display(self.store.load(), now=at(0))
+        self.assertEqual(initial.values['timer'], '--:--:--')
+        self.assertFalse(initial.ticking(False))
+        self.transition('start', 7)
+        end = self.transition('end', 23)
+        display = p.Display(end, now=at(23))
+        self.assertEqual(display.values['timer'], '+00:00:00')
+        self.assertTrue(display.ticking(False))
+        self.assertEqual(display.update(at(24))['timer'], '+01:00:00')
+        self.assertEqual(display.values['status'], 'Off-time · Off-time elapsed · learning your rhythm')
+        self.assertIsNone(display.values['predictedStartUtcMs'])
+        recovered = p.Display(p.Store(self.temp.name).recover(), now=at(25))
+        self.assertEqual(recovered.values['timer'], '+02:00:00')
+        self.transition('start', 31)
+        end = self.transition('end', 47)
+        self.assertEqual(p.view(end, at(47))['timer'], '−08:00:00')
+        reset = self.store.reset('reset', '', 4)
+        self.assertEqual(p.view(reset, at(48))['timer'], '--:--:--')
+
     def test_rotation_and_snapshot_rebuild(self):
         first = self.transition('start', 7, rotate_bytes=1)
         segment = next(self.store.events.glob('*.jsonl'))
@@ -119,6 +140,47 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(duplicate['anchor'], at(7))
         with self.assertRaises(ValueError):
             recovered.transition('end', 'stable-id', 1, now=at(8))
+
+    def test_retry_after_sync_failure_requires_durability(self):
+        for failure in ('file', 'directory'):
+            for restart in (False, True):
+                with self.subTest(failure=failure, restart=restart), tempfile.TemporaryDirectory() as directory:
+                    store = p.Store(directory)
+                    target, name = (p.os, 'fsync') if failure == 'file' else (p, 'sync_dir')
+                    with patch.object(target, name, side_effect=OSError('sync failed')):
+                        with self.assertRaises(OSError):
+                            store.transition('start', 'retry-id', 0, now=at(7))
+                    segment = next(store.events.glob('*.jsonl'))
+                    original = segment.read_bytes()
+                    if restart:
+                        store = p.Store(directory)
+                    with patch.object(target, name, side_effect=OSError('still failing')):
+                        with self.assertRaises(OSError):
+                            store.transition('start', 'retry-id', 0, now=at(8))
+                    with patch.object(p.os, 'fsync', wraps=p.os.fsync) as sync:
+                        state, warning = store.transition('start', 'retry-id', 0, now=at(9))
+                    self.assertGreaterEqual(sync.call_count, 4)  # journal, directory, snapshot, directory
+                    self.assertIsNone(warning)
+                    self.assertEqual(state['sequence'], 1)
+                    self.assertEqual(state['anchor'], at(7))
+                    self.assertEqual(segment.read_bytes(), original)
+                    self.assertEqual(json.loads((store.root / 'state.json').read_text()), state)
+
+    def test_retry_old_rotated_event_preserves_newer_history(self):
+        self.store.transition('start', 'old', 0, now=at(7), rotate_bytes=1)
+        current, _ = self.store.transition('end', 'new', 1, now=at(23), rotate_bytes=1)
+        segments = {path: path.read_bytes() for path in self.store.events.glob('*.jsonl')}
+        synced = []
+        real_sync = p.os.fsync
+        def record_sync(fd):
+            synced.append(os.readlink(f'/proc/self/fd/{fd}'))
+            real_sync(fd)
+        with patch.object(p.os, 'fsync', side_effect=record_sync):
+            state, warning = p.Store(self.temp.name).transition('start', 'old', 0)
+        self.assertIn(str(self.store.events / 'events-00000001.jsonl'), synced)
+        self.assertEqual(state, current)
+        self.assertIsNone(warning)
+        self.assertEqual({path: path.read_bytes() for path in segments}, segments)
 
     def test_torn_tail_preserved_and_rotated(self):
         self.transition('start', 7)
@@ -362,6 +424,17 @@ class BridgeTests(unittest.TestCase):
         self.send({'action': 'panel', 'open': False})
         self.assertIn('view', self.read())
         self.assertEqual(set(self.read()['patch']), {'timer'})
+
+    def test_first_off_time_ticks_with_panel_closed(self):
+        self.send({'action': 'start', 'requestId': 'start', 'sequence': 0})
+        self.assertEqual(self.read()['requestId'], 'start')
+        self.send({'action': 'end', 'requestId': 'end', 'sequence': 1})
+        reply = self.read()
+        self.assertEqual(reply['requestId'], 'end')
+        self.assertTrue(reply['view']['timer'].startswith('+'))
+        tick = self.read()
+        self.assertEqual(set(tick['patch']), {'timer'})
+        self.assertTrue(tick['patch']['timer'].startswith('+'))
 
     def test_external_reset_updates_idle_helper_and_keeps_watching(self):
         store = p.Store(self.temp.name)

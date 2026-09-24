@@ -5,6 +5,7 @@ import "."
 
 Panel {
   id: root
+  objectName: "plancks_root"
   moduleName: "gregl83.plancks"
   manageIpc: false
   property var anchorItem: null
@@ -59,6 +60,7 @@ Panel {
 
     PanelKeyCatcher {
       id: keys
+      objectName: "plancks_keys"
       anchors.fill: parent
       onCloseRequested: { if (root.confirmingReset) root.cancelReset(); else root.close() }
       onTabRequested: function(direction) {
@@ -74,6 +76,7 @@ Panel {
       }
       Flickable {
         id: scroll
+        objectName: "plancks_scroll"
         anchors.fill: parent
         contentWidth: width
         contentHeight: column.implicitHeight
@@ -147,6 +150,7 @@ Panel {
           }
           Button {
             id: actionButton
+            objectName: "plancks_actionButton"
             onActiveFocusChanged: if (activeFocus) root.revealButton(actionButton)
             KeyNavigation.tab: retryButton.visible ? retryButton : resetButton
             width: parent.width
@@ -230,6 +234,7 @@ Panel {
           PanelSeparator { foreground: root.foreground }
           Button {
             id: resetButton
+            objectName: "plancks_resetButton"
             onActiveFocusChanged: if (activeFocus) root.revealButton(resetButton)
             anchors.right: parent.right
             text: "Reset all data…"
@@ -256,6 +261,7 @@ Panel {
             visible: root.confirmingReset
             Text {
               width: parent.width
+              objectName: "plancks_resetWarning"
               text: "Reset all Plancks data? This permanently deletes all recorded epochs, off-time intervals, and learned predictions, and discards any active epoch. This cannot be undone. Widget settings are kept."
               textFormat: Text.PlainText
               wrapMode: Text.WordWrap
@@ -265,6 +271,7 @@ Panel {
             }
             Button {
               id: cancelButton
+              objectName: "plancks_cancelButton"
               onActiveFocusChanged: if (activeFocus) root.revealButton(cancelButton)
               text: "Cancel"
               width: parent.width
@@ -278,6 +285,7 @@ Panel {
             }
             Button {
               id: confirmButton
+              objectName: "plancks_confirmButton"
               onActiveFocusChanged: if (activeFocus) root.revealButton(confirmButton)
               text: "Delete all data and reset"
               width: parent.width
