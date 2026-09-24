@@ -165,17 +165,18 @@ Panel {
             delegate: Column {
               required property var modelData
               width: column.width
-              spacing: Style.space(3)
-              Text {
+              spacing: Style.space(6)
+              PanelSectionHeader {
+                width: parent.width
                 text: {
-                  if (parent.modelData.key === "elapsed") return root.epoch.phase === "active" ? "Epoch elapsed" : "Off-time elapsed"
-                  if (parent.modelData.key === "predictedEndUtcMs") return root.epoch.phase === "active" ? "Expected epoch end" : "Expected next epoch end"
-                  return parent.modelData.label
+                  var label = parent.modelData.label
+                  if (parent.modelData.key === "elapsed") label = root.epoch.phase === "active" ? "Epoch elapsed" : "Off-time elapsed"
+                  if (parent.modelData.key === "predictedEndUtcMs") label = root.epoch.phase === "active" ? "Expected epoch end" : "Expected next epoch end"
+                  return label.toUpperCase()
                 }
-                color: root.foreground
-                opacity: 0.65
-                font.family: Style.font.family
-                font.pixelSize: Style.font.body
+                foreground: root.foreground
+                fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+                wrapMode: Text.WordWrap
               }
               Text {
                 width: parent.width
