@@ -1,3 +1,7 @@
+[![Build](https://github.com/gregl83/omarchy-plancks/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gregl83/omarchy-plancks/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/gregl83/omarchy-plancks)](https://github.com/gregl83/omarchy-plancks/releases/latest)
+[![Apache 2.0 licensed](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/gregl83/omarchy-plancks/blob/main/LICENSE)
+
 # Plancks
 
 Plancks is an Omarchy bar widget for your daily opportunity window. Standard clocks keep people in sync; Plancks helps you understand your own daily rhythm.
@@ -172,6 +176,31 @@ python3 tests/smoke_qml.py
 ```
 
 The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing epoch state through IPC, busy/not-ready guards, overrun, vertical layout, and reset. Physical suspend/reboot and manual keyboard interaction still warrant a live-session check.
+
+## CI and releases
+
+The `ci` workflow validates pull requests targeting `main`, pushes to `main`, and `v*` tags. It runs the Python tests on Python 3.9 and 3.14, checks package metadata, validates the plugin with Omarchy's official validator, and loads the QML in an isolated headless Wayland session. Plancks ships as Python and QML source, so there is no separate compilation step.
+
+The QML job uses the Omarchy revision in `scripts/ci/omarchy-ref` and current Arch Linux packages. Update that revision deliberately when adopting newer shell components. To block merging failed PRs, configure a GitHub branch ruleset for `main` that requires **all systems go**. The workflow supplies that check; repository rules enforce it.
+
+To release:
+
+1. Update `manifest.json` to the new stable `MAJOR.MINOR.PATCH` version and merge the changes into `main` through a passing PR.
+2. Check out the latest `main`, then create and push the matching tag:
+
+   ```bash
+   git switch main
+   git pull --ff-only origin main
+   version=$(python3 -c 'import json; print(json.load(open("manifest.json"))["version"])')
+   git tag -a "v$version" -m "Plancks v$version"
+   git push origin "v$version"
+   ```
+
+3. The tag runs the same validation again. Its version must match the manifest, and its commit must belong to `main`. Only after every check passes does the workflow create the GitHub release with generated release notes.
+
+Use the tag workflow to publish releases; manually creating a release in GitHub bypasses this gate. Existing releases are left unchanged on reruns. The release badge shows the latest published GitHub release once the first release exists.
+
+Marketplace submission and approval are separate from this workflow. Omarchy's Git-based installer follows the repository's current code, not the release badge or tag, so protect `main` as well as validating releases.
 
 ## License
 
