@@ -127,5 +127,5 @@ jobs:
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             echo "Release already exists; leaving it unchanged."
           else
-            gh release create "$RELEASE_TAG" --verify-tag --generate-notes --title "Plancks $RELEASE_TAG"
+            gh release create "$RELEASE_TAG" --verify-tag --generate-notes --title "$RELEASE_TAG"
           fi
