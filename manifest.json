@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "gregl83.plancks",
+  "name": "plancks",
+  "version": "1.0.0",
+  "author": "gregl83",
+  "description": "A bar widget tracking your daily active epoch, adapted from recent effort cycles.",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "Widget.qml"
+  }
+}
