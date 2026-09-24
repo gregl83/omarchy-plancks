@@ -112,6 +112,23 @@ Open the widget panel and select **Reset all data…**. A warning explains what 
 
 The widget returns to its initial off-time state and learns again from new epochs. Widget settings (`initialSeconds`, `rotateBytes`, and bar placement) stay intact. Reset is also available when damaged history prevents starting or ending an epoch. Other instances of the widget refresh automatically.
 
+## Remove
+
+To delete your recorded epochs and learned predictions, use [Reset all data](#reset-all-data) **before uninstalling**. Otherwise, saved history remains in the [storage directory](#persistence-and-recovery) for a future reinstall.
+
+Remove the plugin with:
+
+```bash
+omarchy plugin remove gregl83.plancks
+```
+
+If you added the optional keyboard shortcut, remove the `o.bind(...)` entry containing `omarchy-shell gregl83.plancks toggleEpoch` from `~/.config/hypr/bindings.lua`. Then reload and check the configuration:
+
+```bash
+hyprctl reload
+hyprctl configerrors
+```
+
 ## Persistence and recovery
 
 Runtime history lives at `$XDG_STATE_HOME/omarchy/gregl83.plancks/`, falling back to `~/.local/state/omarchy/gregl83.plancks/`. A relative XDG path is ignored.
