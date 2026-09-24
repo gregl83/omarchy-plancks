@@ -84,15 +84,22 @@ omarchy bar set gregl83.plancks initialSeconds 28800 --json
 
 The default `initialSeconds` is `0` (learn first). Changing it affects future starts without history; it does not rewrite an open epoch. The optional `rotateBytes` setting defaults to `5242880` (5 MiB).
 
+## Reset all data
+
+Open the widget panel and select **Reset all data…**. A warning explains what will be deleted; **Cancel** is focused by default. Select **Delete all data and reset** to permanently delete recorded epochs, off-times, and learned predictions and discard any active epoch. Escape cancels the confirmation. Reset cannot be undone; back up the storage directory first if you want to keep your history.
+
+The widget returns to its initial off-time state and learns again from new epochs. Widget settings (`initialSeconds`, `rotateBytes`, and bar placement) stay intact. Reset is also available when damaged history prevents normal Start/End actions. Other running helpers refresh automatically.
+
 ## Persistence and recovery
 
 Runtime history lives at `$XDG_STATE_HOME/omarchy/gregl83.plancks/`, falling back to `~/.local/state/omarchy/gregl83.plancks/`. A relative XDG path is ignored.
 
 - `events/events-00000001.jsonl`, etc.: append-only start/end records, rotated before the next record exceeds the segment limit. All segments are retained. One record may exceed a very small configured limit.
 - `state.json`: the single mutable snapshot, replaced atomically after a durable journal append. Includes phase, clock anchors, frozen prediction, recent samples, and replay position.
+- `events/.reset.json`: a reset token and completion flag, containing no epoch history. It prevents stale commands and duplicate reset retries from deleting new history and allows interrupted deletion to finish on recovery.
 - `.lock`: an empty coordination file for serializing helper instances; it contains no epoch state.
 
-The journal is authoritative. This first pass replays and validates it on startup or when its files change, then caches the result in memory. A missing or damaged snapshot is rebuilt. An incomplete final record is preserved and the next append goes into a new segment. Malformed complete records or missing segments block updates and display an error. Back up the entire directory together; recovery never deletes history.
+The journal is authoritative. This first pass replays and validates it on startup or when its files change, then caches the result in memory. A missing or damaged snapshot is rebuilt. An incomplete final record is preserved and the next append goes into a new segment. Malformed complete records or missing segments block updates and display an error. Back up the entire directory together; ordinary journal recovery never deletes history. Once a reset is confirmed, recovery finishes any interrupted deletion.
 
 Ordinary one-second updates use cached state and predictions: they do not scan, read, lock, or write history files. An in-process Linux inotify watch detects journal changes without another watcher process. The helper sends only changed timer/status fields; elapsed details update while a panel is open. Before there is any running display to update, it sleeps until a command or file change. Multiple monitor widgets share a controller, and storage also locks and checks revisions to reject stale commands. If storage fails, the panel reports the failure and offers Retry; retries reuse the event ID to avoid recording an action twice.
 
@@ -106,7 +113,7 @@ omarchy plugin validate .
 python3 tests/smoke_qml.py
 ```
 
-The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing Start/End state, overrun, and vertical layout. Physical suspend/reboot and manual keyboard interaction still warrant a live-session check.
+The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing Start/End state, overrun, vertical layout, and reset. Physical suspend/reboot and manual keyboard interaction still warrant a live-session check.
 
 ## License
 

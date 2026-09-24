@@ -9,6 +9,7 @@ QtObject {
   readonly property QtObject state: QtObject {
     property string phase: "off"
     property int sequence: 0
+    property string generation: ""
     property string indicator: "○"
     property string timer: "--:--:--"
     property string status: "Loading Plancks…"
@@ -56,13 +57,23 @@ QtObject {
 
   function transition() {
     if (!ready || busy) return
+    sendAction(state.phase === "active" ? "end" : "start")
+  }
+
+  function reset(generation, sequence) {
+    if (busy) return
+    sendAction("reset", generation, sequence)
+  }
+
+  function sendAction(action, generation, sequence) {
     busy = true
     error = ""
     pendingId = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)
-    pendingCommand = {action: state.phase === "active" ? "end" : "start",
-      requestId: pendingId, sequence: state.sequence,
+    pendingCommand = {action: action, generation: generation === undefined ? state.generation : generation,
+      requestId: pendingId, sequence: sequence === undefined ? state.sequence : sequence,
       rotateBytes: Number(settings.rotateBytes || 5242880)}
-    helper.write(JSON.stringify(pendingCommand) + "\n")
+    if (!helper.running) helper.running = true
+    else helper.write(JSON.stringify(pendingCommand) + "\n")
     watchdog.restart()
   }
 
@@ -106,6 +117,7 @@ QtObject {
             root.applyView(result.view || result.patch || {})
             root.ready = !root.pendingCommand
           } else {
+            if (result.generation !== undefined) root.state.generation = result.generation
             root.error = result.error || "Unable to read epoch state"
             root.ready = false
           }

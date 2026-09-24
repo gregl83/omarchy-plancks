@@ -62,13 +62,18 @@ ShellRoot {
         if (!test.check(widget.epoch.indicator === "●", "overrun keeps active phase")) return
         Plancks.EpochController.transition()
         test.step = 3
-      } else {
+      } else if (test.step === 3) {
         if (!test.check(widget.epoch.phase === "off" && second.epoch.phase === "off", "shared end transition")) return
         if (!test.check(widget.epoch.workSampleCount === 1, "completed sample")) return
         second.bar = verticalBar
         if (!test.check(second.vertical && second.implicitHeight > 40, "vertical layout")) return
+        Plancks.EpochController.reset()
+        test.step = 4
+      } else {
+        if (!test.check(widget.epoch.phase === "off" && second.epoch.sequence === 0, "shared reset")) return
+        if (!test.check(widget.epoch.workSampleCount === 0 && widget.epoch.lastStartUtcMs === null, "reset clears history")) return
         widget.close()
-        console.log("PLANCKS_SMOKE_PASS: two widgets, start, overrun, end, vertical layout")
+        console.log("PLANCKS_SMOKE_PASS: two widgets, start, overrun, end, vertical layout, reset")
         Qt.quit()
       }
     }

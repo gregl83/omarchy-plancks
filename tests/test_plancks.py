@@ -211,6 +211,60 @@ class StoreTests(unittest.TestCase):
         self.assertFalse(replies[5]['retryable'])
         self.assertEqual(replies[5]['requestId'], 'stale-id')
 
+    def test_reset_deletes_history_and_preserves_lock(self):
+        self.transition('start', 7, rotate_bytes=1)
+        self.transition('end', 23, rotate_bytes=1)
+        self.transition('start', 31, rotate_bytes=1)
+        inode = (self.store.root / '.lock').stat().st_ino
+        state = self.store.reset('reset-1', '', 3)
+        self.assertEqual(state, dict(p.blank_state(), generation='reset-1'))
+        self.assertEqual(list(self.store.events.glob('*.jsonl')), [])
+        self.assertEqual((self.store.root / '.lock').stat().st_ino, inode)
+        self.assertEqual(p.Store(self.temp.name).recover(), state)
+
+    def test_reset_retry_preserves_new_history_and_rejects_stale_commands(self):
+        other = p.Store(self.temp.name)
+        other.recover()
+        self.store.reset('reset-1', '', 0)
+        with self.assertRaisesRegex(ValueError, 'reset'):
+            other.transition('start', 'stale', 0, now=at(7))
+        self.store.transition('start', 'new', 0, now=at(8), expected_generation='reset-1')
+        self.assertEqual(self.store.reset('reset-1', '', 0)['phase'], 'active')
+        with self.assertRaisesRegex(ValueError, 'reset elsewhere'):
+            other.reset('stale-reset', '', 0)
+        with self.assertRaisesRegex(ValueError, 'another screen'):
+            other.reset('stale-reset', 'reset-1', 0)
+
+    def test_interrupted_reset_finishes_on_recovery(self):
+        self.transition('start', 7)
+        original_unlink = Path.unlink
+        def fail_history(path, *args, **kwargs):
+            if path.suffix == '.jsonl':
+                raise OSError('interrupted deletion')
+            return original_unlink(path, *args, **kwargs)
+        with patch.object(Path, 'unlink', fail_history):
+            with self.assertRaisesRegex(OSError, 'interrupted deletion'):
+                self.store.reset('reset-1', '', 1)
+        state = p.Store(self.temp.name).recover()
+        self.assertEqual(state, dict(p.blank_state(), generation='reset-1'))
+        self.assertFalse(self.store.reset_marker()['pending'])
+
+    def test_server_can_reset_corrupt_history_at_startup(self):
+        self.transition('start', 7)
+        next(self.store.events.glob('*.jsonl')).write_text('{broken}\n')
+        requests = [
+            {'action': 'reset', 'requestId': 'reset-1', 'generation': '', 'sequence': 1},
+            {'action': 'start', 'requestId': 'new', 'generation': 'reset-1', 'sequence': 0},
+        ]
+        result = subprocess.run([sys.executable, str(Path(p.__file__)), 'serve', '--state-dir', self.temp.name],
+                                input=''.join(json.dumps(r) + '\n' for r in requests),
+                                text=True, capture_output=True, timeout=5)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        replies = [json.loads(line) for line in result.stdout.splitlines()]
+        self.assertFalse(replies[0]['ok'])
+        self.assertEqual(replies[1]['view']['sequence'], 0)
+        self.assertEqual(replies[2]['view']['phase'], 'active')
+
     def test_xdg_root(self):
         with patch.dict(os.environ, {'XDG_STATE_HOME': self.temp.name}):
             self.assertEqual(p.state_root(), Path(self.temp.name) / 'omarchy/gregl83.plancks')
@@ -275,6 +329,13 @@ class BridgeTests(unittest.TestCase):
         self.send({'action': 'panel', 'open': False})
         self.assertIn('view', self.read())
         self.assertEqual(set(self.read()['patch']), {'timer'})
+
+    def test_external_reset_updates_idle_helper_and_keeps_watching(self):
+        store = p.Store(self.temp.name)
+        store.reset('reset-1', '', 0)
+        self.assertEqual(self.read()['view']['generation'], 'reset-1')
+        store.transition('start', 'new', 0, now=p.clock(), expected_generation='reset-1')
+        self.assertEqual(self.read()['view']['phase'], 'active')
 
     def test_removing_history_reports_failure_instead_of_stale_state(self):
         Path(self.temp.name, 'events').rmdir()

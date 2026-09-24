@@ -56,7 +56,7 @@ def duration(milliseconds):
 
 def blank_state():
     return {"schemaVersion": VERSION, "sequence": 0, "lastEventId": None,
-            "phase": "off", "anchor": None, "lastStart": None, "lastEnd": None,
+            "generation": "", "phase": "off", "anchor": None, "lastStart": None, "lastEnd": None,
             "epochId": None, "predictionMs": None, "deadlineUtcMs": None,
             "workSamples": [], "gapSamples": [], "warnings": [], "cursor": None}
 
@@ -107,21 +107,69 @@ class Store:
         self._signature = None
         self._cached = None
         self._ids = {}
+        self._generation = ""
 
     @contextlib.contextmanager
     def locked(self):
         # Never unlink this inode: all helper instances must lock the same object.
         with (self.root / ".lock").open("a+b") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
+            self._finish_reset()
             yield
+
+    def reset_marker(self):
+        try:
+            marker = json.loads((self.events / ".reset.json").read_text())
+            self._generation = marker["generation"]
+            return marker
+        except FileNotFoundError:
+            return {"generation": "", "pending": False}
+
+    def _finish_reset(self):
+        marker = self.reset_marker()
+        if not marker["pending"]:
+            return
+        # Keep the directory and lock inode stable for other helpers/watchers.
+        for path in self.events.glob("events-*.jsonl"):
+            path.unlink(missing_ok=True)
+        for path in [self.root / "state.json", *self.root.glob(".state-*")]:
+            path.unlink(missing_ok=True)
+        sync_dir(self.events)
+        sync_dir(self.root)
+        self.write_json(dict(marker, pending=False), self.events / ".reset.json")
+        self._signature, self._cached, self._ids = None, None, {}
+
+    def reset(self, request_id, expected_generation, expected_sequence):
+        if not isinstance(request_id, str) or not 1 <= len(request_id) <= 128:
+            raise ValueError("A stable reset ID is required")
+        with self.locked():
+            marker = self.reset_marker()
+            if marker["generation"] == request_id:
+                return self.load()  # A retry must never delete newer history.
+            if marker["generation"] != expected_generation:
+                raise ValueError("Data was reset elsewhere. Review the current state and try again.")
+            try:
+                state = self.load()
+            except (ValueError, KeyError, TypeError):
+                state = None  # Explicit reset can recover a damaged journal.
+            if state is not None and state["sequence"] != expected_sequence:
+                raise ValueError("State changed on another screen. Review the current phase and try again.")
+            # Durable intent lets the next lock holder finish an interrupted reset.
+            self.write_json({"generation": request_id, "pending": True}, self.events / ".reset.json")
+            self._finish_reset()
+            state = self.load()
+            self.snapshot(state)
+            return state
 
     def load(self):
         """Replay when the journal changes; ordinary ticks reuse the in-memory state."""
         paths = sorted(self.events.glob("events-*.jsonl"))
-        signature = tuple((p.name, stat.st_size, stat.st_mtime_ns) for p in paths for stat in [p.stat()])
+        generation = self.reset_marker()["generation"]
+        signature = (generation,) + tuple((p.name, stat.st_size, stat.st_mtime_ns) for p in paths for stat in [p.stat()])
         if signature == self._signature and self._cached is not None:
             return copy.deepcopy(self._cached)
         state, ids, warnings = blank_state(), {}, []
+        state["generation"] = generation
         for number, path in enumerate(paths, 1):
             if path.name != f"events-{number:08d}.jsonl":
                 raise ValueError("Missing or unexpected journal segment; restore the event history before continuing")
@@ -152,6 +200,9 @@ class Store:
         return state
 
     def snapshot(self, state):
+        self.write_json(state, self.root / "state.json")
+
+    def write_json(self, state, destination):
         fd, name = tempfile.mkstemp(prefix=".state-", dir=self.root)
         try:
             with os.fdopen(fd, "w") as stream:
@@ -159,8 +210,8 @@ class Store:
                 stream.write("\n")
                 stream.flush()
                 os.fsync(stream.fileno())
-            os.replace(name, self.root / "state.json")
-            sync_dir(self.root)
+            os.replace(name, destination)
+            sync_dir(destination.parent)
         finally:
             if os.path.exists(name):
                 os.unlink(name)
@@ -199,7 +250,7 @@ class Store:
         return {"segment": path.name, "offset": offset}
 
     def transition(self, action, event_id, expected_sequence, initial_ms=None,
-                   rotate_bytes=DEFAULT_ROTATE_BYTES, now=None):
+                   rotate_bytes=DEFAULT_ROTATE_BYTES, now=None, expected_generation=""):
         if action not in ("start", "end"):
             raise ValueError("Action must be start or end")
         if not isinstance(event_id, str) or not 1 <= len(event_id) <= 128:
@@ -211,6 +262,8 @@ class Store:
             raise ValueError("Rotation size must be a positive integer")
         with self.locked():
             state = self.load()
+            if state["generation"] != expected_generation:
+                raise ValueError("Data was reset. Review the current state and try again.")
             event_type = "epoch_started" if action == "start" else "epoch_ended"
             if event_id in self._ids:
                 if self._ids[event_id] != event_type:
@@ -285,6 +338,7 @@ class Display:
         self.gap = estimate(state["gapSamples"])
         active = state["phase"] == "active"
         self.values = {"phase": state["phase"], "sequence": state["sequence"],
+                       "generation": state["generation"],
                        "indicator": "●" if active else "○",
                        "lastStartUtcMs": state["lastStart"]["utcMs"] if state["lastStart"] else None,
                        "lastEndUtcMs": state["lastEnd"]["utcMs"] if state["lastEnd"] else None,
@@ -409,16 +463,21 @@ def serve(store):
                 if not isinstance(request.get("open"), bool):
                     raise ValueError("Panel open must be a boolean")
                 panel_open = request["open"]
+            elif action == "reset":
+                store.reset(request["requestId"], request["generation"], request["sequence"])
+                persistent_warning = None
             elif action in ("start", "end"):
                 _, persistent_warning = store.transition(action, request["requestId"], request["sequence"],
-                                                          initial_ms, request.get("rotateBytes", DEFAULT_ROTATE_BYTES))
+                                                          initial_ms, request.get("rotateBytes", DEFAULT_ROTATE_BYTES),
+                                                          expected_generation=request.get("generation", ""))
             else:
                 raise ValueError("Unknown command")
             # Disk validation is reserved for commands and filesystem events.
             refresh()
             publish(full=True, request_id=ack)
         except (OSError, ValueError, KeyError, TypeError) as exc:
-            emit({"ok": False, "error": str(exc), "retryable": isinstance(exc, OSError), "requestId": ack})
+            emit({"ok": False, "error": str(exc), "retryable": isinstance(exc, OSError), "requestId": ack,
+                  "generation": store._generation})
             try:
                 refresh()
                 publish(full=True)
@@ -432,10 +491,13 @@ def serve(store):
         selector.register(watcher.fd, selectors.EVENT_READ, "journal")
         try:
             store.recover()
-        except OSError as exc:
+        except (OSError, ValueError, KeyError, TypeError) as exc:
             persistent_warning = f"State snapshot unavailable: {exc}"
-        refresh()
-        publish(full=True)
+        try:
+            refresh()
+            publish(full=True)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            emit({"ok": False, "error": str(exc), "generation": store._generation})
         while True:
             timeout = 1 if display is not None and display.ticking(panel_open) else None
             events = selector.select(timeout=timeout)
@@ -449,7 +511,7 @@ def serve(store):
                         try:
                             refresh()
                             # A different writer may have changed phase/anchors.
-                            if any(display.values.get(k) != last_sent.get(k) for k in ("sequence", "phase", "warnings")):
+                            if any(display.values.get(k) != last_sent.get(k) for k in ("generation", "sequence", "phase", "warnings")):
                                 publish(full=True)
                         except (OSError, ValueError, KeyError, TypeError) as exc:
                             display = None
@@ -492,7 +554,8 @@ def main():
                 if args.sequence is None:
                     parser.error("start/end requires --sequence from status")
                 state, warning = store.transition(args.action, args.request_id or str(uuid.uuid4()),
-                                                  args.sequence, args.initial_seconds * 1000 or None)
+                                                  args.sequence, args.initial_seconds * 1000 or None,
+                                                  expected_generation=state["generation"])
             print(json.dumps({"ok": True, "view": view(state), "warning": warning}))
     except (OSError, ValueError, KeyError, TypeError) as exc:
         print(json.dumps({"ok": False, "error": str(exc)}), flush=True)

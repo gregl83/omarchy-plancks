@@ -10,8 +10,16 @@ Panel {
   property var anchorItem: null
   property var hostWidget: null
   readonly property var epoch: EpochController.state
+  property bool confirmingReset: false
+  property string resetGeneration: ""
+  property int resetSequence: 0
+  function cancelReset() {
+    confirmingReset = false
+    resetButton.forceActiveFocus()
+  }
   property bool detailSubscription: false
   onOpenedChanged: {
+    confirmingReset = false
     if (detailSubscription !== opened) {
       detailSubscription = opened
       EpochController.setPanelOpen(opened)
@@ -44,14 +52,16 @@ Panel {
     PanelKeyCatcher {
       id: keys
       anchors.fill: parent
-      onCloseRequested: root.close()
+      onCloseRequested: { if (root.confirmingReset) root.cancelReset(); else root.close() }
       onTabRequested: function(direction) {
-        if (actionButton.enabled) actionButton.forceActiveFocus()
+        if (root.confirmingReset) cancelButton.forceActiveFocus()
+        else if (actionButton.enabled) actionButton.forceActiveFocus()
         else if (retryButton.visible) retryButton.forceActiveFocus()
       }
       onMoveRequested: function(dx, dy) { scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height, scroll.contentY + dy * Style.space(48))) }
       onActivateRequested: {
-        if (EpochController.ready && !EpochController.busy) EpochController.transition()
+        if (root.confirmingReset) root.cancelReset()
+        else if (EpochController.ready && !EpochController.busy) EpochController.transition()
         else if (EpochController.error && !EpochController.busy) EpochController.retry()
       }
       Flickable {
@@ -129,9 +139,10 @@ Panel {
           }
           Button {
             id: actionButton
+            KeyNavigation.tab: retryButton.visible ? retryButton : resetButton
             width: parent.width
             text: EpochController.busy ? "Saving…" : root.epoch.phase === "active" ? "End epoch" : "Start epoch"
-            enabled: EpochController.ready && !EpochController.busy
+            enabled: EpochController.ready && !EpochController.busy && !root.confirmingReset
             focusable: true
             bordered: true
             foreground: root.foreground
@@ -194,14 +205,81 @@ Panel {
           }
           Button {
             id: retryButton
+            KeyNavigation.tab: resetButton
             visible: EpochController.error !== ""
             text: "Retry"
-            enabled: !EpochController.busy
+            enabled: !EpochController.busy && !root.confirmingReset
             focusable: true
             bordered: true
             foreground: root.foreground
             onClicked: if (enabled) EpochController.retry()
             Keys.onEscapePressed: root.close()
+          }
+          PanelSeparator { foreground: root.foreground }
+          Button {
+            id: resetButton
+            anchors.right: parent.right
+            text: "Reset all data…"
+            visible: !root.confirmingReset
+            enabled: !EpochController.busy
+            focusable: true
+            bordered: false
+            fontSize: Style.font.bodySmall
+            foreground: root.foreground
+            KeyNavigation.tab: actionButton.enabled ? actionButton : retryButton
+            onClicked: {
+              if (!enabled) return
+              root.resetGeneration = root.epoch.generation
+              root.resetSequence = root.epoch.sequence
+              root.confirmingReset = true
+              cancelButton.forceActiveFocus()
+              Qt.callLater(function() { scroll.contentY = Math.max(0, scroll.contentHeight - scroll.height) })
+            }
+            Keys.onEscapePressed: root.close()
+          }
+          Column {
+            width: parent.width
+            spacing: Style.space(10)
+            visible: root.confirmingReset
+            Text {
+              width: parent.width
+              text: "Reset all Plancks data? This permanently deletes all recorded epochs, off-times, and learned predictions, and discards any active epoch. This cannot be undone. Widget settings are kept."
+              textFormat: Text.PlainText
+              wrapMode: Text.WordWrap
+              color: root.foreground
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+            }
+            Button {
+              id: cancelButton
+              text: "Cancel"
+              width: parent.width
+              focusable: true
+              bordered: true
+              foreground: root.foreground
+              KeyNavigation.tab: confirmButton
+              KeyNavigation.backtab: confirmButton
+              onClicked: root.cancelReset()
+              Keys.onEscapePressed: root.cancelReset()
+            }
+            Button {
+              id: confirmButton
+              text: "Delete all data and reset"
+              width: parent.width
+              enabled: !EpochController.busy
+              focusable: true
+              bordered: true
+              foreground: root.foreground
+              KeyNavigation.tab: cancelButton
+              KeyNavigation.backtab: cancelButton
+              onClicked: {
+                if (!enabled) return
+                root.confirmingReset = false
+                EpochController.reset(root.resetGeneration, root.resetSequence)
+                keys.forceActiveFocus()
+              }
+              Keys.onEscapePressed: root.cancelReset()
+            }
           }
         }
       }
