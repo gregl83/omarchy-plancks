@@ -20,12 +20,30 @@ with tempfile.TemporaryDirectory(prefix='plancks-smoke-') as directory:
     for name in ('Ui', 'Commons'):
         (root / name).symlink_to(shell / name)
     (root / 'Plancks').symlink_to(repo)
-    (root / 'shell.qml').write_text('''import QtQuick
+    (root / 'shell.qml').write_text(r'''import QtQuick
 import Quickshell
+import Quickshell.Io
 import "Plancks" as Plancks
 ShellRoot {
   id: test
   property int step: 0
+  property bool ipcDone: true
+  Process {
+    id: ipcCall
+    command: ["qs", "ipc", "-n", "-p", decodeURIComponent(Qt.resolvedUrl(".").toString().replace(/^file:\/\//, "")),
+              "call", "--", "gregl83.plancks", "toggleEpoch"]
+    property string reply: ""
+    stdout: SplitParser { onRead: function(line) { ipcCall.reply += line.trim() } }
+    onExited: function(code, status) {
+      if (!test.check(code === 0 && reply === "submitted", "IPC response: " + reply)) return
+      reply = ""
+      test.ipcDone = true
+    }
+  }
+  function toggleViaIpc() {
+    ipcDone = false
+    ipcCall.running = true
+  }
   property int attempts: 0
   property bool preview: PREVIEW
   function check(condition, message) {
@@ -48,10 +66,16 @@ ShellRoot {
     onTriggered: {
       test.attempts++
       if (!test.check(test.attempts < 18, "helper timeout: " + Plancks.EpochController.error)) return
-      if (!Plancks.EpochController.ready || Plancks.EpochController.busy) return
+      if (!test.ipcDone || !Plancks.EpochController.ready || Plancks.EpochController.busy) return
       if (test.step === 0) {
         if (!test.check(widget.epoch.phase === "off", "initial phase")) return
-        Plancks.EpochController.transition()
+        Plancks.EpochController.busy = true
+        if (!test.check(Plancks.EpochController.ipc.toggleEpoch() === "busy", "IPC busy guard")) return
+        Plancks.EpochController.busy = false
+        Plancks.EpochController.ready = false
+        if (!test.check(Plancks.EpochController.ipc.toggleEpoch() === "not-ready", "IPC readiness guard")) return
+        Plancks.EpochController.ready = true
+        test.toggleViaIpc()
         test.step = 1
       } else if (test.step === 1) {
         if (!test.check(widget.epoch.phase === "active" && second.epoch.phase === "active", "shared active epoch")) return
@@ -60,7 +84,7 @@ ShellRoot {
       } else if (test.step === 2) {
         if (widget.epoch.timer.indexOf("+") !== 0) return
         if (!test.check(widget.epoch.indicator === "●", "overrun keeps active phase")) return
-        Plancks.EpochController.transition()
+        test.toggleViaIpc()
         test.step = 3
       } else if (test.step === 3) {
         if (!test.check(widget.epoch.phase === "off" && second.epoch.phase === "off", "shared end transition")) return
@@ -73,7 +97,7 @@ ShellRoot {
         if (!test.check(widget.epoch.phase === "off" && second.epoch.sequence === 0, "shared reset")) return
         if (!test.check(widget.epoch.workSampleCount === 0 && widget.epoch.lastStartUtcMs === null, "reset clears history")) return
         widget.close()
-        console.log("PLANCKS_SMOKE_PASS: two widgets, start, overrun, end, vertical layout, reset")
+        console.log("PLANCKS_SMOKE_PASS: two widgets, IPC start/end, IPC guards, overrun, vertical layout, reset")
         Qt.quit()
       }
     }

@@ -1,8 +1,8 @@
-# omarchy-plancks
+# Plancks
 
-An Omarchy bar widget showing your general daily opportunity window. Start an epoch when you get out of bed or sign into work, and end it when you go to bed or sign out—usually once each per day.
+Plancks is an Omarchy bar widget for your daily opportunity window. An **epoch** is the window from when you start to when you end; **off-time** is the interval between epochs. Start an epoch when you get out of bed or sign in to work, and end it when you go to bed or sign out—usually once each per day.
 
-Plancks learns from recent daily windows to predict opportunity remaining and the off-time before your next start. The window includes normal breaks and interruptions; it measures available opportunity, not continuous productive effort.
+Plancks learns from recent epochs and off-time intervals to predict when your current epoch will end and when the next one will start. The window includes normal breaks and interruptions; it measures available opportunity, not continuous productive effort.
 
 The widget renders Planck-time notation as italic **t** with an upright subscript capital **P**, equivalent to `t_P`. Durations are ordinary hours, minutes, and seconds.
 
@@ -15,13 +15,13 @@ The bar uses normal text for an active epoch and Omarchy's standard dimmed styli
 | Dimmed | `t_P −02:00:00` | Off-time; two hours until the predicted next start |
 | Dimmed | `t_P +00:15:00` | Off-time; fifteen minutes past the predicted next start |
 
-Only starting or ending an epoch changes its active/off-time appearance. Storage errors show an undimmed `!` marker. Click the widget to open its panel, then use **Start epoch** / **End epoch**. The panel shows actual timestamps, elapsed time, predicted durations, and the next expected start/end. Enter or Space activates the primary action; Escape closes the panel.
+Starting or ending an epoch changes its active/off-time appearance; passing a predicted time does not. Resetting also returns the widget to off-time. Storage errors show an undimmed `!` marker. Click the widget to open its panel, then use **Start epoch** / **End epoch**. The panel shows actual timestamps, elapsed time, predicted durations, and the next expected start/end. Tab moves between buttons, and Enter or Space activates the focused button. With focus on the panel itself, Enter or Space starts or ends an epoch (or retries a storage error). Escape closes the panel, or cancels an open reset confirmation.
 
 ## Install
 
 Requires an Omarchy release with the Quickshell plugin system and shared `qs.Ui` components, plus Python 3. The plugin uses only Python's standard library. It does not support the older Waybar shell.
 
-Once the implementation is pushed to this repository, install it through Omarchy:
+Install through Omarchy:
 
 ```bash
 omarchy plugin add https://github.com/gregl83/omarchy-plancks.git --enable
@@ -47,7 +47,7 @@ omarchy plugin update gregl83.plancks
 
 ### Test uncommitted development changes
 
-To try working-tree edits without committing, copy the runtime files instead:
+From the repository directory, validate and copy the runtime files to try edits without committing:
 
 ```bash
 omarchy plugin validate .
@@ -68,42 +68,60 @@ This briefly reloads the desktop shell; the saved epoch and its timing survive t
 
 ## Learning your daily rhythm
 
-With no history, the first epoch counts up from `+00:00:00`. Here `+` means elapsed time since starting; once a prediction exists, it means time past the predicted end. The tooltip and panel identify the first epoch as learning your daily window. Off-time shows `--:--:--` until a complete end-to-next-start interval has been recorded.
+With no history and the default settings, the first epoch counts up from `+00:00:00`. Here `+` means elapsed time since starting; once a prediction exists, it means time past the predicted end. The tooltip and panel show “Learning epoch duration” while no epoch prediction is available. Off-time shows `--:--:--` until an off-time interval has been recorded and the next epoch ends. That is when the first off-time prediction takes effect.
 
-For each prediction, select the last five completed intervals of that kind, drop one shortest and one longest, and average the remaining three. Work and off-time histories are independent. During warm-up, one or two samples use their mean; three or four drop the extremes first. Predictions round to whole seconds with a one-second minimum.
+For each prediction, Plancks uses up to five recent completed intervals of that kind. With five samples, it drops one shortest and one longest and averages the remaining three. Epoch and off-time histories are independent. With one or two samples, it uses their mean; with three or four, it drops the extremes and averages what remains. Predictions round to whole seconds with a one-second minimum.
 
-A daily window of 07:00–23:00 teaches a 16-hour opportunity duration. Starting again at 07:00 teaches eight hours of off-time. A workday sign-in/sign-out routine learns its own durations with the same model.
+A daily window of 07:00–23:00 teaches a 16-hour epoch duration. Starting again at 07:00 teaches eight hours of off-time. A workday sign-in/sign-out routine learns its own durations with the same model.
 
-While active, the next-start forecast uses the predicted end plus predicted off-time. Ending the epoch anchors that forecast to the actual end. The current phase's predicted duration stays fixed until your next Start/End action, including after shell reloads. Late starts and overruns do not change phase automatically.
+While active, the next-start forecast uses the predicted end plus predicted off-time. Ending the epoch anchors that forecast to the actual end. The current phase's predicted duration stays fixed until you start or end an epoch, including after shell reloads. Late starts and overruns do not change phase automatically.
 
-Settings live inline on the widget's entry in Omarchy's `shell.json`. To supply an initial eight-hour opportunity estimate before any history exists:
+Settings live inline on the widget's entry in Omarchy's `shell.json`. To supply an initial eight-hour epoch estimate before any history exists:
 
 ```bash
 omarchy bar set gregl83.plancks initialSeconds 28800 --json
 ```
 
-The default `initialSeconds` is `0` (learn first). Changing it affects future starts without history; it does not rewrite an open epoch. The optional `rotateBytes` setting defaults to `5242880` (5 MiB).
+The default `initialSeconds` is `0` (learn first). Changing it affects future starts without history; it does not change an active epoch. The optional `rotateBytes` setting defaults to `5242880` (5 MiB).
+
+## Optional keyboard shortcut
+
+While the widget is enabled and loaded, start or end an epoch without opening its panel:
+
+```bash
+omarchy-shell gregl83.plancks toggleEpoch
+```
+
+The command uses the same **Start epoch** / **End epoch** action as the panel. It returns `submitted` when the action is sent to storage, `busy` while an action is pending, or `not-ready` when storage is loading or unavailable. `submitted` does not mean the action has been saved yet. Any storage failure appears in the widget and panel, where you can select **Retry**.
+
+To assign **Super+Alt+P**, first check for conflicts with `omarchy menu keybindings --print`, then add this optional binding to `~/.config/hypr/bindings.lua`:
+
+```lua
+o.bind("SUPER + ALT + P", "Plancks: Start/end epoch", "omarchy-shell gregl83.plancks toggleEpoch")
+```
+
+Choose an unused combination, or explicitly unbind an existing assignment before replacing it. Validate the configuration with `hyprctl reload` and `hyprctl configerrors`. The plugin installer does not install keybindings automatically. After updating the controller in an existing installation, run `omarchy restart shell` to register the new IPC action.
 
 ## Reset all data
 
-Open the widget panel and select **Reset all data…**. A warning explains what will be deleted; **Cancel** is focused by default. Select **Delete all data and reset** to permanently delete recorded epochs, off-times, and learned predictions and discard any active epoch. Escape cancels the confirmation. Reset cannot be undone; back up the storage directory first if you want to keep your history.
+Open the widget panel and select **Reset all data…**. A warning explains what will be deleted; **Cancel** is focused by default. Select **Delete all data and reset** to permanently delete recorded epochs, off-time intervals, and learned predictions and discard any active epoch. Escape cancels the confirmation. Reset cannot be undone; back up the [storage directory](#persistence-and-recovery) first if you want to keep your history.
 
-The widget returns to its initial off-time state and learns again from new epochs. Widget settings (`initialSeconds`, `rotateBytes`, and bar placement) stay intact. Reset is also available when damaged history prevents normal Start/End actions. Other running helpers refresh automatically.
+The widget returns to its initial off-time state and learns again from new epochs. Widget settings (`initialSeconds`, `rotateBytes`, and bar placement) stay intact. Reset is also available when damaged history prevents starting or ending an epoch. Other instances of the widget refresh automatically.
 
 ## Persistence and recovery
 
 Runtime history lives at `$XDG_STATE_HOME/omarchy/gregl83.plancks/`, falling back to `~/.local/state/omarchy/gregl83.plancks/`. A relative XDG path is ignored.
 
-- `events/events-00000001.jsonl`, etc.: append-only start/end records, rotated before the next record exceeds the segment limit. All segments are retained. One record may exceed a very small configured limit.
+- `events/events-00000001.jsonl`, etc.: append-only start/end records, rotated before the next record exceeds the segment limit. All segments are retained until you reset the data. One record may exceed a very small configured limit.
 - `state.json`: the single mutable snapshot, replaced atomically after a durable journal append. Includes phase, clock anchors, frozen prediction, recent samples, and replay position.
 - `events/.reset.json`: a reset token and completion flag, containing no epoch history. It prevents stale commands and duplicate reset retries from deleting new history and allows interrupted deletion to finish on recovery.
 - `.lock`: an empty coordination file for serializing helper instances; it contains no epoch state.
 
-The journal is authoritative. This first pass replays and validates it on startup or when its files change, then caches the result in memory. A missing or damaged snapshot is rebuilt. An incomplete final record is preserved and the next append goes into a new segment. Malformed complete records or missing segments block updates and display an error. Back up the entire directory together; ordinary journal recovery never deletes history. Once a reset is confirmed, recovery finishes any interrupted deletion.
+The journal is authoritative. Plancks replays and validates it on startup or when its files change, then caches the result in memory. A missing or damaged snapshot is rebuilt. An incomplete final record is preserved and the next append goes into a new segment. Malformed complete records or missing segments block updates and display an error. Back up the entire directory together; ordinary journal recovery never deletes history. Once a reset is confirmed, recovery finishes any interrupted deletion.
 
-Ordinary one-second updates use cached state and predictions: they do not scan, read, lock, or write history files. An in-process Linux inotify watch detects journal changes without another watcher process. The helper sends only changed timer/status fields; elapsed details update while a panel is open. Before there is any running display to update, it sleeps until a command or file change. Multiple monitor widgets share a controller, and storage also locks and checks revisions to reject stale commands. If storage fails, the panel reports the failure and offers Retry; retries reuse the event ID to avoid recording an action twice.
+Ordinary one-second updates use cached state and predictions: they do not scan, read, lock, or write history files. An in-process Linux inotify watch detects journal changes without another watcher process. The helper sends only changed timer/status fields; elapsed details update while a panel is open. Before there is any running display to update, it sleeps until a command or file change. Multiple monitor widgets share a controller, and storage also locks and checks revisions to reject stale commands. If storage fails, the panel reports the failure and offers **Retry**; retries reuse the request ID to avoid recording an action twice.
 
-Elapsed time includes suspend and uses Linux's suspend-inclusive monotonic clock within a boot. Across reboots it falls back to UTC timestamps; a backwards interval is flagged and excluded from learning. An open epoch remains open through suspend, shutdown, and midnight until you explicitly end it. Long absences, including weekends, are included in off-time samples. This first pass has no automatic schedule, forgotten-sign-out correction, or history editor.
+Elapsed time includes suspend and uses Linux's suspend-inclusive monotonic clock within a boot. Across reboots it falls back to UTC timestamps; a backwards interval is flagged and excluded from learning. An active epoch stays active through suspend, shutdown, and midnight until you end it or reset the data. Long absences, including weekends, are included in off-time samples. Plancks has no automatic schedule, correction for a forgotten epoch end, or history editor.
 
 ## Development checks
 
@@ -113,7 +131,7 @@ omarchy plugin validate .
 python3 tests/smoke_qml.py
 ```
 
-The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing Start/End state, overrun, vertical layout, and reset. Physical suspend/reboot and manual keyboard interaction still warrant a live-session check.
+The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing epoch state through IPC, busy/not-ready guards, overrun, vertical layout, and reset. Physical suspend/reboot and manual keyboard interaction still warrant a live-session check.
 
 ## License
 

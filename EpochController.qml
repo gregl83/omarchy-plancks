@@ -60,6 +60,17 @@ QtObject {
     sendAction(state.phase === "active" ? "end" : "start")
   }
 
+  property IpcHandler ipc: IpcHandler {
+    target: "gregl83.plancks"
+
+    function toggleEpoch(): string {
+      if (root.busy) return "busy"
+      if (!root.ready) return "not-ready"
+      root.transition()
+      return "submitted"
+    }
+  }
+
   function reset(generation, sequence) {
     if (busy) return
     sendAction("reset", generation, sequence)
@@ -92,7 +103,7 @@ QtObject {
     onTriggered: {
       root.busy = false
       root.ready = false
-      root.error = "No response from storage. Retry to check whether the action was saved."
+      root.error = "No response from Plancks storage. Select Retry to check whether the action was saved."
     }
   }
 
@@ -118,7 +129,7 @@ QtObject {
             root.ready = !root.pendingCommand
           } else {
             if (result.generation !== undefined) root.state.generation = result.generation
-            root.error = result.error || "Unable to read epoch state"
+            root.error = result.error || "Unable to read Plancks state"
             root.ready = false
           }
           if (result.requestId && result.requestId === root.pendingId) {
@@ -152,7 +163,7 @@ QtObject {
       root.watchdog.stop()
       root.ready = false
       root.busy = false
-      root.error = "Plancks storage stopped. Retry to reconnect."
+      root.error = "Plancks storage stopped. Select Retry to reconnect."
     }
   }
 }

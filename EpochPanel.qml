@@ -106,7 +106,7 @@ Panel {
               x: header.stacked ? 0 : title.width + Style.space(16)
               y: header.stacked ? title.height + Style.space(6) : (header.height - height) / 2
               width: header.stacked ? header.width : Math.max(0, header.width - x)
-              text: root.epoch.phase === "active" ? "●  Opportunity open" : "○  Off-time"
+              text: root.epoch.phase === "active" ? "●  Epoch active" : "○  Off-time"
               textFormat: Text.PlainText
               horizontalAlignment: Text.AlignRight
               wrapMode: Text.Wrap
@@ -153,13 +153,13 @@ Panel {
           }
           Repeater {
             model: [
-              {label: "Actual start", key: "lastStartUtcMs", format: "stamp", empty: "Not started yet"},
-              {label: "Actual last end", key: "lastEndUtcMs", format: "stamp", empty: "Not ended yet"},
+              {label: "Last epoch start", key: "lastStartUtcMs", format: "stamp", empty: "Not started yet"},
+              {label: "Last epoch end", key: "lastEndUtcMs", format: "stamp", empty: "Not ended yet"},
               {label: "", key: "elapsed", format: "elapsed"},
-              {label: "Predicted opportunity", key: "workPredictionMs", format: "length"},
-              {label: "Predicted off-time", key: "gapPredictionMs", format: "length"},
+              {label: "Predicted epoch duration", key: "workPredictionMs", format: "length"},
+              {label: "Predicted off-time duration", key: "gapPredictionMs", format: "length"},
               {label: "", key: "predictedEndUtcMs", format: "stamp"},
-              {label: "Predicted next start", key: "predictedStartUtcMs", format: "stamp"},
+              {label: "Predicted next epoch start", key: "predictedStartUtcMs", format: "stamp"},
               {label: "Recent samples", key: "workSampleCount", format: "samples"}
             ]
             delegate: Column {
@@ -168,8 +168,8 @@ Panel {
               spacing: Style.space(3)
               Text {
                 text: {
-                  if (parent.modelData.key === "elapsed") return root.epoch.phase === "active" ? "Opportunity elapsed" : "Off-time elapsed"
-                  if (parent.modelData.key === "predictedEndUtcMs") return root.epoch.phase === "active" ? "Predicted end" : "Predicted next end"
+                  if (parent.modelData.key === "elapsed") return root.epoch.phase === "active" ? "Epoch elapsed" : "Off-time elapsed"
+                  if (parent.modelData.key === "predictedEndUtcMs") return root.epoch.phase === "active" ? "Predicted epoch end" : "Predicted next epoch end"
                   return parent.modelData.label
                 }
                 color: root.foreground
@@ -182,7 +182,8 @@ Panel {
                 text: {
                   var row = parent.modelData
                   var value = root.epoch[row.key]
-                  if (row.format === "samples") return root.epoch.workSampleCount + " epochs · " + root.epoch.gapSampleCount + " off-times"
+                  if (row.format === "samples") return root.epoch.workSampleCount + (root.epoch.workSampleCount === 1 ? " epoch · " : " epochs · ")
+                    + root.epoch.gapSampleCount + (root.epoch.gapSampleCount === 1 ? " off-time interval" : " off-time intervals")
                   if (row.format === "stamp") return value == null && row.empty ? row.empty : root.stamp(value)
                   if (row.format === "length") return root.length(value)
                   return value || "00:00:00"
@@ -243,7 +244,7 @@ Panel {
             visible: root.confirmingReset
             Text {
               width: parent.width
-              text: "Reset all Plancks data? This permanently deletes all recorded epochs, off-times, and learned predictions, and discards any active epoch. This cannot be undone. Widget settings are kept."
+              text: "Reset all Plancks data? This permanently deletes all recorded epochs, off-time intervals, and learned predictions, and discards any active epoch. This cannot be undone. Widget settings are kept."
               textFormat: Text.PlainText
               wrapMode: Text.WordWrap
               color: root.foreground

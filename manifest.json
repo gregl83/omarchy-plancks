@@ -4,7 +4,7 @@
   "name": "Plancks",
   "version": "1.0.0",
   "author": "gregl83",
-  "description": "Your daily opportunity window, with learned epoch and off-time predictions.",
+  "description": "Track your daily opportunity window with predictions learned from epochs and off-time intervals.",
   "kinds": [
     "bar-widget"
   ],

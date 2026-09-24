@@ -70,11 +70,11 @@ def apply(state, event):
     if starting != (state["phase"] == "off"):
         raise ValueError("Journal contains an invalid phase transition")
     if not starting and event["epochId"] != state["epochId"]:
-        raise ValueError("End event does not match the open epoch")
+        raise ValueError("End event does not match the active epoch")
     sample = event.get("completedSample")
     if sample:
         if sample["durationMs"] < 0:
-            state["warnings"] = ["A negative clock interval was excluded from predictions."]
+            state["warnings"] = ["The clock moved backwards during an interval. That interval was excluded from predictions."]
         else:
             key = "gapSamples" if starting else "workSamples"
             state[key] = (state[key] + [sample])[-5:]
@@ -306,10 +306,10 @@ def live_view(state, now):
     warnings = list(state["warnings"])
     if elapsed_ms < 0:
         timer, detail = "--:--:--", "Clock changed · prediction unavailable"
-        warnings.append("Clock moved backwards across boots; this interval cannot be predicted reliably.")
+        warnings.append("The clock moved backwards between reboots. A prediction is unavailable for this interval.")
     elif prediction is None:
         timer = "+" + duration(elapsed_ms) if active else "--:--:--"
-        detail = "Learning daily window · elapsed time" if active else "No prediction yet"
+        detail = "Learning epoch duration · elapsed time" if active else "No prediction yet"
     else:
         # Compare whole elapsed seconds, avoiding an early decrement at start.
         delta = elapsed_ms // 1000 - prediction // 1000
