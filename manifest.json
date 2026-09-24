@@ -1,12 +1,24 @@
 {
   "schemaVersion": 1,
   "id": "gregl83.plancks",
-  "name": "plancks",
+  "name": "Plancks",
   "version": "1.0.0",
   "author": "gregl83",
-  "description": "A bar widget tracking your daily active epoch, adapted from recent effort cycles.",
-  "kinds": ["bar-widget"],
+  "description": "Your daily opportunity window, with learned epoch and off-time predictions.",
+  "kinds": [
+    "bar-widget"
+  ],
   "entryPoints": {
     "barWidget": "Widget.qml"
+  },
+  "barWidget": {
+    "displayName": "Plancks",
+    "category": "Time",
+    "allowMultiple": false,
+    "defaultSection": "center",
+    "defaults": {
+      "initialSeconds": 0,
+      "rotateBytes": 5242880
+    }
   }
 }

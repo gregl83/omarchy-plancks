@@ -1,0 +1,3 @@
+singleton EpochController 1.0 EpochController.qml
+Widget 1.0 Widget.qml
+EpochPanel 1.0 EpochPanel.qml

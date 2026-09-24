@@ -1,0 +1,9 @@
+# AI agents
+.agents
+
+# Python build files
+__pycache__/
+*.py[cod]
+
+# IDE
+.idea
