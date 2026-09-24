@@ -2,6 +2,12 @@
 
 Plancks is an Omarchy bar widget for your daily opportunity window. Standard clocks keep people in sync; Plancks helps you understand your own daily rhythm.
 
+<p align="center">
+  <img src="preview.png" alt="Plancks bar timer and panel showing an active epoch, expected durations, and recent samples" width="360">
+  <br>
+  <em>Preview with sample history.</em>
+</p>
+
 An **epoch** is your window of available opportunity; **off-time** is the interval between epochs. Start an epoch when you get out of bed or sign in to work, and end it when you go to bed or sign out—usually once each per day.
 
 Plancks learns from recent epochs and off-time intervals to predict when your current epoch will end and when the next one will start. The window includes normal breaks and interruptions; it measures available opportunity, not continuous productive effort.
