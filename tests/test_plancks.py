@@ -48,7 +48,8 @@ class ModelTests(unittest.TestCase):
                 self.assertEqual(result['indicator'], indicator)
             state['predictionMs'] = None
             result = p.view(state, at(1))
-            self.assertEqual(result['timer'], '+01:00:00' if phase == 'active' else '--:--:--')
+            self.assertEqual(result['timer'], '+01:00:00')
+            self.assertIn('elapsed · learning your rhythm', result['status'])
 
     def test_display_ticks_do_not_read_files_copy_state_or_reestimate(self):
         state = p.blank_state()
@@ -93,6 +94,26 @@ class StoreTests(unittest.TestCase):
         end2 = self.transition('end', 49)  # two hours of overrun are part of the epoch
         self.assertEqual(end2['workSamples'][-1]['durationMs'], 18 * HOUR)
         self.assertEqual(p.view(end2, at(50))['predictedStartUtcMs'], at(57)['utcMs'])
+
+    def test_first_off_time_counts_up_until_a_prediction_is_learned(self):
+        initial = p.Display(self.store.load(), now=at(0))
+        self.assertEqual(initial.values['timer'], '--:--:--')
+        self.assertFalse(initial.ticking(False))
+        self.transition('start', 7)
+        end = self.transition('end', 23)
+        display = p.Display(end, now=at(23))
+        self.assertEqual(display.values['timer'], '+00:00:00')
+        self.assertTrue(display.ticking(False))
+        self.assertEqual(display.update(at(24))['timer'], '+01:00:00')
+        self.assertEqual(display.values['status'], 'Off-time · Off-time elapsed · learning your rhythm')
+        self.assertIsNone(display.values['predictedStartUtcMs'])
+        recovered = p.Display(p.Store(self.temp.name).recover(), now=at(25))
+        self.assertEqual(recovered.values['timer'], '+02:00:00')
+        self.transition('start', 31)
+        end = self.transition('end', 47)
+        self.assertEqual(p.view(end, at(47))['timer'], '−08:00:00')
+        reset = self.store.reset('reset', '', 4)
+        self.assertEqual(p.view(reset, at(48))['timer'], '--:--:--')
 
     def test_rotation_and_snapshot_rebuild(self):
         first = self.transition('start', 7, rotate_bytes=1)
@@ -403,6 +424,17 @@ class BridgeTests(unittest.TestCase):
         self.send({'action': 'panel', 'open': False})
         self.assertIn('view', self.read())
         self.assertEqual(set(self.read()['patch']), {'timer'})
+
+    def test_first_off_time_ticks_with_panel_closed(self):
+        self.send({'action': 'start', 'requestId': 'start', 'sequence': 0})
+        self.assertEqual(self.read()['requestId'], 'start')
+        self.send({'action': 'end', 'requestId': 'end', 'sequence': 1})
+        reply = self.read()
+        self.assertEqual(reply['requestId'], 'end')
+        self.assertTrue(reply['view']['timer'].startswith('+'))
+        tick = self.read()
+        self.assertEqual(set(tick['patch']), {'timer'})
+        self.assertTrue(tick['patch']['timer'].startswith('+'))
 
     def test_external_reset_updates_idle_helper_and_keeps_watching(self):
         store = p.Store(self.temp.name)

@@ -338,8 +338,9 @@ def live_view(state, now):
         timer, detail = "--:--:--", "Clock changed · prediction unavailable"
         warnings.append("The clock moved backwards between reboots. A prediction is unavailable for this interval.")
     elif prediction is None:
-        timer = "+" + duration(elapsed_ms) if active else "--:--:--"
-        detail = "Epoch elapsed · learning your rhythm" if active else "No prediction yet"
+        timer = "+" + duration(elapsed_ms) if state["anchor"] else "--:--:--"
+        phase_name = "Epoch" if active else "Off-time"
+        detail = phase_name + " elapsed · learning your rhythm" if state["anchor"] else "No prediction yet"
     else:
         # Compare whole elapsed seconds, avoiding an early decrement at start.
         delta = elapsed_ms // 1000 - prediction // 1000
@@ -391,8 +392,7 @@ class Display:
         return self.values
 
     def ticking(self, panel_open):
-        return bool(self.state["anchor"] and (self.state["phase"] == "active"
-                    or self.state["predictionMs"] is not None or panel_open))
+        return bool(self.state["anchor"])
 
 
 def view(state, now=None, initial_ms=None):

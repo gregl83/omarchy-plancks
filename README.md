@@ -93,7 +93,7 @@ This briefly reloads the desktop shell; the saved epoch and its timing survive t
 
 ## Learning your daily rhythm
 
-With no history and the default settings, the first epoch counts up from `+00:00:00`. Here `+` means elapsed time since starting; once a prediction exists, it means time since the expected epoch end. The tooltip and panel show “Epoch elapsed · learning your rhythm” while no epoch prediction is available. Off-time shows `--:--:--` until an off-time interval has been recorded and the next epoch ends. That is when the first off-time prediction takes effect.
+With no history and the default settings, the first epoch counts up from `+00:00:00`. The first off-time interval does the same, starting when you end that epoch. Without a prediction, `+` means elapsed time in the current phase; the tooltip and panel show “Epoch elapsed · learning your rhythm” or “Off-time elapsed · learning your rhythm.” Once a prediction exists, `+` means time since the expected epoch end or next epoch start. Before the first epoch starts, or immediately after a reset, the timer shows `--:--:--` because no interval has started yet.
 
 For each prediction, Plancks uses up to five recent completed intervals of that kind. With five samples, it drops one shortest and one longest and averages the remaining three. Epoch and off-time histories are independent. With one or two samples, it uses their mean; with three or four, it drops the extremes and averages what remains. Predictions round to whole seconds with a one-second minimum.
 
