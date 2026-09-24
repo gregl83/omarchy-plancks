@@ -156,10 +156,10 @@ Panel {
               {label: "Last epoch start", key: "lastStartUtcMs", format: "stamp", empty: "Not started yet"},
               {label: "Last epoch end", key: "lastEndUtcMs", format: "stamp", empty: "Not ended yet"},
               {label: "", key: "elapsed", format: "elapsed"},
-              {label: "Predicted epoch duration", key: "workPredictionMs", format: "length"},
-              {label: "Predicted off-time duration", key: "gapPredictionMs", format: "length"},
+              {label: "Expected epoch duration", key: "workPredictionMs", format: "length"},
+              {label: "Expected off-time duration", key: "gapPredictionMs", format: "length"},
               {label: "", key: "predictedEndUtcMs", format: "stamp"},
-              {label: "Predicted next epoch start", key: "predictedStartUtcMs", format: "stamp"},
+              {label: "Expected next epoch start", key: "predictedStartUtcMs", format: "stamp"},
               {label: "Recent samples", key: "workSampleCount", format: "samples"}
             ]
             delegate: Column {
@@ -169,7 +169,7 @@ Panel {
               Text {
                 text: {
                   if (parent.modelData.key === "elapsed") return root.epoch.phase === "active" ? "Epoch elapsed" : "Off-time elapsed"
-                  if (parent.modelData.key === "predictedEndUtcMs") return root.epoch.phase === "active" ? "Predicted epoch end" : "Predicted next epoch end"
+                  if (parent.modelData.key === "predictedEndUtcMs") return root.epoch.phase === "active" ? "Expected epoch end" : "Expected next epoch end"
                   return parent.modelData.label
                 }
                 color: root.foreground

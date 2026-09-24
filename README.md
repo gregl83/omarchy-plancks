@@ -10,12 +10,14 @@ The bar uses normal text for an active epoch and Omarchy's standard dimmed styli
 
 | Appearance | Example | Meaning |
 | --- | --- | --- |
-| Normal | `t_P −02:00:00` | Epoch active; two hours until its predicted end |
-| Normal | `t_P +00:15:00` | Epoch active; fifteen minutes past its predicted end |
-| Dimmed | `t_P −02:00:00` | Off-time; two hours until the predicted next start |
-| Dimmed | `t_P +00:15:00` | Off-time; fifteen minutes past the predicted next start |
+| Normal | `t_P −02:00:00` | Two hours until the current epoch is expected to end |
+| Normal | `t_P +00:15:00` | The current epoch is still active, fifteen minutes after its expected end time |
+| Dimmed | `t_P −02:00:00` | Two hours until the next epoch is expected to start |
+| Dimmed | `t_P +00:15:00` | The next epoch has not started, and its expected start time was fifteen minutes ago |
 
-Starting or ending an epoch changes its active/off-time appearance; passing a predicted time does not. Resetting also returns the widget to off-time. Storage errors show an undimmed `!` marker. Click the widget to open its panel, then use **Start epoch** / **End epoch**. The panel shows actual timestamps, elapsed time, predicted durations, and the next expected start/end. Tab moves between buttons, and Enter or Space activates the focused button. With focus on the panel itself, Enter or Space starts or ends an epoch (or retries a storage error). Escape closes the panel, or cancels an open reset confirmation.
+The timer descriptions use **Until expected epoch end** / **Since expected epoch end** while an epoch is active, and **Until expected next epoch start** / **Since expected next epoch start** during off-time.
+
+Starting or ending an epoch changes its active/off-time appearance; passing a expected time does not. Resetting also returns the widget to off-time. Storage errors show an undimmed `!` marker. Click the widget to open its panel, then use **Start epoch** / **End epoch**. The panel shows actual timestamps, elapsed time, expected durations, and the next expected start/end. Tab moves between buttons, and Enter or Space activates the focused button. With focus on the panel itself, Enter or Space starts or ends an epoch (or retries a storage error). Escape closes the panel, or cancels an open reset confirmation.
 
 ## Install
 
@@ -68,13 +70,13 @@ This briefly reloads the desktop shell; the saved epoch and its timing survive t
 
 ## Learning your daily rhythm
 
-With no history and the default settings, the first epoch counts up from `+00:00:00`. Here `+` means elapsed time since starting; once a prediction exists, it means time past the predicted end. The tooltip and panel show “Learning epoch duration” while no epoch prediction is available. Off-time shows `--:--:--` until an off-time interval has been recorded and the next epoch ends. That is when the first off-time prediction takes effect.
+With no history and the default settings, the first epoch counts up from `+00:00:00`. Here `+` means elapsed time since starting; once a prediction exists, it means time since the expected epoch end. The tooltip and panel show “Epoch elapsed · learning your rhythm” while no epoch prediction is available. Off-time shows `--:--:--` until an off-time interval has been recorded and the next epoch ends. That is when the first off-time prediction takes effect.
 
 For each prediction, Plancks uses up to five recent completed intervals of that kind. With five samples, it drops one shortest and one longest and averages the remaining three. Epoch and off-time histories are independent. With one or two samples, it uses their mean; with three or four, it drops the extremes and averages what remains. Predictions round to whole seconds with a one-second minimum.
 
 A daily window of 07:00–23:00 teaches a 16-hour epoch duration. Starting again at 07:00 teaches eight hours of off-time. A workday sign-in/sign-out routine learns its own durations with the same model.
 
-While active, the next-start forecast uses the predicted end plus predicted off-time. Ending the epoch anchors that forecast to the actual end. The current phase's predicted duration stays fixed until you start or end an epoch, including after shell reloads. Late starts and overruns do not change phase automatically.
+While active, the next-start forecast uses the expected end plus expected off-time. Ending the epoch anchors that forecast to the actual end. The current phase's expected duration stays fixed until you start or end an epoch, including after shell reloads. Late starts and overruns do not change phase automatically.
 
 Settings live inline on the widget's entry in Omarchy's `shell.json`. To supply an initial eight-hour epoch estimate before any history exists:
 

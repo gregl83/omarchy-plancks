@@ -309,13 +309,13 @@ def live_view(state, now):
         warnings.append("The clock moved backwards between reboots. A prediction is unavailable for this interval.")
     elif prediction is None:
         timer = "+" + duration(elapsed_ms) if active else "--:--:--"
-        detail = "Learning epoch duration · elapsed time" if active else "No prediction yet"
+        detail = "Epoch elapsed · learning your rhythm" if active else "No prediction yet"
     else:
         # Compare whole elapsed seconds, avoiding an early decrement at start.
         delta = elapsed_ms // 1000 - prediction // 1000
         timer = ("−" if delta < 0 else "+" if delta > 0 else "") + duration(abs(delta) * 1000)
-        boundary = "end" if active else "start"
-        detail = ("Time until predicted " if delta < 0 else "Past predicted " if delta > 0 else "At predicted ") + boundary
+        boundary = "epoch end" if active else "next epoch start"
+        detail = ("Until expected " if delta < 0 else "Since expected " if delta > 0 else "At expected ") + boundary
     return {"timer": timer, "status": ("Epoch active" if active else "Off-time") + " · " + detail,
             "elapsed": duration(elapsed_ms), "timeBasis": basis, "warnings": warnings}
 
