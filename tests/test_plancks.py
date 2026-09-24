@@ -120,6 +120,47 @@ class StoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             recovered.transition('end', 'stable-id', 1, now=at(8))
 
+    def test_retry_after_sync_failure_requires_durability(self):
+        for failure in ('file', 'directory'):
+            for restart in (False, True):
+                with self.subTest(failure=failure, restart=restart), tempfile.TemporaryDirectory() as directory:
+                    store = p.Store(directory)
+                    target, name = (p.os, 'fsync') if failure == 'file' else (p, 'sync_dir')
+                    with patch.object(target, name, side_effect=OSError('sync failed')):
+                        with self.assertRaises(OSError):
+                            store.transition('start', 'retry-id', 0, now=at(7))
+                    segment = next(store.events.glob('*.jsonl'))
+                    original = segment.read_bytes()
+                    if restart:
+                        store = p.Store(directory)
+                    with patch.object(target, name, side_effect=OSError('still failing')):
+                        with self.assertRaises(OSError):
+                            store.transition('start', 'retry-id', 0, now=at(8))
+                    with patch.object(p.os, 'fsync', wraps=p.os.fsync) as sync:
+                        state, warning = store.transition('start', 'retry-id', 0, now=at(9))
+                    self.assertGreaterEqual(sync.call_count, 4)  # journal, directory, snapshot, directory
+                    self.assertIsNone(warning)
+                    self.assertEqual(state['sequence'], 1)
+                    self.assertEqual(state['anchor'], at(7))
+                    self.assertEqual(segment.read_bytes(), original)
+                    self.assertEqual(json.loads((store.root / 'state.json').read_text()), state)
+
+    def test_retry_old_rotated_event_preserves_newer_history(self):
+        self.store.transition('start', 'old', 0, now=at(7), rotate_bytes=1)
+        current, _ = self.store.transition('end', 'new', 1, now=at(23), rotate_bytes=1)
+        segments = {path: path.read_bytes() for path in self.store.events.glob('*.jsonl')}
+        synced = []
+        real_sync = p.os.fsync
+        def record_sync(fd):
+            synced.append(os.readlink(f'/proc/self/fd/{fd}'))
+            real_sync(fd)
+        with patch.object(p.os, 'fsync', side_effect=record_sync):
+            state, warning = p.Store(self.temp.name).transition('start', 'old', 0)
+        self.assertIn(str(self.store.events / 'events-00000001.jsonl'), synced)
+        self.assertEqual(state, current)
+        self.assertIsNone(warning)
+        self.assertEqual({path: path.read_bytes() for path in segments}, segments)
+
     def test_torn_tail_preserved_and_rotated(self):
         self.transition('start', 7)
         segment = next(self.store.events.glob('*.jsonl'))

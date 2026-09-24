@@ -22,10 +22,12 @@ with tempfile.TemporaryDirectory(prefix='plancks-smoke-') as directory:
     (root / 'Plancks').symlink_to(repo)
     (root / 'shell.qml').write_text(r'''import QtQuick
 import Quickshell
+import QtTest
 import Quickshell.Io
 import "Plancks" as Plancks
 ShellRoot {
   id: test
+  property bool resetUiDone: false
   property int step: 0
   property bool ipcDone: true
   Process {
@@ -91,15 +93,83 @@ ShellRoot {
         if (!test.check(widget.epoch.workSampleCount === 1, "completed sample")) return
         second.bar = verticalBar
         if (!test.check(second.vertical && second.implicitHeight > 40, "vertical layout")) return
-        Plancks.EpochController.reset()
+        if (!test.preview) Plancks.EpochController.reset()
         test.step = 4
       } else {
+        if (test.preview && !test.resetUiDone) return
         if (!test.check(widget.epoch.phase === "off" && second.epoch.sequence === 0, "shared reset")) return
         if (!test.check(widget.epoch.workSampleCount === 0 && widget.epoch.lastStartUtcMs === null, "reset clears history")) return
         widget.close()
         console.log("PLANCKS_SMOKE_PASS: two widgets, IPC start/end, IPC guards, overrun, vertical layout, reset")
         Qt.quit()
       }
+    }
+  }
+  // Keep QtTest from quitting before the outer smoke check verifies both widgets.
+  TestCase { name: "SmokeLifetime"; when: false }
+  TestCase {
+    id: resetTest
+    name: "ResetConfirmation"
+    when: test.preview && test.step === 4
+    function test_resetConfirmation() {
+      var panel = findChild(widget, "plancks_root")
+      verify(panel !== null, "Find the production panel")
+      var keys = findChild(panel, "plancks_keys")
+      verify(keys !== null)
+      // QtTest sends keys to its containing window: use the actual popup.
+      parent = keys
+      var action = findChild(panel, "plancks_actionButton")
+      var reset = findChild(panel, "plancks_resetButton")
+      var cancel = findChild(panel, "plancks_cancelButton")
+      var confirm = findChild(panel, "plancks_confirmButton")
+      var warning = findChild(panel, "plancks_resetWarning")
+      var scroll = findChild(panel, "plancks_scroll")
+      wait(300)
+      keys.forceActiveFocus()
+      keyClick(Qt.Key_Tab)
+      verify(action.activeFocus, "Tab reaches epoch action")
+      keyClick(Qt.Key_Tab)
+      verify(reset.activeFocus, "Tab reaches reset")
+      wait(100)
+      verify(reset.mapToItem(scroll.contentItem, 0, 0).y + reset.height <= scroll.contentY + scroll.height + 1,
+             "Reset scrolls into view")
+      var sequence = Plancks.EpochController.state.sequence
+      var generation = Plancks.EpochController.state.generation
+      function unchanged() {
+        compare(Plancks.EpochController.state.sequence, sequence)
+        compare(Plancks.EpochController.state.generation, generation)
+        compare(Plancks.EpochController.state.workSampleCount, 1)
+        verify(!Plancks.EpochController.busy)
+      }
+      keyClick(Qt.Key_Return)
+      verify(panel.confirmingReset)
+      verify(warning.visible)
+      verify(warning.text.indexOf("This cannot be undone") >= 0)
+      verify(cancel.activeFocus, "Cancel is the default")
+      unchanged()
+      keyClick(Qt.Key_Return)
+      verify(!panel.confirmingReset, "Activating Cancel dismisses warning")
+      verify(reset.activeFocus)
+      wait(150)
+      unchanged()
+      keyClick(Qt.Key_Return)
+      keyClick(Qt.Key_Tab)
+      verify(confirm.activeFocus)
+      keyClick(Qt.Key_Escape)
+      verify(!panel.confirmingReset, "Escape cancels even on the destructive button")
+      verify(reset.activeFocus)
+      wait(150)
+      unchanged()
+      keyClick(Qt.Key_Return)
+      keyClick(Qt.Key_Tab)
+      verify(confirm.activeFocus)
+      keyClick(Qt.Key_Return)
+      tryVerify(function() { return Plancks.EpochController.state.sequence === 0 && !Plancks.EpochController.busy })
+      verify(!panel.confirmingReset)
+      verify(Plancks.EpochController.state.generation !== generation)
+      compare(Plancks.EpochController.state.workSampleCount, 0)
+      console.log("PLANCKS_RESET_UI_PASS")
+      test.resetUiDone = true
     }
   }
   QtObject {
@@ -123,5 +193,5 @@ ShellRoot {
                             env=env, text=True, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, timeout=20)
     print(result.stdout)
-    if result.returncode or 'PLANCKS_SMOKE_PASS' not in result.stdout or 'SMOKE_FAIL' in result.stdout or ' ERROR' in result.stdout or 'WARN scene:' in result.stdout:
+    if result.returncode or 'PLANCKS_SMOKE_PASS' not in result.stdout or 'SMOKE_FAIL' in result.stdout or ' ERROR' in result.stdout or 'WARN scene:' in result.stdout or 'FAIL!' in result.stdout or (args.preview and 'PLANCKS_RESET_UI_PASS' not in result.stdout):
         raise SystemExit(1)

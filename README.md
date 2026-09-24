@@ -175,7 +175,7 @@ omarchy plugin validate .
 python3 tests/smoke_qml.py
 ```
 
-The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing epoch state through IPC, busy/not-ready guards, overrun, vertical layout, and reset. Physical suspend/reboot and manual keyboard interaction still warrant a live-session check.
+The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing epoch state through IPC, busy/not-ready guards, overrun, vertical layout, and reset. With `--preview` (also used in CI), it exercises the reset warning, default Cancel focus, Cancel activation, Escape cancellation, and explicit deletion through keyboard input. Physical suspend/reboot still warrant a live-session check.
 
 ## CI and releases
 

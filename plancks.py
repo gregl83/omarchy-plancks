@@ -206,7 +206,7 @@ class Store:
                         apply(state, event)
                     except (ValueError, KeyError, TypeError) as exc:
                         raise ValueError(f"Invalid record in {path.name}: {exc}") from exc
-                    ids[event["eventId"]] = event["type"]
+                    ids[event["eventId"]] = (event["type"], path.name)
                     state["cursor"] = {"segment": path.name, "offset": stream.tell()}
         try:
             snapshot = json.loads((self.root / "state.json").read_text())
@@ -287,9 +287,16 @@ class Store:
                 raise ValueError("Data was reset. Review the current state and try again.")
             event_type = "epoch_started" if action == "start" else "epoch_ended"
             if event_id in self._ids:
-                if self._ids[event_id] != event_type:
+                saved_type, segment = self._ids[event_id]
+                if saved_type != event_type:
                     raise ValueError("Event ID already used for another action")
-                return state, None
+                # A complete record may only be in the page cache after a failed
+                # append fsync. Retry durability before acknowledging it, including
+                # after a helper restart, without appending the event again.
+                with (self.events / segment).open("rb") as stream:
+                    os.fsync(stream.fileno())
+                sync_dir(self.events)
+                return state, self.snapshot_warning(state)
             if expected_sequence != state["sequence"]:
                 raise ValueError("State changed on another screen. Review the current phase and try again.")
             if (action == "start") != (state["phase"] == "off"):
@@ -311,13 +318,15 @@ class Store:
             apply(state, event)
             cursor = self.append(event, rotate_bytes)
             state["cursor"] = cursor
-            warning = None
-            try:
-                self.snapshot(state)
-            except OSError as exc:
-                warning = f"Epoch saved in the journal; state snapshot needs repair: {exc}"
             self._signature = None
-            return state, warning
+            return state, self.snapshot_warning(state)
+
+    def snapshot_warning(self, state):
+        try:
+            self.snapshot(state)
+        except OSError as exc:
+            return f"Epoch saved in the journal; state snapshot needs repair: {exc}"
+        return None
 
 
 def live_view(state, now):
