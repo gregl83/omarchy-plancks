@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "gregl83.plancks",
   "name": "Plancks",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "gregl83",
   "description": "Track your daily opportunity window with predictions learned from epochs and off-time intervals.",
   "kinds": [

@@ -73,9 +73,11 @@ ShellRoot {
         if (!test.check(widget.epoch.phase === "off", "initial phase")) return
         Plancks.EpochController.busy = true
         if (!test.check(Plancks.EpochController.ipc.toggleEpoch() === "busy", "IPC busy guard")) return
+        if (!test.check(Plancks.EpochController.ipc.toggleEpochSkip() === "busy", "skip IPC busy guard")) return
         Plancks.EpochController.busy = false
         Plancks.EpochController.ready = false
         if (!test.check(Plancks.EpochController.ipc.toggleEpoch() === "not-ready", "IPC readiness guard")) return
+        if (!test.check(Plancks.EpochController.ipc.toggleEpochSkip() === "not-ready", "skip IPC readiness guard")) return
         Plancks.EpochController.ready = true
         test.toggleViaIpc()
         test.step = 1
@@ -93,6 +95,15 @@ ShellRoot {
         if (!test.check(widget.epoch.workSampleCount === 1, "completed sample")) return
         second.bar = verticalBar
         if (!test.check(second.vertical && second.implicitHeight > 40, "vertical layout")) return
+        ipcCall.command[ipcCall.command.length - 1] = "toggleEpochSkip"
+        test.toggleViaIpc()
+        test.step = 5
+      } else if (test.step === 5) {
+        if (!test.check(widget.epoch.phase === "active" && widget.epoch.gapSampleCount === 0, "skip start excludes gap")) return
+        test.toggleViaIpc()
+        test.step = 6
+      } else if (test.step === 6) {
+        if (!test.check(widget.epoch.phase === "off" && widget.epoch.workSampleCount === 1, "skip end preserves learned epoch")) return
         if (!test.preview) Plancks.EpochController.reset()
         test.step = 4
       } else {
@@ -100,7 +111,7 @@ ShellRoot {
         if (!test.check(widget.epoch.phase === "off" && second.epoch.sequence === 0, "shared reset")) return
         if (!test.check(widget.epoch.workSampleCount === 0 && widget.epoch.lastStartUtcMs === null, "reset clears history")) return
         widget.close()
-        console.log("PLANCKS_SMOKE_PASS: two widgets, IPC start/end, IPC guards, overrun, vertical layout, reset")
+        console.log("PLANCKS_SMOKE_PASS: two widgets, IPC start/end, IPC guards, skip start/end, overrun, vertical layout, reset")
         Qt.quit()
       }
     }
@@ -119,6 +130,14 @@ ShellRoot {
       // QtTest sends keys to its containing window: use the actual popup.
       parent = keys
       var action = findChild(panel, "plancks_actionButton")
+      var skip = findChild(panel, "plancks_skipButton")
+      verify(skip !== null)
+      compare(skip.text, "Skip to start epoch")
+      verify(skip.x > action.x, "Skip is to the right")
+      compare(skip.y, action.y)
+      compare(skip.width, action.width, "Epoch buttons have equal width")
+      verify(action.width >= action.implicitWidth, "Primary label fits")
+      verify(skip.width >= skip.implicitWidth, "Skip label fits")
       var reset = findChild(panel, "plancks_resetButton")
       var cancel = findChild(panel, "plancks_cancelButton")
       var confirm = findChild(panel, "plancks_confirmButton")
@@ -128,6 +147,8 @@ ShellRoot {
       keys.forceActiveFocus()
       keyClick(Qt.Key_Tab)
       verify(action.activeFocus, "Tab reaches epoch action")
+      keyClick(Qt.Key_Tab)
+      verify(skip.activeFocus, "Tab reaches skip action")
       keyClick(Qt.Key_Tab)
       verify(reset.activeFocus, "Tab reaches reset")
       wait(100)

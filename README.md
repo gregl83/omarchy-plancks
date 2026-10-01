@@ -109,6 +109,21 @@ omarchy bar set gregl83.plancks initialSeconds 28800 --json
 
 The default `initialSeconds` is `0` (learn first); an initial estimate must be at least one second. Changing it affects future starts without history; it does not change an active epoch. The optional `rotateBytes` setting defaults to `5242880` (5 MiB).
 
+### Skip a period when learning
+
+Use the secondary button to the right of the normal action to advance now while excluding the period you are leaving from prediction learning. The buttons share one row with equal widths and use the shell’s play, stop, and skip-forward icons alongside their labels.
+
+| Phase | Normal action | Secondary action | Period excluded |
+| --- | --- | --- | --- |
+| Off-time | Start epoch | Skip to start epoch | Last epoch end until now |
+| Active epoch | End epoch | Skip to end epoch | Current epoch start until now |
+
+For a weekend away from work, end normally on Friday and select **Skip to start epoch** on Monday. If you forgot to end an epoch, select **Skip to end epoch** when you notice. If you immediately start again, also select **Skip to start epoch** so the brief gap does not become a sample.
+
+Skipped periods keep their actual timestamps and durations in history but do not enter the recent prediction samples or displace valid samples. The new phase starts now, uses existing learned history, and learns normally when completed with the regular action. Skipping does not edit previously recorded intervals or erase learned predictions. Before the first start, there is no completed period to exclude.
+
+Version 1.1.0 keeps journal schema version 1 and adds an optional `excludedFromLearning` boolean to `completedSample`; missing or `false` means normal learning. Existing history requires no migration or reset. Exclusions survive shell restarts and journal recovery. Older releases can read these records but will count skipped periods if you downgrade.
+
 ## Optional keyboard shortcut
 
 While the widget is enabled and loaded, start or end an epoch without opening its panel:
@@ -117,12 +132,20 @@ While the widget is enabled and loaded, start or end an epoch without opening it
 omarchy-shell gregl83.plancks toggleEpoch
 ```
 
-The command uses the same **Start epoch** / **End epoch** action as the panel. It returns `submitted` when the action is sent to storage, `busy` while an action is pending, or `not-ready` when storage is loading or unavailable. `submitted` does not mean the action has been saved yet. Any storage failure appears in the widget and panel, where you can select **Retry**.
+To advance while excluding the completed period from learning:
+
+```bash
+omarchy-shell gregl83.plancks toggleEpochSkip
+```
+
+`toggleEpoch` uses the same **Start epoch** / **End epoch** action as the panel; `toggleEpochSkip` uses **Skip to start epoch** / **Skip to end epoch**. Both commands follow the same readiness, saving, and retry behavior. Each returns `submitted` when the action is sent to storage, `busy` while an action is pending, or `not-ready` when storage is loading or unavailable. `submitted` does not mean the action has been saved yet. Any storage failure appears in the widget and panel, where you can select **Retry**.
 
 To assign **Super+Alt+P**, first check for conflicts with `omarchy menu keybindings --print`, then add this optional binding to `~/.config/hypr/bindings.lua`:
 
 ```lua
 o.bind("SUPER + ALT + P", "Plancks: Start/end epoch", "omarchy-shell gregl83.plancks toggleEpoch")
+-- Optional skip action, if Super+Alt+Shift+P is also unused:
+o.bind("SUPER + ALT + SHIFT + P", "Plancks: Skip to start/end epoch", "omarchy-shell gregl83.plancks toggleEpochSkip")
 ```
 
 Choose an unused combination, or explicitly unbind an existing assignment before replacing it. Validate the configuration with `hyprctl reload` and `hyprctl configerrors`. The plugin installer does not install keybindings automatically. After updating the controller in an existing installation, run `omarchy restart shell` to register the new IPC action.
@@ -165,7 +188,7 @@ The journal is authoritative. Plancks replays and validates it on startup or whe
 
 Ordinary one-second updates use cached state and predictions: they do not scan, read, lock, or write history files. An in-process Linux inotify watch detects journal changes without another watcher process. The helper sends only changed timer/status fields; elapsed details update while a panel is open. Before there is any running display to update, it sleeps until a command or file change. Multiple monitor widgets share a controller, and storage also locks and checks revisions to reject stale commands. If storage fails, the panel reports the failure and offers **Retry**; retries reuse the request ID to avoid recording an action twice.
 
-Elapsed time includes suspend and uses Linux's suspend-inclusive monotonic clock within a boot. Across reboots it falls back to UTC timestamps; a backwards interval is flagged and excluded from learning. An active epoch stays active through suspend, shutdown, and midnight until you end it or reset the data. Long absences, including weekends, are included in off-time samples. Plancks has no automatic schedule, correction for a forgotten epoch end, or history editor.
+Elapsed time includes suspend and uses Linux's suspend-inclusive monotonic clock within a boot. Across reboots it falls back to UTC timestamps; a backwards interval is flagged and excluded from learning. An active epoch stays active through suspend, shutdown, and midnight until you end it or reset the data. Long absences, including weekends, are included in off-time samples unless you use **Skip to start epoch**. **Skip to end epoch** excludes a forgotten or unusual epoch when ending it. Plancks has no automatic schedule, timestamp correction, or history editor.
 
 ## Development checks
 
@@ -175,7 +198,7 @@ omarchy plugin validate .
 python3 tests/smoke_qml.py
 ```
 
-The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing epoch state through IPC, busy/not-ready guards, overrun, vertical layout, and reset. With `--preview` (also used in CI), it exercises the reset warning, default Cancel focus, Cancel activation, Escape cancellation, and explicit deletion through keyboard input. Physical suspend/reboot still warrant a live-session check.
+The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing epoch state through IPC, busy/not-ready guards, normal and skip transitions, overrun, vertical layout, and reset. With `--preview` (also used in CI), it exercises the reset warning, default Cancel focus, Cancel activation, Escape cancellation, and explicit deletion through keyboard input. Physical suspend/reboot still warrant a live-session check.
 
 ## CI and releases
 

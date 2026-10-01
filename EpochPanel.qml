@@ -55,7 +55,7 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keys
-    contentWidth: fittedContentWidth(Style.space(420))
+    contentWidth: fittedContentWidth(Style.space(520))
     contentHeight: fittedContentHeight(column.implicitHeight)
 
     PanelKeyCatcher {
@@ -148,21 +148,53 @@ Panel {
             font.family: Style.font.family
             font.pixelSize: Style.font.body
           }
-          Button {
-            id: actionButton
-            objectName: "plancks_actionButton"
-            onActiveFocusChanged: if (activeFocus) root.revealButton(actionButton)
-            KeyNavigation.tab: retryButton.visible ? retryButton : resetButton
+          Row {
+            id: actionRow
             width: parent.width
-            text: EpochController.busy ? "Saving…" : root.epoch.phase === "active" ? "End epoch" : "Start epoch"
-            enabled: EpochController.ready && !EpochController.busy && !root.confirmingReset
-            focusable: true
-            bordered: true
-            foreground: root.foreground
-            Accessible.role: Accessible.Button
-            Accessible.name: text
-            onClicked: if (enabled) EpochController.transition()
-            Keys.onEscapePressed: root.close()
+            spacing: Style.space(8)
+            Button {
+              id: actionButton
+              objectName: "plancks_actionButton"
+              onActiveFocusChanged: if (activeFocus) root.revealButton(actionButton)
+              KeyNavigation.tab: skipButton
+              width: (parent.width - parent.spacing) / 2
+              text: EpochController.busy ? "Saving…" : root.epoch.phase === "active" ? "End epoch" : "Start epoch"
+              tooltipText: root.epoch.phase === "active"
+                ? "End now; learn from this epoch."
+                : "Start now; learn from the off-time."
+              iconText: root.epoch.phase === "active" ? "\uDB81\uDCDB" : "\uDB81\uDC0A"
+              enabled: EpochController.ready && !EpochController.busy && !root.confirmingReset
+              focusable: true
+              bordered: true
+              foreground: root.foreground
+              Accessible.role: Accessible.Button
+              Accessible.name: text
+              Accessible.description: tooltipText
+              onClicked: if (enabled) EpochController.transition()
+              Keys.onEscapePressed: root.close()
+            }
+            Button {
+              id: skipButton
+              objectName: "plancks_skipButton"
+              onActiveFocusChanged: if (activeFocus) root.revealButton(skipButton)
+              KeyNavigation.tab: retryButton.visible ? retryButton : resetButton
+              KeyNavigation.backtab: actionButton
+              width: actionButton.width
+              text: root.epoch.phase === "active" ? "Skip to end epoch" : "Skip to start epoch"
+              iconText: "\uDB81\uDCAD"
+              tooltipText: root.epoch.phase === "active"
+                ? "End now; exclude this epoch from predictions."
+                : "Start now; exclude the off-time from predictions."
+              enabled: actionButton.enabled
+              focusable: true
+              bordered: false
+              foreground: root.foreground
+              Accessible.role: Accessible.Button
+              Accessible.name: text
+              Accessible.description: tooltipText
+              onClicked: if (enabled) EpochController.transition(true)
+              Keys.onEscapePressed: root.close()
+            }
           }
           Repeater {
             model: [
@@ -224,6 +256,7 @@ Panel {
             KeyNavigation.tab: resetButton
             visible: EpochController.error !== ""
             text: "Retry"
+            tooltipText: "Retry the pending action or reconnect to storage."
             enabled: !EpochController.busy && !root.confirmingReset
             focusable: true
             bordered: true
@@ -238,6 +271,7 @@ Panel {
             onActiveFocusChanged: if (activeFocus) root.revealButton(resetButton)
             anchors.right: parent.right
             text: "Reset all data…"
+            tooltipText: "Review and confirm deletion of all epoch data."
             visible: !root.confirmingReset
             enabled: !EpochController.busy
             focusable: true
@@ -274,6 +308,7 @@ Panel {
               objectName: "plancks_cancelButton"
               onActiveFocusChanged: if (activeFocus) root.revealButton(cancelButton)
               text: "Cancel"
+              tooltipText: "Keep all data and cancel reset."
               width: parent.width
               focusable: true
               bordered: true
@@ -288,6 +323,7 @@ Panel {
               objectName: "plancks_confirmButton"
               onActiveFocusChanged: if (activeFocus) root.revealButton(confirmButton)
               text: "Delete all data and reset"
+              tooltipText: "Permanently delete all epoch data."
               width: parent.width
               enabled: !EpochController.busy
               focusable: true

@@ -55,9 +55,9 @@ QtObject {
       helper.write(JSON.stringify({action: "configure", initialSeconds: Number(settings.initialSeconds || 0)}) + "\n")
   }
 
-  function transition() {
+  function transition(skipLearning) {
     if (!ready || busy) return
-    sendAction(state.phase === "active" ? "end" : "start")
+    sendAction(state.phase === "active" ? "end" : "start", undefined, undefined, skipLearning === true)
   }
 
   property IpcHandler ipc: IpcHandler {
@@ -69,6 +69,13 @@ QtObject {
       root.transition()
       return "submitted"
     }
+
+    function toggleEpochSkip(): string {
+      if (root.busy) return "busy"
+      if (!root.ready) return "not-ready"
+      root.transition(true)
+      return "submitted"
+    }
   }
 
   function reset(generation, sequence) {
@@ -76,11 +83,11 @@ QtObject {
     sendAction("reset", generation, sequence)
   }
 
-  function sendAction(action, generation, sequence) {
+  function sendAction(action, generation, sequence, skipLearning) {
     busy = true
     error = ""
     pendingId = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)
-    pendingCommand = {action: action, generation: generation === undefined ? state.generation : generation,
+    pendingCommand = {action: action, skipLearning: skipLearning === true, generation: generation === undefined ? state.generation : generation,
       requestId: pendingId, sequence: sequence === undefined ? state.sequence : sequence,
       rotateBytes: Number(settings.rotateBytes || 5242880)}
     if (!helper.running) helper.running = true

@@ -95,6 +95,78 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(end2['workSamples'][-1]['durationMs'], 18 * HOUR)
         self.assertEqual(p.view(end2, at(50))['predictedStartUtcMs'], at(57)['utcMs'])
 
+    def test_skip_preserves_history_and_resumes_learning_after_recovery(self):
+        self.transition('start', 7)
+        self.transition('end', 23)
+        self.transition('start', 31)
+        before = self.transition('end', 47)
+        skipped_gap = self.transition('start', 103, skip_learning=True)
+        self.assertEqual(skipped_gap['gapSamples'], before['gapSamples'])
+        self.assertEqual(skipped_gap['predictionMs'], 16 * HOUR)
+        skipped_epoch = self.transition('end', 150, skip_learning=True)
+        self.assertEqual(skipped_epoch['workSamples'], before['workSamples'])
+        self.assertEqual(skipped_epoch['predictionMs'], 8 * HOUR)
+        records = [json.loads(line) for line in next(self.store.events.glob('*.jsonl')).read_text().splitlines()]
+        self.assertNotIn('excludedFromLearning', records[1]['completedSample'])
+        for record, hours in [(records[-2], 56), (records[-1], 47)]:
+            self.assertTrue(record['completedSample']['excludedFromLearning'])
+            self.assertEqual(record['completedSample']['durationMs'], hours * HOUR)
+            self.assertEqual(record['completedSample']['end'], record['clock'])
+            self.assertEqual(record['schemaVersion'], 1)
+        (self.store.root / 'state.json').unlink()
+        self.store = p.Store(self.temp.name)
+        self.assertEqual(self.store.recover()['workSamples'], before['workSamples'])
+        self.assertEqual(self.store.load()['gapSamples'], before['gapSamples'])
+        start = self.transition('start', 158)
+        self.assertEqual(len(start['gapSamples']), 2)
+        end = self.transition('end', 174)
+        self.assertEqual(len(end['workSamples']), 3)
+        self.assertEqual(end['predictionMs'], 8 * HOUR)
+
+    def test_skip_retry_and_stale_commands(self):
+        self.transition('start', 7)
+        self.transition('end', 23, skip_learning=True)
+        store = p.Store(self.temp.name)
+        retry, _ = store.transition('end', 'event-2', 1, now=at(24), skip_learning=True)
+        self.assertEqual(retry['sequence'], 2)
+        self.assertEqual(retry['workSamples'], [])
+        with self.assertRaisesRegex(ValueError, 'another action'):
+            store.transition('end', 'event-2', 1)
+        with self.assertRaisesRegex(ValueError, 'another screen'):
+            store.transition('start', 'stale', 1, skip_learning=True)
+        with self.assertRaisesRegex(ValueError, 'boolean'):
+            store.transition('start', 'invalid', 2, skip_learning='true')
+        self.assertEqual(store.load()['sequence'], 2)
+
+    def test_skip_without_history_and_invalid_replayed_flag(self):
+        first = self.transition('start', 7, skip_learning=True, initial_ms=HOUR)
+        self.assertEqual(first['predictionMs'], HOUR)
+        self.transition('end', 23, skip_learning=True)
+        self.assertEqual(self.store.load()['workSamples'], [])
+        segment = next(self.store.events.glob('*.jsonl'))
+        records = [json.loads(line) for line in segment.read_text().splitlines()]
+        records[-1]['completedSample']['excludedFromLearning'] = 'true'
+        segment.write_text(''.join(json.dumps(record) + '\n' for record in records))
+        with self.assertRaisesRegex(ValueError, 'exclusion flag'):
+            p.Store(self.temp.name).recover()
+
+    def test_server_skip_protocol(self):
+        requests = [
+            {'action': 'start', 'sequence': 0, 'requestId': 'start'},
+            {'action': 'end', 'sequence': 1, 'requestId': 'end', 'skipLearning': True},
+            {'action': 'end', 'sequence': 1, 'requestId': 'end', 'skipLearning': True},
+            {'action': 'start', 'sequence': 2, 'requestId': 'next', 'skipLearning': True},
+        ]
+        result = subprocess.run([sys.executable, str(Path(p.__file__)), 'serve', '--state-dir', self.temp.name],
+                                input=''.join(json.dumps(r) + '\n' for r in requests),
+                                text=True, capture_output=True, timeout=5)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        replies = [json.loads(line) for line in result.stdout.splitlines()]
+        self.assertTrue(all(reply['ok'] for reply in replies))
+        self.assertEqual(replies[-1]['view']['sequence'], 3)
+        self.assertEqual(replies[-1]['view']['workSampleCount'], 0)
+        self.assertEqual(replies[-1]['view']['gapSampleCount'], 0)
+
     def test_first_off_time_counts_up_until_a_prediction_is_learned(self):
         initial = p.Display(self.store.load(), now=at(0))
         self.assertEqual(initial.values['timer'], '--:--:--')
