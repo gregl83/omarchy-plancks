@@ -181,6 +181,13 @@ ShellRoot {
       verify(warning.visible)
       verify(warning.text.indexOf("This cannot be undone") >= 0)
       verify(cancel.activeFocus, "Cancel is the default")
+      verify(!action.visible && !skip.visible && !predictions.visible && !history.visible,
+             "Confirmation replaces the normal content")
+      compare(cancel.width, confirm.width, "Reset actions have equal widths")
+      compare(cancel.y, confirm.y, "Reset actions share one row")
+      verify(confirm.x > cancel.x, "Delete is to the right of Cancel")
+      verify(cancel.width >= cancel.implicitWidth && confirm.width >= confirm.implicitWidth,
+             "Reset action labels fit")
       unchanged()
       keyClick(Qt.Key_Return)
       verify(!panel.confirmingReset, "Activating Cancel dismisses warning")

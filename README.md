@@ -152,7 +152,7 @@ Choose an unused combination, or explicitly unbind an existing assignment before
 
 ## Reset all data
 
-Open the widget panel and select **Reset all data…**. A warning explains what will be deleted; **Cancel** is focused by default. Select **Delete all data and reset** to permanently delete recorded epochs, off-time intervals, and learned predictions and discard any active epoch. Escape cancels the confirmation. Reset cannot be undone; back up the [storage directory](#persistence-and-recovery) first if you want to keep your history.
+Open the widget panel and select **Reset all data…**. A compact confirmation replaces the timer and details, explains what will be deleted, and offers **Cancel** and **Delete all data** side by side. **Cancel** is focused by default; the delete action uses the theme’s urgent color. Select **Delete all data** to permanently delete recorded epochs, off-time intervals, and learned predictions and discard any active epoch. Escape cancels the confirmation. Reset cannot be undone; back up the [storage directory](#persistence-and-recovery) first if you want to keep your history.
 
 The widget returns to its initial off-time state and learns again from new epochs. Widget settings (`initialSeconds`, `rotateBytes`, and bar placement) stay intact. Reset is also available when damaged history prevents starting or ending an epoch. Other instances of the widget refresh automatically. Reset requires writable storage and valid reset metadata; it cannot repair filesystem permissions or a damaged `events/.reset.json` file.
 

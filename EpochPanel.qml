@@ -160,6 +160,7 @@ Panel {
             }
             Text {
               id: phaseBadge
+              visible: !root.confirmingReset
               x: header.width - width
               y: header.stacked ? title.height + Style.space(6) : (header.height - height) / 2
               width: Math.min(implicitWidth, header.width)
@@ -177,323 +178,353 @@ Panel {
           PanelSeparator {
             foreground: root.foreground
           }
-          Item {
-            width: parent.width
-            height: timerText.implicitHeight + Style.space(20)
-            Item {
-              id: timerFrame
-              anchors.centerIn: parent
-              width: Math.min(parent.width, timerText.implicitWidth + Style.space(32))
-              height: parent.height
-              Rectangle {
-                anchors.fill: parent
-                color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.03)
-              }
-              Repeater {
-                model: 4
-                delegate: Item {
-                  required property int index
-                  readonly property bool rightSide: index % 2 === 1
-                  readonly property bool bottomSide: index >= 2
-                  readonly property real lineWidth: Math.max(1, Style.normalBorderWidth)
-                  width: Style.space(10)
-                  height: Style.space(10)
-                  x: rightSide ? timerFrame.width - width : 0
-                  y: bottomSide ? timerFrame.height - height : 0
-                  opacity: 0.35
-                  Rectangle {
-                    width: parent.width
-                    height: parent.lineWidth
-                    y: parent.bottomSide ? parent.height - height : 0
-                    color: root.foreground
-                  }
-                  Rectangle {
-                    width: parent.lineWidth
-                    height: parent.height
-                    x: parent.rightSide ? parent.width - width : 0
-                    color: root.foreground
-                  }
-                }
-              }
-            }
-            Text {
-              id: timerText
-              anchors.centerIn: parent
-              textFormat: Text.RichText
-              text: "<span style=\"font-size: " + Style.space(20) + "px;\"><i>t</i><sub>P</sub></span> " + (root.epoch.timer || "--:--:--")
-              color: root.foreground
-              opacity: root.epoch.phase !== "active" && EpochController.error === "" ? 0.45 : 1
-              Behavior on opacity {
-                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
-              }
-              font.family: Style.font.family
-              font.pixelSize: Style.space(32)
-            }
-          }
-          Text {
-            width: parent.width
-            text: String(root.epoch.status || "")
-              .replace(/^(Epoch active|Off-time) · /, "")
-              .replace("next epoch start", "start")
-              .replace("epoch end", "end")
-              .replace(/^(Epoch|Off-time) elapsed · learning your rhythm$/, "Learning your rhythm")
-              .replace("Clock changed · prediction unavailable", "Prediction unavailable")
-            Accessible.name: root.epoch.status
-            MouseArea {
-              id: captionHover
-              anchors.fill: parent
-              hoverEnabled: true
-              acceptedButtons: Qt.NoButton
-            }
-            PanelToolTip {
-              visible: captionHover.containsMouse
-              text: root.epoch.status
-              fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-            }
-            textFormat: Text.PlainText
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.WordWrap
-            color: root.foreground
-            opacity: 0.75
-            font.family: Style.font.family
-            font.pixelSize: Style.font.bodySmall
-          }
-          PanelSeparator { foreground: root.foreground }
-          Row {
-            id: actionRow
-            width: parent.width
-            spacing: Style.space(8)
-            Button {
-              id: actionButton
-              objectName: "plancks_actionButton"
-              onActiveFocusChanged: if (activeFocus) root.revealButton(actionButton)
-              KeyNavigation.tab: skipButton
-              width: (parent.width - parent.spacing) / 2
-              fontSize: Style.font.bodySmall
-              horizontalPadding: Style.space(8)
-              text: EpochController.busy ? "Saving…" : root.epoch.phase === "active" ? "End epoch" : "Start epoch"
-              tooltipText: root.epoch.phase === "active"
-                ? "End now; learn from this epoch."
-                : "Start now; learn from the off-time."
-              iconText: root.epoch.phase === "active" ? "\uDB81\uDCDB" : "\uDB81\uDC0A"
-              enabled: EpochController.ready && !EpochController.busy && !root.confirmingReset
-              focusable: true
-              bordered: true
-              foreground: root.foreground
-              background: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
-              Accessible.role: Accessible.Button
-              Accessible.name: text
-              Accessible.description: tooltipText
-              onClicked: if (enabled) EpochController.transition()
-              Keys.onEscapePressed: root.close()
-            }
-            Button {
-              id: skipButton
-              objectName: "plancks_skipButton"
-              onActiveFocusChanged: if (activeFocus) root.revealButton(skipButton)
-              KeyNavigation.tab: retryButton.visible ? retryButton : resetButton
-              KeyNavigation.backtab: actionButton
-              width: actionButton.width
-              fontSize: Style.font.bodySmall
-              horizontalPadding: Style.space(8)
-              text: root.epoch.phase === "active" ? "Skip to end epoch" : "Skip to start epoch"
-              iconText: "\uDB81\uDCAD"
-              tooltipText: root.epoch.phase === "active"
-                ? "End now; exclude this epoch from predictions."
-                : "Start now; exclude the off-time from predictions."
-              enabled: actionButton.enabled
-              focusable: true
-              bordered: true
-              foreground: root.foreground
-              Accessible.role: Accessible.Button
-              Accessible.name: text
-              Accessible.description: tooltipText
-              onClicked: if (enabled) EpochController.transition(true)
-              Keys.onEscapePressed: root.close()
-            }
-          }
-          PanelSeparator { foreground: root.foreground }
-          Repeater {
-            model: [
-              {section: "Predictions", rows: [
-                {label: "End", key: "predictedEndUtcMs", format: "stamp"},
-                {label: "Next start", description: "Expected next epoch start", key: "predictedStartUtcMs", format: "stamp"},
-                {label: "Epoch", description: "Expected epoch duration", key: "workPredictionMs", format: "length"},
-                {label: "Off-time", description: "Expected off-time duration", key: "gapPredictionMs", format: "length"}
-              ]},
-              {section: "History", rows: [
-                {label: "Started", description: "Last epoch start", key: "lastStartUtcMs", format: "stamp", empty: "Not started yet"},
-                {label: "Ended", description: "Last epoch end", key: "lastEndUtcMs", format: "stamp", empty: "Not ended yet"},
-                {label: "Elapsed", key: "elapsed", format: "elapsed"},
-                {label: "Samples", description: "Recent samples", key: "workSampleCount", format: "samples"}
-              ]}
-            ]
-            delegate: Column {
-              id: sectionGroup
-              required property var modelData
-              width: column.width
-              spacing: Style.space(14)
-              PanelSeparator {
-                visible: sectionGroup.modelData.section === "History"
-                foreground: root.foreground
-              }
-              PanelSectionHeader {
-                width: parent.width
-                text: sectionGroup.modelData.section.toUpperCase()
-                foreground: root.foreground
-                fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-              }
-              Grid {
-                id: sectionDetails
-                objectName: "plancks_" + sectionGroup.modelData.section + "_details"
-                width: parent.width
-                columns: width >= Style.space(320) ? 4 : 2
-                columnSpacing: Style.space(20)
-                rowSpacing: Style.spacing.labelGap
-                readonly property real labelSpace: columns === 4
-                  ? root.firstLabelWidth + root.secondLabelWidth
-                  : Math.max(root.firstLabelWidth, root.secondLabelWidth)
-                readonly property real valueWidth: Math.max(0,
-                  (width - (columns - 1) * columnSpacing - labelSpace) / (columns / 2))
-                Repeater {
-                  model: {
-                    var cells = []
-                    for (var row of sectionGroup.modelData.rows) {
-                      cells.push({row: row, isValue: false})
-                      cells.push({row: row, isValue: true})
-                    }
-                    return cells
-                  }
-                  delegate: Text {
-                    required property var modelData
-                    required property int index
-                    width: modelData.isValue ? sectionDetails.valueWidth
-                      : sectionDetails.columns === 2 ? sectionDetails.labelSpace
-                      : index % 4 === 0 ? root.firstLabelWidth : root.secondLabelWidth
-                    text: modelData.isValue ? root.detailValue(modelData.row, true) : modelData.row.label
-                    readonly property string detailTooltip: root.detailLabel(modelData.row) + ": " + root.detailValue(modelData.row, false)
-                    Accessible.name: detailTooltip
-                    MouseArea {
-                      id: detailHover
-                      anchors.fill: parent
-                      hoverEnabled: true
-                      acceptedButtons: Qt.NoButton
-                    }
-                    PanelToolTip {
-                      visible: detailHover.containsMouse
-                      text: parent.detailTooltip
-                      fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-                    }
-                    textFormat: Text.PlainText
-                    horizontalAlignment: modelData.isValue ? Text.AlignRight : Text.AlignLeft
-                    wrapMode: modelData.isValue ? Text.WordWrap : Text.NoWrap
-                    color: root.foreground
-                    opacity: modelData.isValue ? 1 : 0.55
-                    font.weight: modelData.isValue ? Font.Medium : Font.Normal
-                    font.family: root.bar ? root.bar.fontFamily : Style.font.family
-                    font.pixelSize: Style.font.bodySmall
-                  }
-                }
-              }
-            }
-          }
-          Text {
-            width: parent.width
-            visible: text !== ""
-            text: [EpochController.error].concat(root.epoch.warnings || []).filter(function(x) { return !!x }).join("\n")
-            wrapMode: Text.WordWrap
-            color: root.foreground
-            font.family: Style.font.family
-            font.pixelSize: Style.font.body
-          }
-          Button {
-            id: retryButton
-            onActiveFocusChanged: if (activeFocus) root.revealButton(retryButton)
-            KeyNavigation.tab: resetButton
-            visible: EpochController.error !== ""
-            text: "Retry"
-            tooltipText: "Retry the pending action or reconnect to storage."
-            enabled: !EpochController.busy && !root.confirmingReset
-            focusable: true
-            bordered: true
-            foreground: root.foreground
-            onClicked: if (enabled) EpochController.retry()
-            Keys.onEscapePressed: root.close()
-          }
-          PanelSeparator { foreground: root.foreground }
-          Button {
-            id: resetButton
-            objectName: "plancks_resetButton"
-            onActiveFocusChanged: if (activeFocus) root.revealButton(resetButton)
-            anchors.right: parent.right
-            text: "Reset all data…"
-            tooltipText: "Review and confirm deletion of all epoch data."
-            visible: !root.confirmingReset
-            enabled: !EpochController.busy
-            focusable: true
-            bordered: false
-            fontSize: Style.font.bodySmall
-            foreground: root.foreground
-            KeyNavigation.tab: actionButton.enabled ? actionButton : retryButton
-            onClicked: {
-              if (!enabled) return
-              root.resetGeneration = root.epoch.generation
-              root.resetSequence = root.epoch.sequence
-              root.confirmingReset = true
-              cancelButton.forceActiveFocus()
-              Qt.callLater(function() { scroll.contentY = Math.max(0, scroll.contentHeight - scroll.height) })
-            }
-            Keys.onEscapePressed: root.close()
-          }
           Column {
+            id: normalContent
             width: parent.width
-            spacing: Style.space(10)
-            visible: root.confirmingReset
+            spacing: Style.space(14)
+            visible: !root.confirmingReset
+            Item {
+              width: parent.width
+              height: timerText.implicitHeight + Style.space(20)
+              Item {
+                id: timerFrame
+                anchors.centerIn: parent
+                width: Math.min(parent.width, timerText.implicitWidth + Style.space(32))
+                height: parent.height
+                Repeater {
+                  model: 4
+                  delegate: Item {
+                    required property int index
+                    readonly property bool rightSide: index % 2 === 1
+                    readonly property bool bottomSide: index >= 2
+                    readonly property real lineWidth: Math.max(1, Style.normalBorderWidth)
+                    width: Style.space(10)
+                    height: Style.space(10)
+                    x: rightSide ? timerFrame.width - width : 0
+                    y: bottomSide ? timerFrame.height - height : 0
+                    opacity: 0.35
+                    Rectangle {
+                      width: parent.width
+                      height: parent.lineWidth
+                      y: parent.bottomSide ? parent.height - height : 0
+                      color: root.foreground
+                    }
+                    Rectangle {
+                      width: parent.lineWidth
+                      height: parent.height
+                      x: parent.rightSide ? parent.width - width : 0
+                      color: root.foreground
+                    }
+                  }
+                }
+              }
+              Text {
+                id: timerText
+                anchors.centerIn: parent
+                textFormat: Text.RichText
+                text: "<span style=\"font-size: " + Style.space(20) + "px;\"><i>t</i><sub>P</sub></span> " + (root.epoch.timer || "--:--:--")
+                color: root.foreground
+                opacity: root.epoch.phase !== "active" && EpochController.error === "" ? 0.45 : 1
+                Behavior on opacity {
+                  NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                }
+                font.family: Style.font.family
+                font.pixelSize: Style.space(32)
+              }
+            }
             Text {
               width: parent.width
-              objectName: "plancks_resetWarning"
-              text: "Reset all Plancks data? This permanently deletes all recorded epochs, off-time intervals, and learned predictions, and discards any active epoch. This cannot be undone. Widget settings are kept."
+              text: String(root.epoch.status || "")
+                .replace(/^(Epoch active|Off-time) · /, "")
+                .replace("next epoch start", "start")
+                .replace("epoch end", "end")
+                .replace(/^(Epoch|Off-time) elapsed · learning your rhythm$/, "Learning your rhythm")
+                .replace("Clock changed · prediction unavailable", "Prediction unavailable")
+              Accessible.name: root.epoch.status
+              MouseArea {
+                id: captionHover
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.NoButton
+              }
+              PanelToolTip {
+                visible: captionHover.containsMouse
+                text: root.epoch.status
+                fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+              }
               textFormat: Text.PlainText
+              horizontalAlignment: Text.AlignHCenter
+              wrapMode: Text.WordWrap
+              color: root.foreground
+              opacity: 0.75
+              font.family: Style.font.family
+              font.pixelSize: Style.font.bodySmall
+            }
+            PanelSeparator { foreground: root.foreground }
+            Row {
+              id: actionRow
+              width: parent.width
+              spacing: Style.space(8)
+              Button {
+                id: actionButton
+                objectName: "plancks_actionButton"
+                onActiveFocusChanged: if (activeFocus) root.revealButton(actionButton)
+                KeyNavigation.tab: skipButton
+                width: (parent.width - parent.spacing) / 2
+                fontSize: Style.font.bodySmall
+                horizontalPadding: Style.space(8)
+                text: EpochController.busy ? "Saving…" : root.epoch.phase === "active" ? "End epoch" : "Start epoch"
+                tooltipText: root.epoch.phase === "active"
+                  ? "End now; learn from this epoch."
+                  : "Start now; learn from the off-time."
+                iconText: root.epoch.phase === "active" ? "\uDB81\uDCDB" : "\uDB81\uDC0A"
+                enabled: EpochController.ready && !EpochController.busy && !root.confirmingReset
+                focusable: true
+                bordered: true
+                foreground: root.foreground
+                background: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
+                Accessible.role: Accessible.Button
+                Accessible.name: text
+                Accessible.description: tooltipText
+                onClicked: if (enabled) EpochController.transition()
+                Keys.onEscapePressed: root.close()
+              }
+              Button {
+                id: skipButton
+                objectName: "plancks_skipButton"
+                onActiveFocusChanged: if (activeFocus) root.revealButton(skipButton)
+                KeyNavigation.tab: retryButton.visible ? retryButton : resetButton
+                KeyNavigation.backtab: actionButton
+                width: actionButton.width
+                fontSize: Style.font.bodySmall
+                horizontalPadding: Style.space(8)
+                text: root.epoch.phase === "active" ? "Skip to end epoch" : "Skip to start epoch"
+                iconText: "\uDB81\uDCAD"
+                tooltipText: root.epoch.phase === "active"
+                  ? "End now; exclude this epoch from predictions."
+                  : "Start now; exclude the off-time from predictions."
+                enabled: actionButton.enabled
+                focusable: true
+                bordered: true
+                foreground: root.foreground
+                Accessible.role: Accessible.Button
+                Accessible.name: text
+                Accessible.description: tooltipText
+                onClicked: if (enabled) EpochController.transition(true)
+                Keys.onEscapePressed: root.close()
+              }
+            }
+            PanelSeparator { foreground: root.foreground }
+            Repeater {
+              model: [
+                {section: "Predictions", rows: [
+                  {label: "End", key: "predictedEndUtcMs", format: "stamp"},
+                  {label: "Next start", description: "Expected next epoch start", key: "predictedStartUtcMs", format: "stamp"},
+                  {label: "Epoch", description: "Expected epoch duration", key: "workPredictionMs", format: "length"},
+                  {label: "Off-time", description: "Expected off-time duration", key: "gapPredictionMs", format: "length"}
+                ]},
+                {section: "History", rows: [
+                  {label: "Started", description: "Last epoch start", key: "lastStartUtcMs", format: "stamp", empty: "Not started yet"},
+                  {label: "Ended", description: "Last epoch end", key: "lastEndUtcMs", format: "stamp", empty: "Not ended yet"},
+                  {label: "Elapsed", key: "elapsed", format: "elapsed"},
+                  {label: "Samples", description: "Recent samples", key: "workSampleCount", format: "samples"}
+                ]}
+              ]
+              delegate: Column {
+                id: sectionGroup
+                required property var modelData
+                width: column.width
+                spacing: Style.space(14)
+                PanelSeparator {
+                  visible: sectionGroup.modelData.section === "History"
+                  foreground: root.foreground
+                }
+                PanelSectionHeader {
+                  width: parent.width
+                  text: sectionGroup.modelData.section.toUpperCase()
+                  foreground: root.foreground
+                  fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+                }
+                Grid {
+                  id: sectionDetails
+                  objectName: "plancks_" + sectionGroup.modelData.section + "_details"
+                  width: parent.width
+                  columns: width >= Style.space(320) ? 4 : 2
+                  columnSpacing: Style.space(20)
+                  rowSpacing: Style.spacing.labelGap
+                  readonly property real labelSpace: columns === 4
+                    ? root.firstLabelWidth + root.secondLabelWidth
+                    : Math.max(root.firstLabelWidth, root.secondLabelWidth)
+                  readonly property real valueWidth: Math.max(0,
+                    (width - (columns - 1) * columnSpacing - labelSpace) / (columns / 2))
+                  Repeater {
+                    model: {
+                      var cells = []
+                      for (var row of sectionGroup.modelData.rows) {
+                        cells.push({row: row, isValue: false})
+                        cells.push({row: row, isValue: true})
+                      }
+                      return cells
+                    }
+                    delegate: Text {
+                      required property var modelData
+                      required property int index
+                      width: modelData.isValue ? sectionDetails.valueWidth
+                        : sectionDetails.columns === 2 ? sectionDetails.labelSpace
+                        : index % 4 === 0 ? root.firstLabelWidth : root.secondLabelWidth
+                      text: modelData.isValue ? root.detailValue(modelData.row, true) : modelData.row.label
+                      readonly property string detailTooltip: root.detailLabel(modelData.row) + ": " + root.detailValue(modelData.row, false)
+                      Accessible.name: detailTooltip
+                      MouseArea {
+                        id: detailHover
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.NoButton
+                      }
+                      PanelToolTip {
+                        visible: detailHover.containsMouse
+                        text: parent.detailTooltip
+                        fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+                      }
+                      textFormat: Text.PlainText
+                      horizontalAlignment: modelData.isValue ? Text.AlignRight : Text.AlignLeft
+                      wrapMode: modelData.isValue ? Text.WordWrap : Text.NoWrap
+                      color: root.foreground
+                      opacity: modelData.isValue ? 1 : 0.55
+                      font.weight: modelData.isValue ? Font.Medium : Font.Normal
+                      font.family: root.bar ? root.bar.fontFamily : Style.font.family
+                      font.pixelSize: Style.font.bodySmall
+                    }
+                  }
+                }
+              }
+            }
+            Text {
+              width: parent.width
+              visible: text !== ""
+              text: [EpochController.error].concat(root.epoch.warnings || []).filter(function(x) { return !!x }).join("\n")
               wrapMode: Text.WordWrap
               color: root.foreground
               font.family: Style.font.family
               font.pixelSize: Style.font.body
             }
             Button {
-              id: cancelButton
-              objectName: "plancks_cancelButton"
-              onActiveFocusChanged: if (activeFocus) root.revealButton(cancelButton)
-              text: "Cancel"
-              tooltipText: "Keep all data and cancel reset."
-              width: parent.width
+              id: retryButton
+              onActiveFocusChanged: if (activeFocus) root.revealButton(retryButton)
+              KeyNavigation.tab: resetButton
+              visible: EpochController.error !== ""
+              text: "Retry"
+              tooltipText: "Retry the pending action or reconnect to storage."
+              enabled: !EpochController.busy && !root.confirmingReset
               focusable: true
               bordered: true
               foreground: root.foreground
-              KeyNavigation.tab: confirmButton
-              KeyNavigation.backtab: confirmButton
-              onClicked: root.cancelReset()
-              Keys.onEscapePressed: root.cancelReset()
+              onClicked: if (enabled) EpochController.retry()
+              Keys.onEscapePressed: root.close()
             }
+            PanelSeparator { foreground: root.foreground }
             Button {
-              id: confirmButton
-              objectName: "plancks_confirmButton"
-              onActiveFocusChanged: if (activeFocus) root.revealButton(confirmButton)
-              text: "Delete all data and reset"
-              tooltipText: "Permanently delete all epoch data."
-              width: parent.width
+              id: resetButton
+              objectName: "plancks_resetButton"
+              onActiveFocusChanged: if (activeFocus) root.revealButton(resetButton)
+              anchors.right: parent.right
+              text: "Reset all data…"
+              tooltipText: "Review and confirm deletion of all epoch data."
+              visible: !root.confirmingReset
               enabled: !EpochController.busy
               focusable: true
-              bordered: true
+              bordered: false
+              fontSize: Style.font.bodySmall
               foreground: root.foreground
-              KeyNavigation.tab: cancelButton
-              KeyNavigation.backtab: cancelButton
+              KeyNavigation.tab: actionButton.enabled ? actionButton : retryButton
               onClicked: {
                 if (!enabled) return
-                root.confirmingReset = false
-                EpochController.reset(root.resetGeneration, root.resetSequence)
-                keys.forceActiveFocus()
+                root.resetGeneration = root.epoch.generation
+                root.resetSequence = root.epoch.sequence
+                root.confirmingReset = true
+                cancelButton.forceActiveFocus()
+                Qt.callLater(function() { scroll.contentY = 0 })
               }
-              Keys.onEscapePressed: root.cancelReset()
+              Keys.onEscapePressed: root.close()
+            }
+          }
+          Column {
+            width: parent.width
+            spacing: Style.space(14)
+            visible: root.confirmingReset
+            PanelSectionHeader {
+              width: parent.width
+              text: "RESET ALL DATA?"
+              foreground: root.foreground
+              fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+            }
+            Text {
+              width: parent.width
+              text: "Delete recorded epochs, off-time intervals, and learned predictions. Any active epoch will be discarded."
+              textFormat: Text.PlainText
+              wrapMode: Text.WordWrap
+              color: root.foreground
+              font.family: root.bar ? root.bar.fontFamily : Style.font.family
+              font.pixelSize: Style.font.bodySmall
+            }
+            Text {
+              width: parent.width
+              objectName: "plancks_resetWarning"
+              text: "This cannot be undone. Widget settings are kept."
+              textFormat: Text.PlainText
+              wrapMode: Text.WordWrap
+              color: root.foreground
+              opacity: 0.6
+              font.family: root.bar ? root.bar.fontFamily : Style.font.family
+              font.pixelSize: Style.font.bodySmall
+            }
+            Row {
+              width: parent.width
+              spacing: Style.space(8)
+              Button {
+                id: cancelButton
+                objectName: "plancks_cancelButton"
+                onActiveFocusChanged: if (activeFocus) root.revealButton(cancelButton)
+                text: "Cancel"
+                tooltipText: "Keep all data and cancel reset."
+                width: (parent.width - parent.spacing) / 2
+                fontSize: Style.font.bodySmall
+                fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+                horizontalPadding: Style.space(8)
+                focusable: true
+                bordered: true
+                foreground: root.foreground
+                KeyNavigation.tab: confirmButton
+                KeyNavigation.backtab: confirmButton
+                onClicked: root.cancelReset()
+                Keys.onEscapePressed: root.cancelReset()
+              }
+              Button {
+                id: confirmButton
+                objectName: "plancks_confirmButton"
+                onActiveFocusChanged: if (activeFocus) root.revealButton(confirmButton)
+                text: "Delete all data"
+                tooltipText: "Permanently delete all epoch data."
+                width: cancelButton.width
+                fontSize: Style.font.bodySmall
+                fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+                horizontalPadding: Style.space(8)
+                enabled: !EpochController.busy
+                focusable: true
+                bordered: true
+                foreground: root.bar ? root.bar.urgent : Color.urgent
+                Accessible.name: text
+                Accessible.description: tooltipText
+                KeyNavigation.tab: cancelButton
+                KeyNavigation.backtab: cancelButton
+                onClicked: {
+                  if (!enabled) return
+                  root.confirmingReset = false
+                  EpochController.reset(root.resetGeneration, root.resetSequence)
+                  keys.forceActiveFocus()
+                }
+                Keys.onEscapePressed: root.cancelReset()
+              }
             }
           }
         }
