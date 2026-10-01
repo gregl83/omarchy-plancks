@@ -7,10 +7,12 @@
 Plancks is an Omarchy bar widget for your daily opportunity window. Standard clocks keep people in sync; Plancks helps you understand your own daily rhythm.
 
 <p align="center">
-  <img src="preview.png" alt="Plancks bar timer and panel showing an active epoch, expected durations, and recent samples" width="360">
+  <img src="preview.png" alt="Plancks panel in Tokyo Night showing an active epoch with 3 hours 23 minutes remaining, consistent predictions, and sample history" width="360">
   <br>
-  <em>Preview with sample history.</em>
+  <em>Tokyo Night · illustrative sample history on Omarchy's launch day.</em>
 </p>
+
+The preview is frozen at **June 26, 2025, 13:37 PDT**, using the date of [Omarchy's launch announcement](https://world.hey.com/dhh/omarchy-is-out-4666dd31). The time is illustrative, not the announcement's publication time. Its sample epoch starts at 09:00 and is expected to end at 17:00: 4h 37m elapsed, with 3h 23m remaining. Five completed 8h epochs and five 16h off-time intervals predict the next start at 09:00 on Friday, June 27; the previous epoch ended at 17:00 on Wednesday, June 25.
 
 An **epoch** is your window of available opportunity; **off-time** is the interval between epochs. Start an epoch when you get out of bed or sign in to work, and end it when you go to bed or sign out—usually once each per day.
 
