@@ -140,10 +140,10 @@ Panel {
           Item {
             id: header
             width: parent.width
-            readonly property bool stacked: title.implicitWidth + statusMetrics.width + Style.space(16) > width
+            readonly property bool stacked: title.implicitWidth + phaseBadge.implicitWidth + Style.space(16) > width
             implicitHeight: stacked
-              ? title.height + Style.space(6) + phaseStatus.height
-              : Math.max(title.height, phaseStatus.height)
+              ? title.height + Style.space(6) + phaseBadge.height
+              : Math.max(title.height, phaseBadge.height)
             height: implicitHeight
 
             Text {
@@ -158,46 +158,101 @@ Panel {
               font.bold: true
               elide: Text.ElideRight
             }
-            TextMetrics {
-              id: statusMetrics
-              font: phaseStatus.font
-              text: phaseStatus.text
-            }
             Text {
-              id: phaseStatus
-              x: header.stacked ? 0 : title.width + Style.space(16)
+              id: phaseBadge
+              x: header.width - width
               y: header.stacked ? title.height + Style.space(6) : (header.height - height) / 2
-              width: header.stacked ? header.width : Math.max(0, header.width - x)
-              text: root.epoch.phase === "active" ? "●  Epoch active" : "○  Off-time"
+              width: Math.min(implicitWidth, header.width)
+              text: root.epoch.phase === "active" ? "● ACTIVE" : "○ OFF-TIME"
               textFormat: Text.PlainText
               horizontalAlignment: Text.AlignRight
               wrapMode: Text.Wrap
               color: root.foreground
+              opacity: 0.6
               font.family: root.bar ? root.bar.fontFamily : Style.font.family
-              font.pixelSize: Style.font.caption
+              font.pixelSize: Math.max(Style.space(9), Style.font.caption - Style.space(1))
+              Accessible.name: root.epoch.phase === "active" ? "Epoch active" : "Off-time"
             }
           }
           PanelSeparator {
             foreground: root.foreground
           }
-          Text {
+          Item {
             width: parent.width
-            textFormat: Text.RichText
-            horizontalAlignment: Text.AlignHCenter
-            text: "<span style=\"font-size: " + Style.space(20) + "px;\"><i>t</i><sub>P</sub></span> " + (root.epoch.timer || "--:--:--")
-            color: root.foreground
-            font.family: Style.font.family
-            font.pixelSize: Style.space(32)
+            height: timerText.implicitHeight + Style.space(20)
+            Item {
+              id: timerFrame
+              anchors.centerIn: parent
+              width: Math.min(parent.width, timerText.implicitWidth + Style.space(32))
+              height: parent.height
+              Rectangle {
+                anchors.fill: parent
+                color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.03)
+              }
+              Repeater {
+                model: 4
+                delegate: Item {
+                  required property int index
+                  readonly property bool rightSide: index % 2 === 1
+                  readonly property bool bottomSide: index >= 2
+                  readonly property real lineWidth: Math.max(1, Style.normalBorderWidth)
+                  width: Style.space(10)
+                  height: Style.space(10)
+                  x: rightSide ? timerFrame.width - width : 0
+                  y: bottomSide ? timerFrame.height - height : 0
+                  opacity: 0.35
+                  Rectangle {
+                    width: parent.width
+                    height: parent.lineWidth
+                    y: parent.bottomSide ? parent.height - height : 0
+                    color: root.foreground
+                  }
+                  Rectangle {
+                    width: parent.lineWidth
+                    height: parent.height
+                    x: parent.rightSide ? parent.width - width : 0
+                    color: root.foreground
+                  }
+                }
+              }
+            }
+            Text {
+              id: timerText
+              anchors.centerIn: parent
+              textFormat: Text.RichText
+              text: "<span style=\"font-size: " + Style.space(20) + "px;\"><i>t</i><sub>P</sub></span> " + (root.epoch.timer || "--:--:--")
+              color: root.foreground
+              font.family: Style.font.family
+              font.pixelSize: Style.space(32)
+            }
           }
           Text {
             width: parent.width
-            text: String(root.epoch.status || "").replace(/^(Epoch active|Off-time) · /, "")
+            text: String(root.epoch.status || "")
+              .replace(/^(Epoch active|Off-time) · /, "")
+              .replace("next epoch start", "start")
+              .replace("epoch end", "end")
+              .replace(/^(Epoch|Off-time) elapsed · learning your rhythm$/, "Learning your rhythm")
+              .replace("Clock changed · prediction unavailable", "Prediction unavailable")
+            Accessible.name: root.epoch.status
+            MouseArea {
+              id: captionHover
+              anchors.fill: parent
+              hoverEnabled: true
+              acceptedButtons: Qt.NoButton
+            }
+            PanelToolTip {
+              visible: captionHover.containsMouse
+              text: root.epoch.status
+              fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+            }
             textFormat: Text.PlainText
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
             color: root.foreground
+            opacity: 0.75
             font.family: Style.font.family
-            font.pixelSize: Style.font.body
+            font.pixelSize: Style.font.bodySmall
           }
           PanelSeparator { foreground: root.foreground }
           Row {
@@ -221,6 +276,7 @@ Panel {
               focusable: true
               bordered: true
               foreground: root.foreground
+              background: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
               Accessible.role: Accessible.Button
               Accessible.name: text
               Accessible.description: tooltipText
@@ -243,7 +299,7 @@ Panel {
                 : "Start now; exclude the off-time from predictions."
               enabled: actionButton.enabled
               focusable: true
-              bordered: false
+              bordered: true
               foreground: root.foreground
               Accessible.role: Accessible.Button
               Accessible.name: text
@@ -328,7 +384,8 @@ Panel {
                     horizontalAlignment: modelData.isValue ? Text.AlignRight : Text.AlignLeft
                     wrapMode: modelData.isValue ? Text.WordWrap : Text.NoWrap
                     color: root.foreground
-                    opacity: modelData.isValue ? 1 : 0.6
+                    opacity: modelData.isValue ? 1 : 0.55
+                    font.weight: modelData.isValue ? Font.Medium : Font.Normal
                     font.family: root.bar ? root.bar.fontFamily : Style.font.family
                     font.pixelSize: Style.font.bodySmall
                   }
