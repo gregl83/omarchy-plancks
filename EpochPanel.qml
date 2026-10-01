@@ -367,6 +367,7 @@ Panel {
                       return cells
                     }
                     delegate: Text {
+                      id: detailCell
                       required property var modelData
                       required property int index
                       width: modelData.isValue ? sectionDetails.valueWidth
@@ -382,9 +383,33 @@ Panel {
                         acceptedButtons: Qt.NoButton
                       }
                       PanelToolTip {
+                        id: detailTip
                         visible: detailHover.containsMouse
-                        text: parent.detailTooltip
+                        text: detailCell.detailTooltip
                         fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+                        contentItem: Row {
+                          leftPadding: Border.left(detailTip.panelBorderSpec) + Style.spacing.controlPaddingX
+                          rightPadding: Border.right(detailTip.panelBorderSpec) + Style.spacing.controlPaddingX
+                          topPadding: Border.top(detailTip.panelBorderSpec) + Style.spacing.controlPaddingY
+                          bottomPadding: Border.bottom(detailTip.panelBorderSpec) + Style.spacing.controlPaddingY
+                          Text {
+                            text: root.detailLabel(detailCell.modelData.row) + ": "
+                            textFormat: Text.PlainText
+                            color: detailTip.panelForeground
+                            opacity: 0.55
+                            font.family: detailTip.fontFamily
+                            font.pixelSize: detailTip.fontSize
+                            font.weight: Font.Normal
+                          }
+                          Text {
+                            text: root.detailValue(detailCell.modelData.row, false)
+                            textFormat: Text.PlainText
+                            color: detailTip.panelForeground
+                            font.family: detailTip.fontFamily
+                            font.pixelSize: detailTip.fontSize
+                            font.weight: Font.Normal
+                          }
+                        }
                       }
                       textFormat: Text.PlainText
                       horizontalAlignment: modelData.isValue ? Text.AlignRight : Text.AlignLeft
