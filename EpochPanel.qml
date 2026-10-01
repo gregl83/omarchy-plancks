@@ -222,6 +222,10 @@ Panel {
               textFormat: Text.RichText
               text: "<span style=\"font-size: " + Style.space(20) + "px;\"><i>t</i><sub>P</sub></span> " + (root.epoch.timer || "--:--:--")
               color: root.foreground
+              opacity: root.epoch.phase !== "active" && EpochController.error === "" ? 0.45 : 1
+              Behavior on opacity {
+                NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+              }
               font.family: Style.font.family
               font.pixelSize: Style.space(32)
             }

@@ -18,7 +18,7 @@ Plancks learns from recent epochs and off-time intervals to predict when your cu
 
 The widget renders Planck-time notation as italic **t** with an upright subscript capital **P**, equivalent to `t_P`. Durations are ordinary hours, minutes, and seconds.
 
-The bar uses normal text for an active epoch and Omarchy's standard dimmed styling for off-time. The tooltip, accessible label, and panel name the phase explicitly.
+The bar and panel timer use normal text for an active epoch and Omarchy's standard dimmed styling for off-time. Only the panel timer’s digits and notation fade; its frame and controls keep their normal styling. Storage errors restore full timer brightness. The tooltip, accessible label, and panel name the phase explicitly.
 
 | Appearance | Example | Meaning |
 | --- | --- | --- |
