@@ -67,7 +67,7 @@ ShellRoot {
     running: true
     onTriggered: {
       test.attempts++
-      if (!test.check(test.attempts < 18, "helper timeout: " + Plancks.EpochController.error)) return
+      if (!test.check(test.attempts < 18, "helper timeout at step " + test.step + ": " + Plancks.EpochController.error)) return
       if (!test.ipcDone || !Plancks.EpochController.ready || Plancks.EpochController.busy) return
       if (test.step === 0) {
         if (!test.check(widget.epoch.phase === "off", "initial phase")) return
@@ -129,6 +129,21 @@ ShellRoot {
       verify(keys !== null)
       // QtTest sends keys to its containing window: use the actual popup.
       parent = keys
+      var scroll = findChild(panel, "plancks_scroll")
+      function findVisual(item, name) {
+        if (item.objectName === name) return item
+        for (var child of item.children || []) {
+          var found = findVisual(child, name)
+          if (found) return found
+        }
+        return null
+      }
+      var predictions = findVisual(scroll.contentItem, "plancks_Predictions_details")
+      var history = findVisual(scroll.contentItem, "plancks_History_details")
+      verify(predictions !== null && history !== null)
+      compare(predictions.columns, 4, "Two prediction pairs per row at the normal panel width")
+      compare(history.columns, 4, "Two history pairs per row at the normal panel width")
+      compare(predictions.width, history.width, "Both sections use the same column widths")
       var action = findChild(panel, "plancks_actionButton")
       var skip = findChild(panel, "plancks_skipButton")
       verify(skip !== null)
@@ -142,7 +157,6 @@ ShellRoot {
       var cancel = findChild(panel, "plancks_cancelButton")
       var confirm = findChild(panel, "plancks_confirmButton")
       var warning = findChild(panel, "plancks_resetWarning")
-      var scroll = findChild(panel, "plancks_scroll")
       wait(300)
       keys.forceActiveFocus()
       keyClick(Qt.Key_Tab)

@@ -38,7 +38,7 @@ Panel {
   readonly property color foreground: bar ? bar.foreground : Color.foreground
 
   function stamp(value) {
-    return value === null || value === undefined ? "Not enough history" : Qt.formatDateTime(new Date(value), "ddd, MMM d · HH:mm:ss")
+    return value === null || value === undefined ? "Not enough history" : Qt.formatDateTime(new Date(value), "ddd, MMM d, yyyy · HH:mm:ss")
   }
   function length(value) {
     if (value === null || value === undefined) return "Not enough history"
@@ -48,6 +48,57 @@ Panel {
       + (seconds % 60).toString().padStart(2, "0")
   }
 
+  function compactStamp(value) {
+    if (value === null || value === undefined) return "—"
+    // Refresh relative dates with the phase's elapsed updates while open.
+    var elapsed = root.epoch.elapsed
+    var date = new Date(value)
+    var today = new Date()
+    var days = (Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+      - Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000
+    if (days === 0) return "Today " + Qt.formatDateTime(date, "HH:mm")
+    if (Math.abs(days) < 7) return Qt.formatDateTime(date, "ddd HH:mm")
+    return Qt.formatDateTime(date, date.getFullYear() === today.getFullYear() ? "MMM d HH:mm" : "yyyy-MM-dd HH:mm")
+  }
+  function compactLength(milliseconds) {
+    if (milliseconds === null || milliseconds === undefined) return "—"
+    var minutes = Math.floor(milliseconds / 60000)
+    if (minutes === 0) return milliseconds > 0 ? "<1m" : "0m"
+    var hours = Math.floor(minutes / 60)
+    var rest = minutes % 60
+    return hours ? hours + "h" + (rest ? " " + rest + "m" : "") : rest + "m"
+  }
+  function detailLabel(row) {
+    if (row.key === "elapsed") return root.epoch.phase === "active" ? "Epoch elapsed" : "Off-time elapsed"
+    if (row.key === "predictedEndUtcMs") return root.epoch.phase === "active" ? "Expected epoch end" : "Expected next epoch end"
+    return row.description
+  }
+  function detailValue(row, compact) {
+    var value = root.epoch[row.key]
+    if (row.format === "samples") {
+      if (compact) return root.epoch.workSampleCount + " / " + root.epoch.gapSampleCount
+      return root.epoch.workSampleCount + (root.epoch.workSampleCount === 1 ? " epoch · " : " epochs · ")
+        + root.epoch.gapSampleCount + (root.epoch.gapSampleCount === 1 ? " off-time interval" : " off-time intervals")
+    }
+    if (row.format === "stamp") return compact ? compactStamp(value) : value == null && row.empty ? row.empty : stamp(value)
+    if (row.format === "length") return compact ? compactLength(value) : length(value)
+    if (!compact) return value || "00:00:00"
+    var parts = String(value || "00:00:00").split(":")
+    return compactLength((Number(parts[0]) * 3600 + Number(parts[1]) * 60 + Number(parts[2])) * 1000)
+  }
+
+  FontMetrics {
+    id: detailFontMetrics
+    font.family: root.bar ? root.bar.fontFamily : Style.font.family
+    font.pixelSize: Style.font.bodySmall
+  }
+  readonly property real firstLabelWidth: Math.ceil(Math.max(
+    detailFontMetrics.advanceWidth("End"), detailFontMetrics.advanceWidth("Epoch"),
+    detailFontMetrics.advanceWidth("Started"), detailFontMetrics.advanceWidth("Elapsed")))
+  readonly property real secondLabelWidth: Math.ceil(Math.max(
+    detailFontMetrics.advanceWidth("Next start"), detailFontMetrics.advanceWidth("Off-time"),
+    detailFontMetrics.advanceWidth("Ended"), detailFontMetrics.advanceWidth("Samples")))
+
   KeyboardPanel {
     id: popup
     anchorItem: root.anchorItem
@@ -55,7 +106,7 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keys
-    contentWidth: fittedContentWidth(Style.space(520))
+    contentWidth: fittedContentWidth(Style.space(380))
     contentHeight: fittedContentHeight(column.implicitHeight)
 
     PanelKeyCatcher {
@@ -133,7 +184,7 @@ Panel {
             width: parent.width
             textFormat: Text.RichText
             horizontalAlignment: Text.AlignHCenter
-            text: "<i>t</i><sub>P</sub> " + (root.epoch.timer || "--:--:--")
+            text: "<span style=\"font-size: " + Style.space(20) + "px;\"><i>t</i><sub>P</sub></span> " + (root.epoch.timer || "--:--:--")
             color: root.foreground
             font.family: Style.font.family
             font.pixelSize: Style.space(32)
@@ -148,6 +199,7 @@ Panel {
             font.family: Style.font.family
             font.pixelSize: Style.font.body
           }
+          PanelSeparator { foreground: root.foreground }
           Row {
             id: actionRow
             width: parent.width
@@ -158,6 +210,8 @@ Panel {
               onActiveFocusChanged: if (activeFocus) root.revealButton(actionButton)
               KeyNavigation.tab: skipButton
               width: (parent.width - parent.spacing) / 2
+              fontSize: Style.font.bodySmall
+              horizontalPadding: Style.space(8)
               text: EpochController.busy ? "Saving…" : root.epoch.phase === "active" ? "End epoch" : "Start epoch"
               tooltipText: root.epoch.phase === "active"
                 ? "End now; learn from this epoch."
@@ -180,6 +234,8 @@ Panel {
               KeyNavigation.tab: retryButton.visible ? retryButton : resetButton
               KeyNavigation.backtab: actionButton
               width: actionButton.width
+              fontSize: Style.font.bodySmall
+              horizontalPadding: Style.space(8)
               text: root.epoch.phase === "active" ? "Skip to end epoch" : "Skip to start epoch"
               iconText: "\uDB81\uDCAD"
               tooltipText: root.epoch.phase === "active"
@@ -196,48 +252,87 @@ Panel {
               Keys.onEscapePressed: root.close()
             }
           }
+          PanelSeparator { foreground: root.foreground }
           Repeater {
             model: [
-              {label: "Last epoch start", key: "lastStartUtcMs", format: "stamp", empty: "Not started yet"},
-              {label: "Last epoch end", key: "lastEndUtcMs", format: "stamp", empty: "Not ended yet"},
-              {label: "", key: "elapsed", format: "elapsed"},
-              {label: "Expected epoch duration", key: "workPredictionMs", format: "length"},
-              {label: "Expected off-time duration", key: "gapPredictionMs", format: "length"},
-              {label: "", key: "predictedEndUtcMs", format: "stamp"},
-              {label: "Expected next epoch start", key: "predictedStartUtcMs", format: "stamp"},
-              {label: "Recent samples", key: "workSampleCount", format: "samples"}
+              {section: "Predictions", rows: [
+                {label: "End", key: "predictedEndUtcMs", format: "stamp"},
+                {label: "Next start", description: "Expected next epoch start", key: "predictedStartUtcMs", format: "stamp"},
+                {label: "Epoch", description: "Expected epoch duration", key: "workPredictionMs", format: "length"},
+                {label: "Off-time", description: "Expected off-time duration", key: "gapPredictionMs", format: "length"}
+              ]},
+              {section: "History", rows: [
+                {label: "Started", description: "Last epoch start", key: "lastStartUtcMs", format: "stamp", empty: "Not started yet"},
+                {label: "Ended", description: "Last epoch end", key: "lastEndUtcMs", format: "stamp", empty: "Not ended yet"},
+                {label: "Elapsed", key: "elapsed", format: "elapsed"},
+                {label: "Samples", description: "Recent samples", key: "workSampleCount", format: "samples"}
+              ]}
             ]
             delegate: Column {
+              id: sectionGroup
               required property var modelData
               width: column.width
-              spacing: Style.space(6)
+              spacing: Style.space(14)
+              PanelSeparator {
+                visible: sectionGroup.modelData.section === "History"
+                foreground: root.foreground
+              }
               PanelSectionHeader {
                 width: parent.width
-                text: {
-                  var label = parent.modelData.label
-                  if (parent.modelData.key === "elapsed") label = root.epoch.phase === "active" ? "Epoch elapsed" : "Off-time elapsed"
-                  if (parent.modelData.key === "predictedEndUtcMs") label = root.epoch.phase === "active" ? "Expected epoch end" : "Expected next epoch end"
-                  return label.toUpperCase()
-                }
+                text: sectionGroup.modelData.section.toUpperCase()
                 foreground: root.foreground
                 fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-                wrapMode: Text.WordWrap
               }
-              Text {
+              Grid {
+                id: sectionDetails
+                objectName: "plancks_" + sectionGroup.modelData.section + "_details"
                 width: parent.width
-                text: {
-                  var row = parent.modelData
-                  var value = root.epoch[row.key]
-                  if (row.format === "samples") return root.epoch.workSampleCount + (root.epoch.workSampleCount === 1 ? " epoch · " : " epochs · ")
-                    + root.epoch.gapSampleCount + (root.epoch.gapSampleCount === 1 ? " off-time interval" : " off-time intervals")
-                  if (row.format === "stamp") return value == null && row.empty ? row.empty : root.stamp(value)
-                  if (row.format === "length") return root.length(value)
-                  return value || "00:00:00"
+                columns: width >= Style.space(320) ? 4 : 2
+                columnSpacing: Style.space(20)
+                rowSpacing: Style.spacing.labelGap
+                readonly property real labelSpace: columns === 4
+                  ? root.firstLabelWidth + root.secondLabelWidth
+                  : Math.max(root.firstLabelWidth, root.secondLabelWidth)
+                readonly property real valueWidth: Math.max(0,
+                  (width - (columns - 1) * columnSpacing - labelSpace) / (columns / 2))
+                Repeater {
+                  model: {
+                    var cells = []
+                    for (var row of sectionGroup.modelData.rows) {
+                      cells.push({row: row, isValue: false})
+                      cells.push({row: row, isValue: true})
+                    }
+                    return cells
+                  }
+                  delegate: Text {
+                    required property var modelData
+                    required property int index
+                    width: modelData.isValue ? sectionDetails.valueWidth
+                      : sectionDetails.columns === 2 ? sectionDetails.labelSpace
+                      : index % 4 === 0 ? root.firstLabelWidth : root.secondLabelWidth
+                    text: modelData.isValue ? root.detailValue(modelData.row, true) : modelData.row.label
+                    readonly property string detailTooltip: root.detailLabel(modelData.row) + ": " + root.detailValue(modelData.row, false)
+                    Accessible.name: detailTooltip
+                    MouseArea {
+                      id: detailHover
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      acceptedButtons: Qt.NoButton
+                    }
+                    PanelToolTip {
+                      visible: detailHover.containsMouse
+                      text: parent.detailTooltip
+                      fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+                    }
+                    textFormat: Text.PlainText
+                    horizontalAlignment: modelData.isValue ? Text.AlignRight : Text.AlignLeft
+                    wrapMode: modelData.isValue ? Text.WordWrap : Text.NoWrap
+                    color: root.foreground
+                    opacity: modelData.isValue ? 1 : 0.6
+                    font.family: root.bar ? root.bar.fontFamily : Style.font.family
+                    font.pixelSize: Style.font.bodySmall
+                  }
                 }
-                wrapMode: Text.WordWrap
-                color: root.foreground
-                font.family: Style.font.family
-                font.pixelSize: Style.font.body
               }
             }
           }
