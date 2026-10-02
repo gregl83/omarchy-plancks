@@ -7,7 +7,7 @@
 Plancks is an Omarchy bar widget for your daily opportunity window. Standard clocks keep people in sync; Plancks helps you understand your own daily rhythm.
 
 <p align="center">
-  <img src="preview.png" alt="Plancks panel showing an active epoch, predictions, and recent samples" width="360">
+  <img src="preview.png" alt="Plancks between the clock and weather, with its active epoch panel open" width="360">
   <br>
   <em>Preview with sample history.</em>
 </p>
