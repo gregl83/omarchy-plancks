@@ -90,9 +90,11 @@ def apply(state, event):
                 or type(sample.get("durationMs")) not in (int, float)
                 or not -(2**53 - 1) <= sample["durationMs"] <= 2**53 - 1):
             raise ValueError("Invalid journal sample")
+        if type(sample.get("excludedFromLearning", False)) is not bool:
+            raise ValueError("Invalid journal sample exclusion flag")
         if sample["durationMs"] < 0:
             state["warnings"] = ["The clock moved backwards during an interval. That interval was excluded from predictions."]
-        else:
+        elif not sample.get("excludedFromLearning", False):
             key = "gapSamples" if starting else "workSamples"
             state[key] = (state[key] + [sample])[-5:]
     state.update(sequence=event["sequence"], lastEventId=event["eventId"],
@@ -206,7 +208,9 @@ class Store:
                         apply(state, event)
                     except (ValueError, KeyError, TypeError) as exc:
                         raise ValueError(f"Invalid record in {path.name}: {exc}") from exc
-                    ids[event["eventId"]] = (event["type"], path.name)
+                    sample = event.get("completedSample")
+                    exclusion = sample.get("excludedFromLearning", False) if sample is not None else None
+                    ids[event["eventId"]] = (event["type"], path.name, exclusion)
                     state["cursor"] = {"segment": path.name, "offset": stream.tell()}
         try:
             snapshot = json.loads((self.root / "state.json").read_text())
@@ -271,7 +275,10 @@ class Store:
         return {"segment": path.name, "offset": offset}
 
     def transition(self, action, event_id, expected_sequence, initial_ms=None,
-                   rotate_bytes=DEFAULT_ROTATE_BYTES, now=None, expected_generation=""):
+                   rotate_bytes=DEFAULT_ROTATE_BYTES, now=None, expected_generation="",
+                   skip_learning=False):
+        if type(skip_learning) is not bool:
+            raise ValueError("Skip learning must be a boolean")
         if action not in ("start", "end"):
             raise ValueError("Action must be start or end")
         if not isinstance(event_id, str) or not 1 <= len(event_id) <= 128:
@@ -287,8 +294,8 @@ class Store:
                 raise ValueError("Data was reset. Review the current state and try again.")
             event_type = "epoch_started" if action == "start" else "epoch_ended"
             if event_id in self._ids:
-                saved_type, segment = self._ids[event_id]
-                if saved_type != event_type:
+                saved_type, segment, saved_exclusion = self._ids[event_id]
+                if saved_type != event_type or (saved_exclusion is not None and saved_exclusion != skip_learning):
                     raise ValueError("Event ID already used for another action")
                 # A complete record may only be in the page cache after a failed
                 # append fsync. Retry durability before acknowledging it, including
@@ -307,6 +314,8 @@ class Store:
                 length, basis = elapsed(state["anchor"], now)
                 sample = {"eventId": event_id, "start": state["anchor"], "end": now,
                           "durationMs": length, "timeBasis": basis}
+                if skip_learning:
+                    sample["excludedFromLearning"] = True
             samples = state["workSamples" if action == "start" else "gapSamples"]
             prediction = estimate(samples, initial_ms if action == "start" else None)
             event = {"schemaVersion": VERSION, "sequence": state["sequence"] + 1,
@@ -500,7 +509,8 @@ def serve(store):
             elif action in ("start", "end"):
                 _, persistent_warning = store.transition(action, request["requestId"], request["sequence"],
                                                           initial_ms, request.get("rotateBytes", DEFAULT_ROTATE_BYTES),
-                                                          expected_generation=request.get("generation", ""))
+                                                          expected_generation=request.get("generation", ""),
+                                                          skip_learning=request.get("skipLearning", False))
             else:
                 raise ValueError("Unknown command")
             # Disk validation is reserved for commands and filesystem events.
@@ -573,6 +583,7 @@ def main():
     parser.add_argument("--request-id", default=None)
     parser.add_argument("--sequence", type=int, help="Expected sequence for start/end")
     parser.add_argument("--initial-seconds", type=int, default=0)
+    parser.add_argument("--skip", action="store_true", help="Exclude the completed interval from prediction learning")
     args = parser.parse_args()
     try:
         store = Store(args.state_dir)
@@ -586,7 +597,7 @@ def main():
                     parser.error("start/end requires --sequence from status")
                 state, warning = store.transition(args.action, args.request_id or str(uuid.uuid4()),
                                                   args.sequence, args.initial_seconds * 1000 or None,
-                                                  expected_generation=state["generation"])
+                                                  expected_generation=state["generation"], skip_learning=args.skip)
             print(json.dumps({"ok": True, "view": view(state), "warning": warning}))
     except (OSError, ValueError, KeyError, TypeError) as exc:
         print(json.dumps({"ok": False, "error": str(exc)}), flush=True)
