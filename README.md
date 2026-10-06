@@ -112,7 +112,7 @@ omarchy bar set gregl83.plancks initialSeconds 28800 --json
 
 The default `initialSeconds` is `0` (learn first); an initial estimate must be at least one second. Changing it affects future starts without history; it does not change an active epoch. The optional `rotateBytes` setting defaults to `5242880` (5 MiB).
 
-### Skip unusual periods (1.1.0)
+### Skip unusual periods
 
 The skip button changes phase while excluding the period you are leaving from prediction learning. Its timestamps and duration stay recorded.
 
@@ -123,7 +123,11 @@ The skip button changes phase while excluding the period you are leaving from pr
 
 Use **Skip to start epoch** after a weekend, or **Skip to end epoch** when you forgot to stop. If you immediately start again, use both skip actions to exclude the brief gap too. Normal actions resume learning.
 
-Version 1.1.0 is compatible with existing history; no migration or reset is needed. Older versions can read skipped records but count them toward predictions if you downgrade.
+Skipped intervals stay in history and can be included again through **View history**.
+
+### History and trends
+
+History shows five intervals per page, with inclusion switches and separate epoch and off-time duration trends. Each chart shows up to ten completed intervals, stays fixed while paging, and disappears without valid data. Changing an interval's inclusion updates relevant predictions while keeping the current interval's original start time.
 
 ## Optional keyboard shortcut
 
@@ -174,7 +178,7 @@ Plancks stores data locally and makes no network requests. It starts one Python 
 Runtime history lives at `$XDG_STATE_HOME/omarchy/gregl83.plancks/`, falling back to `~/.local/state/omarchy/gregl83.plancks/`. A relative XDG path is ignored.
 
 - `events/events-00000001.jsonl`, etc.: append-only start/end and history inclusion-change records, rotated before the next record exceeds the segment limit. All segments are retained until you reset the data. One record may exceed a very small configured limit.
-- `state.json`: the single mutable snapshot, replaced atomically after a durable journal append. Includes phase, clock anchors, frozen prediction, recent samples, and replay position.
+- `state.json`: the single mutable snapshot, replaced atomically after a durable journal append. Includes phase, clock anchors, the current prediction, recent samples, complete interval history, and replay position.
 - `events/.reset.json`: a reset token and completion flag, containing no epoch history. It prevents stale commands and duplicate reset retries from deleting new history and allows interrupted deletion to finish on recovery.
 - `.lock`: an empty coordination file for serializing helper instances; it contains no epoch state.
 
@@ -182,7 +186,7 @@ The journal is authoritative. Plancks replays and validates it on startup or whe
 
 Ordinary one-second updates use cached state and predictions: they do not scan, read, lock, or write history files. An in-process Linux inotify watch detects journal changes without another watcher process. The helper sends only changed timer/status fields; elapsed details update while a panel is open. Before there is any running display to update, it sleeps until a command or file change. Multiple monitor widgets share a controller, and storage also locks and checks revisions to reject stale commands. If storage fails, the panel reports the failure and offers **Retry**; retries reuse the request ID to avoid recording an action twice.
 
-Elapsed time includes suspend and uses Linux's suspend-inclusive monotonic clock within a boot. Across reboots it falls back to UTC timestamps; a backwards interval is flagged and excluded from learning. An active epoch stays active through suspend, shutdown, and midnight until you end it or reset the data. Long absences, including weekends, are included in off-time samples unless you use **Skip to start epoch**. Plancks has no automatic schedule or timestamp correction. History inclusion changes are appended to the journal without rewriting original intervals. Older plugin versions cannot read these new inclusion-change records; back up your storage before downgrading.
+Elapsed time includes suspend and uses Linux's suspend-inclusive monotonic clock within a boot. Across reboots it falls back to UTC timestamps; a backwards interval is flagged and excluded from learning. An active epoch stays active through suspend, shutdown, and midnight until you end it or reset the data. Long absences, including weekends, are included in off-time samples unless you use **Skip to start epoch**. Plancks has no automatic schedule or timestamp correction. History inclusion changes are appended to the journal without rewriting original intervals.
 
 ## Development checks
 
@@ -192,7 +196,7 @@ omarchy plugin validate .
 python3 tests/smoke_qml.py
 ```
 
-The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing epoch state through IPC, busy/not-ready guards, normal and skip transitions, overrun, vertical layout, and reset. With `--preview` (also used in CI), it exercises the reset warning, default Cancel focus, Cancel activation, Escape cancellation, and explicit deletion through keyboard input. Physical suspend/reboot still warrant a live-session check.
+The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing epoch state through IPC, busy/not-ready guards, normal and skip transitions, overrun, vertical layout, and reset. With `--preview` (also used in CI), it exercises history navigation, inclusion switches, pagination, trends and their empty-state behavior, plus the reset warning, default Cancel focus, Cancel activation, Escape cancellation, and explicit deletion through keyboard input. Physical suspend/reboot still warrant a live-session check.
 
 Regenerate both README previews with `python3 scripts/preview.py` in an active Wayland session. It renders the production panels with isolated, frozen sample history, preserves the preview’s bar framing and background strip, and leaves your saved history untouched.
 
