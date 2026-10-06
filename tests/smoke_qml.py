@@ -67,7 +67,7 @@ ShellRoot {
     running: true
     onTriggered: {
       test.attempts++
-      if (!test.check(test.attempts < 18, "helper timeout at step " + test.step + ": " + Plancks.EpochController.error)) return
+      if (!test.check(test.attempts < 40, "helper timeout at step " + test.step + ": " + Plancks.EpochController.error)) return
       if (!test.ipcDone || !Plancks.EpochController.ready || Plancks.EpochController.busy) return
       if (test.step === 0) {
         if (!test.check(widget.epoch.phase === "off", "initial phase")) return
@@ -111,7 +111,7 @@ ShellRoot {
         if (!test.check(widget.epoch.phase === "off" && second.epoch.sequence === 0, "shared reset")) return
         if (!test.check(widget.epoch.workSampleCount === 0 && widget.epoch.lastStartUtcMs === null, "reset clears history")) return
         widget.close()
-        console.log("PLANCKS_SMOKE_PASS: two widgets, IPC start/end, IPC guards, skip start/end, overrun, vertical layout, reset")
+        console.log("PLANCKS_SMOKE_PASS: two widgets, IPC start/end, IPC guards, skip start/end, overrun, vertical layout, history inclusion, pagination, reset")
         Qt.quit()
       }
     }
@@ -122,7 +122,24 @@ ShellRoot {
     id: resetTest
     name: "ResetConfirmation"
     when: test.preview && test.step === 4
+    // Quickshell does not initialize QtTest's text logger. Surface failures
+    // explicitly so the Python runner can report the failed UI assertion.
+    function verify(condition, message) {
+      if (!condition) { console.error("SMOKE_FAIL " + message); Qt.quit(); throw new Error(message) }
+    }
+    function compare(actual, expected, message) {
+      verify(actual === expected, (message || "Compare") + ": " + actual + " !== " + expected)
+    }
+    function tryVerify(callback, timeout, message) {
+      var deadline = Date.now() + (timeout || 5000)
+      while (!callback() && Date.now() < deadline) wait(20)
+      verify(callback(), message || "UI condition timed out")
+    }
     function test_resetConfirmation() {
+      try { runConfirmation() }
+      catch (error) { console.error("SMOKE_FAIL UI: " + error); Qt.quit(); throw error }
+    }
+    function runConfirmation() {
       var panel = findChild(widget, "plancks_root")
       verify(panel !== null, "Find the production panel")
       var keys = findChild(panel, "plancks_keys")
@@ -164,7 +181,64 @@ ShellRoot {
       keyClick(Qt.Key_Tab)
       verify(skip.activeFocus, "Tab reaches skip action")
       keyClick(Qt.Key_Tab)
-      verify(reset.activeFocus, "Tab reaches reset")
+      var historyButton = panel.historyLink
+      verify(historyButton.activeFocus, "Tab reaches history")
+      keyClick(Qt.Key_Return)
+      verify(panel.showingHistory, "History replaces the main panel")
+      var historyView = findChild(panel, "plancks_historyView")
+      verify(historyView.visible)
+      var back = findChild(panel, "plancks_historyBackButton")
+      tryVerify(function() { return !Plancks.EpochController.historyLoading })
+      compare(Plancks.EpochController.history.total, 3)
+      var skipped = findVisual(scroll.contentItem, "plancks_historyToggle_0")
+      verify(skipped !== null && !skipped.checked, "Skipped interval is unchecked")
+      skipped.forceActiveFocus()
+      keyClick(Qt.Key_Space)
+      tryVerify(function() { return !Plancks.EpochController.busy && !Plancks.EpochController.historyLoading
+        && Plancks.EpochController.state.workSampleCount === 2 })
+      skipped = findVisual(scroll.contentItem, "plancks_historyToggle_0")
+      verify(skipped.checked, "Included interval is checked after saving")
+      skipped.forceActiveFocus()
+      keyClick(Qt.Key_Space)
+      tryVerify(function() { return !Plancks.EpochController.busy && !Plancks.EpochController.historyLoading
+        && Plancks.EpochController.state.workSampleCount === 1 })
+      // Produce enough skipped intervals to exercise three pages without
+      // changing the learned samples used by the reset checks below.
+      for (var i = 0; i < 12; i++) {
+        Plancks.EpochController.transition(true)
+        tryVerify(function() { return !Plancks.EpochController.busy && !Plancks.EpochController.historyLoading })
+      }
+      compare(Plancks.EpochController.history.pages, 3)
+      compare(Plancks.EpochController.history.rows.length, 5)
+      var next = findChild(panel, "plancks_historyNextButton")
+      var previous = findChild(panel, "plancks_historyPreviousButton")
+      verify(next.enabled && !previous.enabled)
+      next.forceActiveFocus()
+      keyClick(Qt.Key_Return)
+      tryVerify(function() { return !Plancks.EpochController.historyLoading })
+      compare(Plancks.EpochController.history.page, 1)
+      compare(Plancks.EpochController.history.rows.length, 5)
+      verify(previous.enabled && next.enabled)
+      next.forceActiveFocus()
+      keyClick(Qt.Key_Return)
+      tryVerify(function() { return !Plancks.EpochController.historyLoading })
+      compare(Plancks.EpochController.history.page, 2)
+      compare(Plancks.EpochController.history.rows.length, 5)
+      verify(previous.enabled && !next.enabled)
+      previous.forceActiveFocus()
+      keyClick(Qt.Key_Return)
+      tryVerify(function() { return !Plancks.EpochController.historyLoading })
+      compare(Plancks.EpochController.history.page, 1)
+      previous.forceActiveFocus()
+      keyClick(Qt.Key_Return)
+      tryVerify(function() { return !Plancks.EpochController.historyLoading })
+      compare(Plancks.EpochController.history.page, 0)
+      back.forceActiveFocus()
+      keyClick(Qt.Key_Escape)
+      verify(!panel.showingHistory && panel.opened, "Escape returns to the main panel")
+      tryVerify(function() { return keys.activeFocus })
+      reset.forceActiveFocus()
+      verify(reset.activeFocus, "Reset receives keyboard focus")
       wait(100)
       verify(reset.mapToItem(scroll.contentItem, 0, 0).y + reset.height <= scroll.contentY + scroll.height + 1,
              "Reset scrolls into view")
@@ -233,7 +307,7 @@ ShellRoot {
     env = dict(os.environ, XDG_STATE_HOME=str(root / 'state'))
     result = subprocess.run(['quickshell', '-p', str(root), '--no-color'],
                             env=env, text=True, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, timeout=20)
+                            stderr=subprocess.STDOUT, timeout=35)
     print(result.stdout)
     if result.returncode or 'PLANCKS_SMOKE_PASS' not in result.stdout or 'SMOKE_FAIL' in result.stdout or ' ERROR' in result.stdout or 'WARN scene:' in result.stdout or 'FAIL!' in result.stdout or (args.preview and 'PLANCKS_RESET_UI_PASS' not in result.stdout):
         raise SystemExit(1)

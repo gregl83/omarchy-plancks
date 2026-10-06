@@ -11,6 +11,17 @@ Panel {
   property var anchorItem: null
   property var hostWidget: null
   readonly property var epoch: EpochController.state
+  property bool showingHistory: false
+  function openHistory() {
+    showingHistory = true
+    EpochController.requestHistory(0)
+    Qt.callLater(function() { scroll.contentY = 0; keys.forceActiveFocus() })
+  }
+  function closeHistory() {
+    showingHistory = false
+    Qt.callLater(function() { scroll.contentY = 0; keys.forceActiveFocus() })
+  }
+  property var historyLink: null
   property bool confirmingReset: false
   property string resetGeneration: ""
   property int resetSequence: 0
@@ -20,6 +31,8 @@ Panel {
   }
   function revealButton(button) {
     Qt.callLater(function() {
+      // A history refresh may replace a focused row before this runs.
+      if (!button || typeof button.mapToItem !== "function" || !button.visible) return
       var top = button.mapToItem(scroll.contentItem, 0, 0).y
       var bottom = top + button.height
       if (top < scroll.contentY) scroll.contentY = top
@@ -29,6 +42,7 @@ Panel {
   property bool detailSubscription: false
   onOpenedChanged: {
     confirmingReset = false
+    showingHistory = false
     if (detailSubscription !== opened) {
       detailSubscription = opened
       EpochController.setPanelOpen(opened)
@@ -115,15 +129,17 @@ Panel {
       id: keys
       objectName: "plancks_keys"
       anchors.fill: parent
-      onCloseRequested: { if (root.confirmingReset) root.cancelReset(); else root.close() }
+      onCloseRequested: { if (root.showingHistory) root.closeHistory(); else if (root.confirmingReset) root.cancelReset(); else root.close() }
       onTabRequested: function(direction) {
-        if (root.confirmingReset) cancelButton.forceActiveFocus()
+        if (root.showingHistory) historyView.focusBack()
+        else if (root.confirmingReset) cancelButton.forceActiveFocus()
         else if (actionButton.enabled) actionButton.forceActiveFocus()
         else if (retryButton.visible) retryButton.forceActiveFocus()
       }
       onMoveRequested: function(dx, dy) { scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height, scroll.contentY + dy * Style.space(48))) }
       onActivateRequested: {
-        if (root.confirmingReset) root.cancelReset()
+        if (root.showingHistory) historyView.focusBack()
+        else if (root.confirmingReset) root.cancelReset()
         else if (EpochController.ready && !EpochController.busy) EpochController.transition()
         else if (EpochController.error && !EpochController.busy) EpochController.retry()
       }
@@ -142,10 +158,12 @@ Panel {
           Item {
             id: header
             width: parent.width
-            readonly property bool stacked: title.implicitWidth + phaseBadge.implicitWidth + Style.space(16) > width
+            readonly property real trailingWidth: root.showingHistory ? historyBackButton.implicitWidth : phaseBadge.implicitWidth
+            readonly property real trailingHeight: root.showingHistory ? historyBackButton.height : phaseBadge.height
+            readonly property bool stacked: title.implicitWidth + trailingWidth + Style.space(16) > width
             implicitHeight: stacked
-              ? title.height + Style.space(6) + phaseBadge.height
-              : Math.max(title.height, phaseBadge.height)
+              ? title.height + Style.space(6) + trailingHeight
+              : Math.max(title.height, trailingHeight)
             height: implicitHeight
 
             Text {
@@ -162,7 +180,7 @@ Panel {
             }
             Text {
               id: phaseBadge
-              visible: !root.confirmingReset
+              visible: !root.confirmingReset && !root.showingHistory
               x: header.width - width
               y: header.stacked ? title.height + Style.space(6) : (header.height - height) / 2
               width: Math.min(implicitWidth, header.width)
@@ -176,6 +194,25 @@ Panel {
               font.pixelSize: Math.max(Style.space(9), Style.font.caption - Style.space(1))
               Accessible.name: root.epoch.phase === "active" ? "Epoch active" : "Off-time"
             }
+            Button {
+              id: historyBackButton
+              objectName: "plancks_historyBackButton"
+              visible: root.showingHistory
+              x: header.width - width
+              y: header.stacked ? title.height + Style.space(6) : (header.height - height) / 2
+              text: "Back"
+              tooltipText: "Return to the current epoch."
+              foreground: Qt.darker(root.foreground, 1.4)
+              fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+              fontSize: Style.font.caption
+              horizontalPadding: Style.space(4)
+              verticalPadding: Style.space(2)
+              bordered: false
+              focusable: true
+              onClicked: root.closeHistory()
+              onActiveFocusChanged: if (activeFocus) root.revealButton(historyBackButton)
+              Keys.onEscapePressed: root.closeHistory()
+            }
           }
           PanelSeparator {
             foreground: root.foreground
@@ -184,7 +221,7 @@ Panel {
             id: normalContent
             width: parent.width
             spacing: Style.space(14)
-            visible: !root.confirmingReset
+            visible: !root.confirmingReset && !root.showingHistory
             Item {
               width: parent.width
               height: timerText.implicitHeight + Style.space(20)
@@ -295,7 +332,7 @@ Panel {
                 id: skipButton
                 objectName: "plancks_skipButton"
                 onActiveFocusChanged: if (activeFocus) root.revealButton(skipButton)
-                KeyNavigation.tab: retryButton.visible ? retryButton : resetButton
+                KeyNavigation.tab: root.historyLink
                 KeyNavigation.backtab: actionButton
                 width: actionButton.width
                 fontSize: Style.font.bodySmall
@@ -424,6 +461,27 @@ Panel {
                     }
                   }
                 }
+                Button {
+                  id: historyButton
+                  objectName: "plancks_historyButton"
+                  visible: sectionGroup.modelData.section === "History"
+                  anchors.horizontalCenter: parent.horizontalCenter
+                  text: "View history"
+                  tooltipText: "Review recorded intervals and choose which to use for predictions."
+                  fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+                  fontSize: Style.font.caption
+                  horizontalPadding: Style.space(4)
+                  verticalPadding: Style.space(2)
+                  foreground: Qt.darker(root.foreground, 1.4)
+                  focusable: true
+                  bordered: false
+                  KeyNavigation.tab: retryButton.visible ? retryButton : resetButton
+                  KeyNavigation.backtab: skipButton
+                  Component.onCompleted: if (sectionGroup.modelData.section === "History") root.historyLink = historyButton
+                  onActiveFocusChanged: if (activeFocus) root.revealButton(historyButton)
+                  onClicked: root.openHistory()
+                  Keys.onEscapePressed: root.close()
+                }
               }
             }
             Text {
@@ -457,7 +515,7 @@ Panel {
               anchors.right: parent.right
               text: "Reset all data…"
               tooltipText: "Review and confirm deletion of all epoch data."
-              visible: !root.confirmingReset
+              visible: !root.confirmingReset && !root.showingHistory
               enabled: !EpochController.busy
               focusable: true
               bordered: false
@@ -474,6 +532,18 @@ Panel {
               }
               Keys.onEscapePressed: root.close()
             }
+          }
+          HistoryView {
+            id: historyView
+            objectName: "plancks_historyView"
+            width: parent.width
+            visible: root.showingHistory
+            backControl: historyBackButton
+            foreground: root.foreground
+            fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+            onBackRequested: root.closeHistory()
+            onRevealRequested: function(item) { root.revealButton(item) }
+            onPageChanged: Qt.callLater(function() { scroll.contentY = 0; keys.forceActiveFocus() })
           }
           Column {
             width: parent.width

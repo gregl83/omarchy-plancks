@@ -79,6 +79,123 @@ class StoreTests(unittest.TestCase):
         self.n += 1
         return self.store.transition(action, f'event-{self.n}', self.store.load()['sequence'], now=at(hours), **kwargs)[0]
 
+    def include(self, sample_id, excluded, request_id='edit', **kwargs):
+        state = self.store.load()
+        return self.store.set_inclusion(sample_id, excluded, request_id, state['sequence'],
+                                        state['generation'], **kwargs)[0]
+
+    def test_history_pagination_includes_skipped_and_replays_rotated_records(self):
+        for i in range(14):
+            self.transition('start' if i % 2 == 0 else 'end', i,
+                            skip_learning=i == 3, rotate_bytes=1)
+        first = self.store.history_page()
+        self.assertEqual((first['total'], first['pages'], len(first['rows'])), (13, 3, 5))
+        self.assertEqual(first['rows'][0]['eventId'], 'event-14')
+        second = self.store.history_page(1)
+        self.assertEqual(len(second['rows']), 5)
+        third = self.store.history_page(2)
+        self.assertEqual(len(third['rows']), 3)
+        self.assertTrue(third['rows'][0]['excludedFromLearning'])
+        self.assertEqual(self.store.history_page(100)['page'], 2)
+        recovered = p.Store(self.temp.name)
+        self.assertEqual(recovered.history_page(), first)
+        with self.assertRaises(ValueError):
+            self.store.history_page(-1)
+
+    def test_exclusion_backfills_older_sample_and_updates_active_prediction(self):
+        hour = 0
+        for length in [1, 2, 4, 6, 8, 10]:
+            self.transition('start', hour)
+            hour += length
+            self.transition('end', hour)
+            hour += 1
+        active = self.transition('start', hour)
+        anchor = active['anchor']
+        edited = self.include('event-12', True)
+        self.assertEqual([s['durationMs'] // HOUR for s in edited['workSamples']], [1, 2, 4, 6, 8])
+        self.assertEqual(edited['predictionMs'], 4 * HOUR)
+        self.assertEqual(edited['anchor'], anchor)
+        self.assertEqual(edited['phase'], 'active')
+        self.assertEqual(p.view(edited, at(hour + 1))['timer'], '−03:00:00')
+        self.assertEqual(p.view(edited, at(hour + 1))['predictedEndUtcMs'], at(hour + 4)['utcMs'])
+        self.assertEqual(p.Store(self.temp.name).recover(), edited)
+        restored = self.include('event-12', False, 'restore')
+        self.assertEqual(restored['predictionMs'], active['predictionMs'])
+
+    def test_old_exclusions_and_other_interval_type_preserve_frozen_prediction(self):
+        for i in range(14):
+            self.transition('start' if i % 2 == 0 else 'end', i)
+        active = self.transition('start', 14)
+        older = self.include('event-2', True)
+        self.assertEqual(older['predictionMs'], active['predictionMs'])
+        gap = self.include('event-15', True, 'gap-edit')
+        self.assertEqual(gap['predictionMs'], active['predictionMs'])
+        self.assertEqual(gap['workSamples'], older['workSamples'])
+        self.assertEqual(gap['anchor'], active['anchor'])
+
+    def test_removing_all_work_samples_uses_fallback_or_learning(self):
+        self.transition('start', 0)
+        self.transition('end', 4, skip_learning=True)
+        self.transition('start', 5)
+        included = self.include('event-2', False)
+        self.assertEqual(included['predictionMs'], 4 * HOUR)
+        fallback = self.include('event-2', True, 'fallback', initial_ms=8 * HOUR)
+        self.assertEqual(fallback['predictionMs'], 8 * HOUR)
+        self.include('event-2', False, 'restore')
+        learning = self.include('event-2', True, 'learning')
+        self.assertIsNone(learning['predictionMs'])
+        self.assertEqual(p.view(learning, at(6))['timer'], '+01:00:00')
+
+    def test_off_time_exclusion_updates_current_off_time(self):
+        self.transition('start', 0)
+        self.transition('end', 4)
+        self.transition('start', 6)
+        off = self.transition('end', 10)
+        self.assertEqual(off['predictionMs'], 2 * HOUR)
+        edited = self.include('event-3', True)
+        self.assertIsNone(edited['predictionMs'])
+        self.assertEqual(edited['anchor'], off['anchor'])
+        restored = self.include('event-3', False, 'restore')
+        self.assertEqual(p.view(restored, at(11))['predictedStartUtcMs'], at(12)['utcMs'])
+
+    def test_history_edit_retries_stale_revisions_and_reset_generation(self):
+        self.transition('start', 0)
+        before = self.transition('end', 4)
+        edited = self.include('event-2', True)
+        duplicate, _ = self.store.set_inclusion('event-2', True, 'edit', before['sequence'])
+        self.assertEqual(duplicate, edited)
+        with self.assertRaisesRegex(ValueError, 'another action'):
+            self.store.set_inclusion('event-2', False, 'edit', edited['sequence'])
+        with self.assertRaisesRegex(ValueError, 'changed'):
+            self.store.set_inclusion('event-2', False, 'stale', before['sequence'])
+        self.store.reset('reset-history', '', edited['sequence'])
+        self.assertEqual(self.store.history_page()['total'], 0)
+        with self.assertRaisesRegex(ValueError, 'reset'):
+            self.store.set_inclusion('event-2', True, 'edit', edited['sequence'])
+
+    def test_history_edit_retry_after_uncertain_append_is_durable_and_idempotent(self):
+        self.transition('start', 0)
+        before = self.transition('end', 4)
+        with patch.object(p.os, 'fsync', side_effect=OSError('uncertain append')):
+            with self.assertRaises(OSError):
+                self.include('event-2', True)
+        recovered = p.Store(self.temp.name)
+        with patch.object(p.os, 'fsync', wraps=p.os.fsync) as synced:
+            state, _ = recovered.set_inclusion('event-2', True, 'edit', before['sequence'])
+            self.assertTrue(synced.called)
+        self.assertEqual(state['sequence'], before['sequence'] + 1)
+        self.assertTrue(recovered.history_page()['rows'][0]['excludedFromLearning'])
+        self.assertEqual(len(state['history']), 1)
+
+    def test_invalid_clock_interval_cannot_be_reincluded(self):
+        self.transition('start', 5)
+        self.transition('end', 4)
+        row = self.store.history_page()['rows'][0]
+        self.assertLess(row['durationMs'], 0)
+        self.assertFalse(row['recent'])
+        with self.assertRaisesRegex(ValueError, 'invalid history interval'):
+            self.include('event-2', False)
+
     def test_daily_window_and_independent_gaps(self):
         first = self.transition('start', 7)
         self.assertIsNone(first['predictionMs'])
@@ -473,6 +590,30 @@ class BridgeTests(unittest.TestCase):
     def send(self, request):
         self.process.stdin.write((json.dumps(request) + '\n').encode())
         self.process.stdin.flush()
+
+    def test_history_bridge_edit_updates_view_and_external_edits_refresh(self):
+        self.send({'action': 'history', 'requestId': 'history-empty'})
+        self.assertEqual(self.read()['history']['total'], 0)
+        store = p.Store(self.temp.name)
+        store.transition('start', 's1', 0, now=p.clock())
+        self.read()
+        store.transition('end', 'e1', 1, now=p.clock())
+        self.read()
+        self.send({'action': 'history', 'page': 0, 'requestId': 'history-full'})
+        history = self.read()['history']
+        self.assertEqual(history['rows'][0]['eventId'], 'e1')
+        self.send({'action': 'set_inclusion', 'sampleId': 'e1', 'excludedFromLearning': True,
+                   'requestId': 'edit', 'sequence': history['sequence'], 'generation': history['generation']})
+        reply = self.read()
+        self.assertTrue(reply['ok'])
+        self.assertEqual(reply['requestId'], 'edit')
+        self.assertEqual(reply['view']['workSampleCount'], 0)
+        store.set_inclusion('e1', False, 'external-edit', 3)
+        reply = self.read()
+        self.assertEqual(reply['view']['workSampleCount'], 1)
+        self.send({'action': 'history', 'requestId': 'history-updated'})
+        reply = self.read()
+        self.assertFalse(reply['history']['rows'][0]['excludedFromLearning'])
 
     def test_idle_sleeps_and_external_writer_wakes_it(self):
         self.assertFalse(select.select([self.process.stdout], [], [], 1.2)[0])
