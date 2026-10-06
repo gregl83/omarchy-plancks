@@ -9,8 +9,8 @@
 Plancks sits alongside your standard clock in the Omarchy bar, tracking your daily opportunity window and predicting what comes next. Standard clocks keep people in sync; Plancks helps you understand your own daily rhythm.
 
 <p align="center">
-  <img src="preview.png" alt="Plancks between the clock and weather, with its active epoch panel open" width="360">
-  <img src="preview-history.png" alt="Plancks history with epoch and off-time trends, five intervals, inclusion switches, and pagination" width="360">
+  <img align="top" src="preview.png" alt="Plancks between the clock and weather, with its active epoch panel open" width="360">
+  <img align="top" src="preview-history.png" alt="Plancks history with epoch and off-time trends, five intervals, inclusion switches, and pagination" width="360">
   <br>
   <em>Preview with sample history.</em>
 </p>
