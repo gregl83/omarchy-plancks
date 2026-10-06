@@ -5,12 +5,14 @@ from __future__ import annotations
 import argparse
 import contextlib
 import ctypes
+from datetime import datetime
 from functools import cache
 import copy
 import fcntl
 import json
 import math
 import os
+import re
 from pathlib import Path
 import selectors
 import sys
@@ -21,6 +23,47 @@ import uuid
 
 VERSION = 1
 DEFAULT_ROTATE_BYTES = 5 * 1024 * 1024
+
+
+def search_terms(text):
+    text = re.sub(r"[,\s]+", " ", text.casefold()).strip()
+    months = r"(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)"
+    return re.findall(rf"\b{months}\s+\d{{1,2}}\b|\b\d{{1,2}}\s+{months}\b|\S+", text)
+
+
+def history_matches(text, terms):
+    # Named dates are phrases; a bare number remains a broad substring search.
+    return all(re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", text) if " " in term
+               else term in text for term in terms)
+
+
+def history_search_text(sample, recent):
+    """Search the local dates, times, durations, and labels shown in history."""
+    excluded = sample["durationMs"] < 0 or sample.get("excludedFromLearning", False)
+    fields = ["epoch" if sample["kind"] == "epoch" else "off-time off time",
+              "excluded" if excluded else "included",
+              "recent sample" if recent else "older"]
+    for anchor in (sample["start"], sample["end"]):
+        try:
+            date = datetime.fromtimestamp(anchor["utcMs"] / 1000).astimezone()
+        except (ValueError, OverflowError, OSError):
+            continue
+        fields.extend([date.strftime("%Y-%m-%d %Y/%m/%d %m/%d/%Y %H:%M:%S %I:%M %p %A %a %b %d %B %d %d %b %d %B"),
+                       f"{date.month}/{date.day}/{date.year}",
+                       f"{date.strftime('%b')} {date.day} {date.strftime('%B')} {date.day}",
+                       f"{date.day} {date.strftime('%b')} {date.day} {date.strftime('%B')}",
+                       f"{date.strftime('%b')}{date.day} {date.strftime('%B')}{date.day}",
+                       f"{date.hour}:{date.minute:02d}"])
+    if sample["durationMs"] < 0:
+        fields.append("clock changed backwards")
+    else:
+        seconds = sample["durationMs"] // 1000
+        hours, minutes = divmod(seconds // 60, 60)
+        fields.extend([duration(sample["durationMs"]), f"{hours}h {minutes}m", f"{hours}h{minutes}m",
+                       f"{hours} hours {minutes} minutes", f"{seconds // 60}m", f"{seconds}s"])
+        if seconds < 60:
+            fields.append("<1m" if sample["durationMs"] > 0 else "0m")
+    return " ".join(search_terms(" ".join(fields)))
 
 
 @cache
@@ -353,16 +396,27 @@ class Store:
             self._signature = None
             return state, self.snapshot_warning(state)
 
-    def history_page(self, page=0, page_size=5):
+    def history_page(self, page=0, page_size=5, query=""):
         if type(page) is not int or page < 0:
             raise ValueError("History page must be a nonnegative integer")
+        if not isinstance(query, str) or len(query) > 256:
+            raise ValueError("History search must be text of at most 256 characters")
         with self.locked():
             state = self.load()
-        total = len(state["history"])
+        recent = {s["eventId"] for key in ("workSamples", "gapSamples") for s in state[key]}
+        terms = search_terms(query)
+        matches = list(reversed(state["history"]))
+        if terms:
+            filtered = []
+            for sample in matches:
+                text = history_search_text(sample, sample["eventId"] in recent)
+                if history_matches(text, terms):
+                    filtered.append(sample)
+            matches = filtered
+        total = len(matches)
         pages = max(1, math.ceil(total / page_size))
         page = min(page, pages - 1)
-        recent = {s["eventId"] for key in ("workSamples", "gapSamples") for s in state[key]}
-        rows = list(reversed(state["history"]))[page * page_size:(page + 1) * page_size]
+        rows = matches[page * page_size:(page + 1) * page_size]
         trends = {}
         for kind in ("epoch", "off"):
             completed = [s for s in state["history"] if s["kind"] == kind and s["durationMs"] >= 0][-10:]
@@ -370,7 +424,8 @@ class Store:
                              "durationMs": s["durationMs"],
                              "excludedFromLearning": s.get("excludedFromLearning", False)} for s in completed]
         return {"page": page, "pages": pages, "total": total, "sequence": state["sequence"],
-                "generation": state["generation"], "trends": trends,
+                "generation": state["generation"], "trends": trends, "query": query.strip(),
+                "unfilteredTotal": len(state["history"]),
                 "rows": [dict(s, recent=s["eventId"] in recent) for s in rows]}
 
     def set_inclusion(self, sample_id, excluded, event_id, expected_sequence,
@@ -590,7 +645,7 @@ def serve(store):
                     raise ValueError("Panel open must be a boolean")
                 panel_open = request["open"]
             elif action == "history":
-                emit({"ok": True, "history": store.history_page(request.get("page", 0)), "requestId": ack})
+                emit({"ok": True, "history": store.history_page(request.get("page", 0), query=request.get("query", "")), "requestId": ack})
                 return
             elif action == "set_inclusion":
                 _, persistent_warning = store.set_inclusion(

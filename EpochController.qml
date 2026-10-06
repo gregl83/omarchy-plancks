@@ -30,14 +30,16 @@ QtObject {
   property string historyError: ""
   property string historyRequestId: ""
   property int historyPage: 0
+  property string historyQuery: ""
 
-  function requestHistory(page) {
+  function requestHistory(page, query) {
+    if (query !== undefined) historyQuery = query
     historyPage = Math.max(0, page)
     historyError = ""
     historyLoading = true
     historyRequestId = "history-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)
     if (helper.running) {
-      helper.write(JSON.stringify({action: "history", page: historyPage, requestId: historyRequestId}) + "\n")
+      helper.write(JSON.stringify({action: "history", page: historyPage, query: historyQuery, requestId: historyRequestId}) + "\n")
       historyWatchdog.restart()
     } else helper.running = true
   }
