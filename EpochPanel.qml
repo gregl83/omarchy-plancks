@@ -82,6 +82,8 @@ Panel {
     }
     if (row.format === "stamp") return compact ? compactStamp(value) : value == null && row.empty ? row.empty : stamp(value)
     if (row.format === "length") return compact ? compactLength(value) : length(value)
+    if (row.format === "elapsed" && root.epoch.lastStartUtcMs == null)
+      return compact ? "—" : "Not started yet"
     if (!compact) return value || "00:00:00"
     var parts = String(value || "00:00:00").split(":")
     return compactLength((Number(parts[0]) * 3600 + Number(parts[1]) * 60 + Number(parts[2])) * 1000)
