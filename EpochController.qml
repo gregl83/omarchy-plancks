@@ -25,6 +25,37 @@ QtObject {
     property int gapSampleCount: 0
     property var warnings: []
   }
+  property var history: ({rows: [], page: 0, pages: 1, total: 0})
+  property bool historyLoading: false
+  property string historyError: ""
+  property string historyRequestId: ""
+  property int historyPage: 0
+
+  function requestHistory(page) {
+    historyPage = Math.max(0, page)
+    historyError = ""
+    historyLoading = true
+    historyRequestId = "history-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)
+    if (helper.running) {
+      helper.write(JSON.stringify({action: "history", page: historyPage, requestId: historyRequestId}) + "\n")
+      historyWatchdog.restart()
+    } else helper.running = true
+  }
+
+  function setHistoryInclusion(sampleId, excluded) {
+    if (!ready || busy || historyLoading) return
+    sendAction("set_inclusion", history.generation, history.sequence, false,
+      {sampleId: sampleId, excludedFromLearning: excluded})
+  }
+
+  property Timer historyWatchdog: Timer {
+    interval: 10000
+    onTriggered: {
+      root.historyLoading = false
+      root.historyError = "No response from Plancks storage. Select Retry to load history."
+    }
+  }
+
   property int openPanels: 0
 
   function setPanelOpen(opened) {
@@ -83,13 +114,14 @@ QtObject {
     sendAction("reset", generation, sequence)
   }
 
-  function sendAction(action, generation, sequence, skipLearning) {
+  function sendAction(action, generation, sequence, skipLearning, extra) {
     busy = true
     error = ""
     pendingId = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)
     pendingCommand = {action: action, skipLearning: skipLearning === true, generation: generation === undefined ? state.generation : generation,
       requestId: pendingId, sequence: sequence === undefined ? state.sequence : sequence,
       rotateBytes: Number(settings.rotateBytes || 5242880)}
+    if (extra) for (var key in extra) pendingCommand[key] = extra[key]
     if (!helper.running) helper.running = true
     else helper.write(JSON.stringify(pendingCommand) + "\n")
     watchdog.restart()
@@ -120,6 +152,7 @@ QtObject {
     running: true
     onStarted: {
       root.configure(root.settings)
+      if (root.historyLoading) root.requestHistory(root.historyPage)
       if (root.openPanels > 0) write(JSON.stringify({action: "panel", open: true}) + "\n")
       if (root.pendingCommand) {
         root.busy = true
@@ -131,6 +164,16 @@ QtObject {
       onRead: function(line) {
         try {
           var result = JSON.parse(line)
+          if (result.requestId && result.requestId.indexOf("history-") === 0) {
+            if (result.requestId !== root.historyRequestId) return
+            root.historyWatchdog.stop()
+            root.historyLoading = false
+            if (result.ok && result.history) {
+              root.history = result.history
+              root.historyPage = result.history.page
+            } else root.historyError = result.error || "Unable to load history"
+            return
+          }
           if (result.ok) {
             root.applyView(result.view || result.patch || {})
             root.ready = !root.pendingCommand
@@ -168,6 +211,9 @@ QtObject {
     }
     onExited: function(code, status) {
       root.watchdog.stop()
+      root.historyWatchdog.stop()
+      root.historyLoading = false
+      root.historyError = "Plancks storage stopped. Select Retry to reconnect."
       root.ready = false
       root.busy = false
       root.error = "Plancks storage stopped. Select Retry to reconnect."

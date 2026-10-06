@@ -58,7 +58,7 @@ def blank_state():
     return {"schemaVersion": VERSION, "sequence": 0, "lastEventId": None,
             "generation": "", "phase": "off", "anchor": None, "lastStart": None, "lastEnd": None,
             "epochId": None, "predictionMs": None, "deadlineUtcMs": None,
-            "workSamples": [], "gapSamples": [], "warnings": [], "cursor": None}
+            "workSamples": [], "gapSamples": [], "history": [], "warnings": [], "cursor": None}
 
 
 def apply(state, event):
@@ -77,6 +77,19 @@ def apply(state, event):
         raise ValueError("Invalid journal event ID")
     if event.get("schemaVersion") != VERSION or event.get("sequence") != state["sequence"] + 1:
         raise ValueError("Unsupported journal version or missing/out-of-order event")
+    if event["type"] == "sample_inclusion_changed":
+        target = event["sampleId"]
+        excluded = event["excludedFromLearning"]
+        if not isinstance(target, str) or type(excluded) is not bool:
+            raise ValueError("Invalid sample inclusion change")
+        sample = next((s for s in state["history"] if s["eventId"] == target), None)
+        if sample is None or sample["durationMs"] < 0:
+            raise ValueError("Unknown or invalid history interval")
+        sample["excludedFromLearning"] = excluded
+        rebuild_samples(state)
+        state.update(sequence=event["sequence"], lastEventId=event["eventId"],
+                     predictionMs=prediction, deadlineUtcMs=event["deadlineUtcMs"])
+        return
     starting = event["type"] == "epoch_started"
     if event["type"] not in ("epoch_started", "epoch_ended"):
         raise ValueError("Unknown journal event type")
@@ -92,6 +105,8 @@ def apply(state, event):
             raise ValueError("Invalid journal sample")
         if type(sample.get("excludedFromLearning", False)) is not bool:
             raise ValueError("Invalid journal sample exclusion flag")
+        sample = dict(sample, kind="off" if starting else "epoch")
+        state["history"].append(sample)
         if sample["durationMs"] < 0:
             state["warnings"] = ["The clock moved backwards during an interval. That interval was excluded from predictions."]
         elif not sample.get("excludedFromLearning", False):
@@ -102,6 +117,12 @@ def apply(state, event):
                  epochId=event["epochId"] if starting else None,
                  predictionMs=event["predictionMs"], deadlineUtcMs=event["deadlineUtcMs"])
     state["lastStart" if starting else "lastEnd"] = event["clock"]
+
+
+def rebuild_samples(state):
+    for kind, key in (("epoch", "workSamples"), ("off", "gapSamples")):
+        state[key] = [s for s in state["history"] if s["kind"] == kind
+                      and s["durationMs"] >= 0 and not s.get("excludedFromLearning", False)][-5:]
 
 
 def state_root():
@@ -210,6 +231,8 @@ class Store:
                         raise ValueError(f"Invalid record in {path.name}: {exc}") from exc
                     sample = event.get("completedSample")
                     exclusion = sample.get("excludedFromLearning", False) if sample is not None else None
+                    if event["type"] == "sample_inclusion_changed":
+                        exclusion = (event["sampleId"], event["excludedFromLearning"])
                     ids[event["eventId"]] = (event["type"], path.name, exclusion)
                     state["cursor"] = {"segment": path.name, "offset": stream.tell()}
         try:
@@ -327,6 +350,69 @@ class Store:
             apply(state, event)
             cursor = self.append(event, rotate_bytes)
             state["cursor"] = cursor
+            self._signature = None
+            return state, self.snapshot_warning(state)
+
+    def history_page(self, page=0, page_size=5):
+        if type(page) is not int or page < 0:
+            raise ValueError("History page must be a nonnegative integer")
+        with self.locked():
+            state = self.load()
+        total = len(state["history"])
+        pages = max(1, math.ceil(total / page_size))
+        page = min(page, pages - 1)
+        recent = {s["eventId"] for key in ("workSamples", "gapSamples") for s in state[key]}
+        rows = list(reversed(state["history"]))[page * page_size:(page + 1) * page_size]
+        trends = {}
+        for kind in ("epoch", "off"):
+            completed = [s for s in state["history"] if s["kind"] == kind and s["durationMs"] >= 0][-10:]
+            trends[kind] = [{"eventId": s["eventId"], "endUtcMs": s["end"]["utcMs"],
+                             "durationMs": s["durationMs"],
+                             "excludedFromLearning": s.get("excludedFromLearning", False)} for s in completed]
+        return {"page": page, "pages": pages, "total": total, "sequence": state["sequence"],
+                "generation": state["generation"], "trends": trends,
+                "rows": [dict(s, recent=s["eventId"] in recent) for s in rows]}
+
+    def set_inclusion(self, sample_id, excluded, event_id, expected_sequence,
+                      expected_generation="", initial_ms=None, rotate_bytes=DEFAULT_ROTATE_BYTES):
+        if type(excluded) is not bool or not isinstance(sample_id, str):
+            raise ValueError("Invalid history inclusion command")
+        if not isinstance(event_id, str) or not 1 <= len(event_id) <= 128:
+            raise ValueError("A stable event ID is required")
+        if type(rotate_bytes) is not int or rotate_bytes < 1:
+            raise ValueError("Rotation size must be a positive integer")
+        with self.locked():
+            state = self.load()
+            if state["generation"] != expected_generation:
+                raise ValueError("Data was reset. Review the current history and try again.")
+            if event_id in self._ids:
+                saved_type, segment, payload = self._ids[event_id]
+                if saved_type != "sample_inclusion_changed" or payload != (sample_id, excluded):
+                    raise ValueError("Event ID already used for another action")
+                with (self.events / segment).open("rb") as stream:
+                    os.fsync(stream.fileno())
+                sync_dir(self.events)
+                return state, self.snapshot_warning(state)
+            if expected_sequence != state["sequence"]:
+                raise ValueError("State changed on another screen. Review the current history and try again.")
+            sample = next((s for s in state["history"] if s["eventId"] == sample_id), None)
+            if sample is None or sample["durationMs"] < 0:
+                raise ValueError("Unknown or invalid history interval")
+            active_key = "workSamples" if state["phase"] == "active" else "gapSamples"
+            before = [s["eventId"] for s in state[active_key]]
+            sample["excludedFromLearning"] = excluded
+            rebuild_samples(state)
+            after = [s["eventId"] for s in state[active_key]]
+            prediction = state["predictionMs"]
+            if before != after:
+                prediction = estimate(state[active_key], initial_ms if state["phase"] == "active" else None)
+            event = {"schemaVersion": VERSION, "sequence": state["sequence"] + 1,
+                     "eventId": event_id, "type": "sample_inclusion_changed", "clock": clock(),
+                     "sampleId": sample_id, "excludedFromLearning": excluded,
+                     "predictionMs": prediction,
+                     "deadlineUtcMs": state["anchor"]["utcMs"] + prediction if prediction is not None else None}
+            apply(state, event)
+            state["cursor"] = self.append(event, rotate_bytes)
             self._signature = None
             return state, self.snapshot_warning(state)
 
@@ -503,6 +589,14 @@ def serve(store):
                 if not isinstance(request.get("open"), bool):
                     raise ValueError("Panel open must be a boolean")
                 panel_open = request["open"]
+            elif action == "history":
+                emit({"ok": True, "history": store.history_page(request.get("page", 0)), "requestId": ack})
+                return
+            elif action == "set_inclusion":
+                _, persistent_warning = store.set_inclusion(
+                    request["sampleId"], request["excludedFromLearning"], request["requestId"],
+                    request["sequence"], request.get("generation", ""), initial_ms,
+                    request.get("rotateBytes", DEFAULT_ROTATE_BYTES))
             elif action == "reset":
                 store.reset(request["requestId"], request["generation"], request["sequence"])
                 persistent_warning = None
