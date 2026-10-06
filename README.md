@@ -23,6 +23,8 @@ The widget renders Planck-time notation as italic **t** with an upright subscrip
 
 The bar and panel timer use normal text for an active epoch and Omarchy's standard dimmed styling for off-time. The tooltip, accessible label, and panel name the phase explicitly.
 
+The main panel frames the timer with subtle corner brackets, with a small coffee cup aligned to the left outside the brackets. During an active epoch it empties toward the expected end; during off-time it fills toward the expected next start. Past zero, a bounded puddle grows with a gentle drip beneath the empty active cup or overflowing full off-time cup. While learning without a prediction, steam rises without a fill level. Animations run only while the timer panel is open.
+
 | Appearance | Example | Meaning |
 | --- | --- | --- |
 | Normal | `t_P −02:00:00` | Two hours until the current epoch is expected to end |

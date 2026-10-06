@@ -52,6 +52,37 @@ ShellRoot {
     if (!condition) { console.error("SMOKE_FAIL " + message); Qt.quit(); }
     return condition
   }
+  function checkCoffeeRefill(cup) {
+    var state = Plancks.EpochController.state
+    var saved = {phase: state.phase, timer: state.timer, elapsed: state.elapsed,
+                 predictedStartUtcMs: state.predictedStartUtcMs, predictedEndUtcMs: state.predictedEndUtcMs}
+    try {
+      state.phase = "off"
+      state.predictedStartUtcMs = 1
+      state.timer = "−01:00:00"
+      state.elapsed = "00:00:00"
+      if (!check(cup.predicted && cup.fill === 0, "off-time cup starts empty")) return false
+      state.timer = "−00:45:00"
+      state.elapsed = "00:15:00"
+      if (!check(cup.fill === 0.25, "off-time cup fills one quarter")) return false
+      state.timer = "−00:15:00"
+      state.elapsed = "00:45:00"
+      if (!check(cup.fill === 0.75, "off-time cup fills three quarters")) return false
+      state.timer = "+00:00:00"
+      state.elapsed = "01:00:00"
+      if (!check(cup.fill === 1 && !cup.overtime && cup.spill === 0, "off-time cup full at zero")) return false
+      state.timer = "+00:05:00"
+      state.elapsed = "01:05:00"
+      if (!check(cup.fill === 1 && cup.overtime && cup.spill > 0, "off-time cup stays full and overflows")) return false
+      state.phase = "active"
+      state.predictedEndUtcMs = 1
+      state.timer = "−00:45:00"
+      state.elapsed = "00:15:00"
+      return check(cup.fill === 0.75 && !cup.overtime, "active cup consumes the same fraction")
+    } finally {
+      for (var key in saved) state[key] = saved[key]
+    }
+  }
   PanelWindow {
     visible: test.preview
     implicitWidth: 280
@@ -87,11 +118,24 @@ ShellRoot {
         test.step = 2
       } else if (test.step === 2) {
         if (widget.epoch.timer.indexOf("+") !== 0) return
+        if (test.preview) {
+          var cup = resetTest.findChild(widget, "plancks_coffee")
+          if (widget.epoch.timer === "+00:00:00") return
+          if (!test.check(cup && cup.predicted && cup.overtime && cup.fill === 0 && cup.spill > 0,
+                          "coffee cup empties and spills past the prediction")) return
+        }
         if (!test.check(widget.epoch.indicator === "●", "overrun keeps active phase")) return
         test.toggleViaIpc()
         test.step = 3
       } else if (test.step === 3) {
         if (!test.check(widget.epoch.phase === "off" && second.epoch.phase === "off", "shared end transition")) return
+        if (test.preview) {
+          var learningCup = resetTest.findChild(widget, "plancks_coffee")
+          if (!test.check(learningCup && learningCup.learning && !learningCup.predicted
+                          && learningCup.fill === 0 && learningCup.spill === 0,
+                          "learning cup shows no predicted fill or spill")) return
+          if (!test.checkCoffeeRefill(learningCup)) return
+        }
         if (!test.check(widget.epoch.workSampleCount === 1, "completed sample")) return
         second.bar = verticalBar
         if (!test.check(second.vertical && second.implicitHeight > 40, "vertical layout")) return
