@@ -2,3 +2,4 @@ singleton EpochController 1.0 EpochController.qml
 Widget 1.0 Widget.qml
 EpochPanel 1.0 EpochPanel.qml
 HistoryView 1.0 HistoryView.qml
+HistoryTrend 1.0 HistoryTrend.qml

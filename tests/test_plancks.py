@@ -84,6 +84,24 @@ class StoreTests(unittest.TestCase):
         return self.store.set_inclusion(sample_id, excluded, request_id, state['sequence'],
                                         state['generation'], **kwargs)[0]
 
+    def test_history_trends_are_bounded_chronological_and_independent_of_page(self):
+        self.assertEqual(self.store.history_page()['trends'], {'epoch': [], 'off': []})
+        for i in range(24):
+            self.transition('start' if i % 2 == 0 else 'end', i, skip_learning=i == 23)
+        first = self.store.history_page()
+        last = self.store.history_page(4)
+        self.assertEqual(first['trends'], last['trends'])
+        epochs = first['trends']['epoch']
+        gaps = first['trends']['off']
+        self.assertEqual(len(epochs), 10)
+        self.assertEqual(len(gaps), 10)
+        self.assertEqual(epochs[0]['eventId'], 'event-6')
+        self.assertEqual(epochs[-1]['eventId'], 'event-24')
+        self.assertTrue(epochs[-1]['excludedFromLearning'])
+        self.assertEqual([p['endUtcMs'] for p in gaps], sorted(p['endUtcMs'] for p in gaps))
+        self.include('event-24', False)
+        self.assertFalse(self.store.history_page()['trends']['epoch'][-1]['excludedFromLearning'])
+
     def test_history_pagination_includes_skipped_and_replays_rotated_records(self):
         for i in range(14):
             self.transition('start' if i % 2 == 0 else 'end', i,
@@ -191,6 +209,7 @@ class StoreTests(unittest.TestCase):
         self.transition('start', 5)
         self.transition('end', 4)
         row = self.store.history_page()['rows'][0]
+        self.assertEqual(self.store.history_page()['trends'], {'epoch': [], 'off': []})
         self.assertLess(row['durationMs'], 0)
         self.assertFalse(row['recent'])
         with self.assertRaisesRegex(ValueError, 'invalid history interval'):

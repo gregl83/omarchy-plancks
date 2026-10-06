@@ -4,10 +4,13 @@
 
 # Plancks
 
-Plancks is an Omarchy bar widget for your daily opportunity window. Standard clocks keep people in sync; Plancks helps you understand your own daily rhythm.
+**A second clock, tuned to your daily rhythm.**
+
+Plancks sits alongside your standard clock in the Omarchy bar, tracking your daily opportunity window and predicting what comes next. Standard clocks keep people in sync; Plancks helps you understand your own daily rhythm.
 
 <p align="center">
   <img src="preview.png" alt="Plancks between the clock and weather, with its active epoch panel open" width="360">
+  <img src="preview-history.png" alt="Plancks history with epoch and off-time trends, five intervals, inclusion switches, and pagination" width="360">
   <br>
   <em>Preview with sample history.</em>
 </p>
@@ -29,7 +32,7 @@ The bar and panel timer use normal text for an active epoch and Omarchy's standa
 
 The timer descriptions use **Until expected epoch end** / **Since expected epoch end** while an epoch is active, and **Until expected next epoch start** / **Since expected next epoch start** during off-time.
 
-Starting or ending an epoch changes its active/off-time appearance; passing an expected time does not. Resetting also returns the widget to off-time. Storage errors show an undimmed `!` marker. Click the widget to open its panel, then use **Start epoch** / **End epoch**. The panel groups forecasts under **Predictions** and actual timestamps, elapsed time, and sample counts under **History**. Hover details for full timestamps and durations. Select **View history →** in the History section to browse completed epochs and off-time intervals, five per page. **Use for predictions** controls whether each interval is eligible for learning; skipped intervals can be included again. Recent eligible samples are marked, while intervals invalidated by backwards clock changes remain excluded. Changes save immediately and recalculate the current prediction when its sample window changes, keeping the original start time. **Back** or Escape returns to the main panel. Tab moves between buttons, and Enter or Space activates the focused button. With focus on the panel itself, Enter or Space starts or ends an epoch (or retries a storage error). Escape closes the panel, or cancels an open reset confirmation.
+Starting or ending an epoch changes its active/off-time appearance; passing an expected time does not. Resetting also returns the widget to off-time. Storage errors show an undimmed `!` marker. Click the widget to open its panel, then use **Start epoch** / **End epoch**. The panel groups forecasts under **Predictions** and actual timestamps, elapsed time, and sample counts under **History**. Hover details for full timestamps and durations. Select **View history** in the History section to browse completed epochs and off-time intervals, five per page. Compact epoch and off-time trends show the latest ten completed intervals of each kind, independently of pagination. Charts disappear when there is no valid data; hover points for details, and hollow points mark excluded intervals. The **Included** / **Excluded** switch controls whether each interval is eligible for learning; skipped intervals can be included again. Recent eligible samples are marked, while intervals invalidated by backwards clock changes remain excluded. Changes save immediately and recalculate the current prediction when its sample window changes, keeping the original start time. **Back** or Escape returns to the main panel. Tab moves between buttons, and Enter or Space activates the focused button. With focus on the panel itself, Enter or Space starts or ends an epoch (or retries a storage error). Escape closes the panel, or cancels an open reset confirmation.
 
 ## Install
 
@@ -77,7 +80,7 @@ From the repository directory, validate and copy the runtime files to try edits 
 ```bash
 omarchy plugin validate .
 mkdir -p ~/.config/omarchy/plugins/gregl83.plancks
-cp manifest.json qmldir Widget.qml EpochPanel.qml EpochController.qml HistoryView.qml plancks.py \
+cp manifest.json qmldir Widget.qml EpochPanel.qml EpochController.qml HistoryView.qml HistoryTrend.qml plancks.py \
   ~/.config/omarchy/plugins/gregl83.plancks/
 omarchy-shell shell rescanPlugins
 omarchy plugin enable gregl83.plancks --after omarchy.clock
@@ -190,6 +193,8 @@ python3 tests/smoke_qml.py
 ```
 
 The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing epoch state through IPC, busy/not-ready guards, normal and skip transitions, overrun, vertical layout, and reset. With `--preview` (also used in CI), it exercises the reset warning, default Cancel focus, Cancel activation, Escape cancellation, and explicit deletion through keyboard input. Physical suspend/reboot still warrant a live-session check.
+
+Regenerate both README previews with `python3 scripts/preview.py` in an active Wayland session. It renders the production panels with isolated, frozen sample history, preserves the preview’s bar framing and background strip, and leaves your saved history untouched.
 
 ## CI and releases
 

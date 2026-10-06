@@ -59,6 +59,34 @@ Column {
     foreground: root.foreground
     fontFamily: root.fontFamily
   }
+  Column {
+    width: parent.width
+    visible: !!root.history.trends && (root.history.trends.epoch.length > 0 || root.history.trends.off.length > 0)
+    spacing: Style.space(14)
+    Row {
+      width: parent.width
+      spacing: Style.space(20)
+      HistoryTrend {
+        id: epochTrend
+        objectName: "plancks_epochTrend"
+        width: offTrend.visible ? (parent.width - parent.spacing) / 2 : parent.width
+        title: "Epochs"
+        points: root.history.trends ? root.history.trends.epoch : []
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+      }
+      HistoryTrend {
+        id: offTrend
+        objectName: "plancks_offTrend"
+        width: epochTrend.visible ? (parent.width - parent.spacing) / 2 : parent.width
+        title: "Off-time"
+        points: root.history.trends ? root.history.trends.off : []
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+      }
+    }
+    PanelSeparator { foreground: root.foreground }
+  }
   Text {
     width: parent.width
     visible: root.history.total === 0 && EpochController.historyError === ""

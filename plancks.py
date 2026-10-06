@@ -363,8 +363,15 @@ class Store:
         page = min(page, pages - 1)
         recent = {s["eventId"] for key in ("workSamples", "gapSamples") for s in state[key]}
         rows = list(reversed(state["history"]))[page * page_size:(page + 1) * page_size]
+        trends = {}
+        for kind in ("epoch", "off"):
+            completed = [s for s in state["history"] if s["kind"] == kind and s["durationMs"] >= 0][-10:]
+            trends[kind] = [{"eventId": s["eventId"], "endUtcMs": s["end"]["utcMs"],
+                             "durationMs": s["durationMs"],
+                             "excludedFromLearning": s.get("excludedFromLearning", False)} for s in completed]
         return {"page": page, "pages": pages, "total": total, "sequence": state["sequence"],
-                "generation": state["generation"], "rows": [dict(s, recent=s["eventId"] in recent) for s in rows]}
+                "generation": state["generation"], "trends": trends,
+                "rows": [dict(s, recent=s["eventId"] in recent) for s in rows]}
 
     def set_inclusion(self, sample_id, excluded, event_id, expected_sequence,
                       expected_generation="", initial_ms=None, rotate_bytes=DEFAULT_ROTATE_BYTES):
