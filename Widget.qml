@@ -7,6 +7,12 @@ BarWidget {
   id: root
   moduleName: "gregl83.plancks"
   readonly property var epoch: EpochController.state
+  readonly property bool tooltipsEnabled: setting("tooltipsEnabled", true) !== false
+  function setTooltipsEnabled(enabled) {
+    settings = Object.assign({}, settings, {tooltipsEnabled: enabled})
+    if (bar && bar.shell) bar.shell.updateEntryInline(moduleName, settings)
+    if (!enabled && bar) bar.hideTooltip(button)
+  }
   readonly property bool opened: panel.opened
   readonly property bool popoutSwitchClosing: panel.popoutSwitchClosing
   readonly property real openPanelIndicatorWidth: label.implicitWidth
@@ -31,7 +37,7 @@ BarWidget {
     dimmed: root.epoch.phase !== "active" && EpochController.error === ""
     fixedWidth: root.vertical ? root.barSize : label.implicitWidth + Style.space(18)
     fixedHeight: root.vertical ? label.implicitHeight + Style.space(14) : root.barSize
-    tooltipText: EpochController.error || root.epoch.status
+    tooltipText: root.tooltipsEnabled ? EpochController.error || root.epoch.status : ""
     activeFocusOnTab: true
     Accessible.role: Accessible.Button
     Accessible.name: "Plancks. " + root.epoch.status + ". " + root.epoch.timer

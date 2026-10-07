@@ -6,6 +6,7 @@ import "."
 Column {
   id: root
   spacing: Style.space(14)
+  property bool tooltipsEnabled: true
   property color foreground: Color.foreground
   property string fontFamily: Style.font.family
   property Item backControl: null
@@ -91,6 +92,7 @@ Column {
           id: epochTrend
           objectName: "plancks_epochTrend"
           width: offTrend.visible ? (parent.width - parent.spacing) / 2 : parent.width
+          tooltipsEnabled: root.tooltipsEnabled
           title: "Epochs"
           points: root.history.trends ? root.history.trends.epoch : []
           foreground: root.foreground
@@ -100,6 +102,7 @@ Column {
           id: offTrend
           objectName: "plancks_offTrend"
           width: epochTrend.visible ? (parent.width - parent.spacing) / 2 : parent.width
+          tooltipsEnabled: root.tooltipsEnabled
           title: "Off-time"
           points: root.history.trends ? root.history.trends.off : []
           foreground: root.foreground
@@ -244,7 +247,7 @@ Column {
                 acceptedButtons: Qt.NoButton
               }
               PanelToolTip {
-                visible: stampHover.containsMouse
+                visible: root.tooltipsEnabled && stampHover.containsMouse
                 text: Qt.formatDateTime(new Date(intervalRow.modelData.start.utcMs), "ddd, MMM d, yyyy · HH:mm:ss")
                   + " → " + Qt.formatDateTime(new Date(intervalRow.modelData.end.utcMs), "ddd, MMM d, yyyy · HH:mm:ss")
                 fontFamily: root.fontFamily
@@ -285,7 +288,7 @@ Column {
                 EpochController.setHistoryInclusion(intervalRow.modelData.eventId, checked)
               }
               PanelToolTip {
-                visible: inclusion.containsMouse
+                visible: root.tooltipsEnabled && inclusion.containsMouse
                 text: "Use for predictions · " + intervalRow.sampleStatus
                 fontFamily: root.fontFamily
               }

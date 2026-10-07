@@ -70,10 +70,10 @@ ShellRoot {
       if (!check(cup.fill === 0.75, "off-time cup fills three quarters")) return false
       state.timer = "+00:00:00"
       state.elapsed = "01:00:00"
-      if (!check(cup.fill === 1 && !cup.overtime && cup.spill === 0, "off-time cup full at zero")) return false
+      if (!check(cup.fill === 1 && !cup.overtime, "off-time cup full at zero")) return false
       state.timer = "+00:05:00"
       state.elapsed = "01:05:00"
-      if (!check(cup.fill === 1 && cup.overtime && cup.spill > 0, "off-time cup stays full and overflows")) return false
+      if (!check(cup.fill === 1 && cup.overtime, "off-time cup stays full past the prediction")) return false
       state.phase = "active"
       state.predictedEndUtcMs = 1
       state.timer = "−00:45:00"
@@ -121,8 +121,8 @@ ShellRoot {
         if (test.preview) {
           var cup = resetTest.findChild(widget, "plancks_coffee")
           if (widget.epoch.timer === "+00:00:00") return
-          if (!test.check(cup && cup.predicted && cup.overtime && cup.fill === 0 && cup.spill > 0,
-                          "coffee cup empties and spills past the prediction")) return
+          if (!test.check(cup && cup.predicted && cup.overtime && cup.fill === 0,
+                          "coffee cup stays empty past the prediction")) return
         }
         if (!test.check(widget.epoch.indicator === "●", "overrun keeps active phase")) return
         test.toggleViaIpc()
@@ -132,8 +132,8 @@ ShellRoot {
         if (test.preview) {
           var learningCup = resetTest.findChild(widget, "plancks_coffee")
           if (!test.check(learningCup && learningCup.learning && !learningCup.predicted
-                          && learningCup.fill === 0 && learningCup.spill === 0,
-                          "learning cup shows no predicted fill or spill")) return
+                          && learningCup.fill === 0,
+                          "learning cup shows no predicted fill")) return
           if (!test.checkCoffeeRefill(learningCup)) return
         }
         if (!test.check(widget.epoch.workSampleCount === 1, "completed sample")) return
@@ -227,6 +227,27 @@ ShellRoot {
       var cancel = findChild(panel, "plancks_cancelButton")
       var confirm = findChild(panel, "plancks_confirmButton")
       var warning = findChild(panel, "plancks_resetWarning")
+      var tooltipSwitch = findChild(panel, "plancks_tooltipsSwitch")
+      verify(tooltipSwitch !== null && tooltipSwitch.checked, "Tooltips default to enabled")
+      var tooltipSequence = Plancks.EpochController.state.sequence
+      tooltipSwitch.forceActiveFocus()
+      keyClick(Qt.Key_Space)
+      verify(!tooltipSwitch.checked && !panel.tooltipsEnabled && !widget.tooltipsEnabled,
+             "Keyboard toggle disables tooltips")
+      compare(widget.settings.tooltipsEnabled, false, "Preference is stored in widget settings")
+      compare(widgetButton.tooltipText, "", "Bar tooltip is disabled")
+      compare(action.tooltipText, "", "Panel button tooltip is disabled")
+      verify(action.Accessible.description.length > 0, "Accessible action description is retained")
+      keyClick(Qt.Key_Backtab)
+      verify(reset.activeFocus, "Shift-Tab moves from tooltips to reset")
+      keyClick(Qt.Key_Tab)
+      verify(tooltipSwitch.activeFocus, "Tab moves from reset to tooltips")
+      keyClick(Qt.Key_Tab)
+      verify(action.activeFocus, "Tab returns from tooltips to the epoch action")
+      tooltipSwitch.forceActiveFocus()
+      keyClick(Qt.Key_Space)
+      verify(tooltipSwitch.checked && panel.tooltipsEnabled, "Tooltips can be enabled again")
+      compare(Plancks.EpochController.state.sequence, tooltipSequence, "Tooltip preference does not change epochs")
       wait(300)
       keys.forceActiveFocus()
       keyClick(Qt.Key_Tab)

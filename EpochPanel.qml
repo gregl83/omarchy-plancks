@@ -10,6 +10,7 @@ Panel {
   manageIpc: false
   property var anchorItem: null
   property var hostWidget: null
+  readonly property bool tooltipsEnabled: !hostWidget || hostWidget.tooltipsEnabled
   readonly property var epoch: EpochController.state
   property bool showingHistory: false
   function openHistory() {
@@ -82,6 +83,8 @@ Panel {
     var rest = minutes % 60
     return hours ? hours + "h" + (rest ? " " + rest + "m" : "") : rest + "m"
   }
+  readonly property string samplesExplanation: "Counts are epoch / off-time. Each prediction uses up to five recent completed, included intervals of that kind. Excluded intervals do not count."
+
   function detailLabel(row) {
     if (row.key === "elapsed") return root.epoch.phase === "active" ? "Epoch elapsed" : "Off-time elapsed"
     if (row.key === "predictedEndUtcMs") return root.epoch.phase === "active" ? "Expected epoch end" : "Expected next epoch end"
@@ -201,7 +204,8 @@ Panel {
               x: header.width - width
               y: header.stacked ? title.height + Style.space(6) : (header.height - height) / 2
               text: "Back"
-              tooltipText: "Return to the current epoch."
+              property string helpText: "Return to the current epoch."
+              tooltipText: root.tooltipsEnabled ? helpText : ""
               foreground: Qt.darker(root.foreground, 1.4)
               fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
               fontSize: Style.font.caption
@@ -291,18 +295,15 @@ Panel {
                   ? root.epoch.phase === "active" ? remainingFraction : 1 - remainingFraction
                   : 0
                 readonly property bool overtime: predicted && remainingSeconds < 0
-                readonly property real spill: overtime ? Math.min(1, -remainingSeconds / Math.max(60, durationSeconds * 0.1)) : 0
                 readonly property bool learning: !predicted && isFinite(timerSeconds)
                 property real motion: 0
                 onFillChanged: cupDrawing.requestPaint()
-                onSpillChanged: cupDrawing.requestPaint()
                 onLearningChanged: cupDrawing.requestPaint()
-                onOvertimeChanged: cupDrawing.requestPaint()
                 onMotionChanged: cupDrawing.requestPaint()
                 Timer {
                   interval: 100
                   repeat: true
-                  running: root.opened && !root.showingHistory && !root.confirmingReset && (coffee.learning || coffee.overtime)
+                  running: root.opened && !root.showingHistory && !root.confirmingReset && coffee.learning
                   onTriggered: coffee.motion = (coffee.motion + 0.035) % 1
                 }
                 Canvas {
@@ -359,17 +360,7 @@ Panel {
                     ctx.moveTo(5, 44)
                     ctx.quadraticCurveTo(21, 48, 38, 44)
                     ctx.stroke()
-                    if (coffee.overtime) {
-                      ctx.globalAlpha = 0.3
-                      ctx.beginPath()
-                      ctx.ellipse(26, 50, 7 + coffee.spill * 17, 1.5 + coffee.spill * 1.5, 0, 0, Math.PI * 2)
-                      ctx.fill()
-                      // A quiet drip makes even the first seconds past zero visible.
-                      ctx.globalAlpha = 0.6 * Math.sin(coffee.motion * Math.PI)
-                      ctx.beginPath()
-                      ctx.ellipse(39, 37 + coffee.motion * 11, 1, 1.8, 0, 0, Math.PI * 2)
-                      ctx.fill()
-                    } else if (coffee.learning) {
+                    if (coffee.learning) {
                       ctx.globalAlpha = 0.25
                       for (var i = 0; i < 2; ++i) {
                         var drift = Math.sin((coffee.motion + i * 0.4) * Math.PI * 2) * 2
@@ -416,7 +407,7 @@ Panel {
                 acceptedButtons: Qt.NoButton
               }
               PanelToolTip {
-                visible: captionHover.containsMouse
+                visible: root.tooltipsEnabled && captionHover.containsMouse
                 text: root.epoch.status
                 fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
               }
@@ -442,9 +433,10 @@ Panel {
                 fontSize: Style.font.bodySmall
                 horizontalPadding: Style.space(8)
                 text: EpochController.busy ? "Saving…" : root.epoch.phase === "active" ? "End epoch" : "Start epoch"
-                tooltipText: root.epoch.phase === "active"
+                property string helpText: root.epoch.phase === "active"
                   ? "End now; learn from this epoch."
                   : "Start now; learn from the off-time."
+                tooltipText: root.tooltipsEnabled ? helpText : ""
                 iconText: root.epoch.phase === "active" ? "\uDB81\uDCDB" : "\uDB81\uDC0A"
                 enabled: EpochController.ready && !EpochController.busy && !root.confirmingReset
                 focusable: true
@@ -453,7 +445,7 @@ Panel {
                 background: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
                 Accessible.role: Accessible.Button
                 Accessible.name: text
-                Accessible.description: tooltipText
+                Accessible.description: helpText
                 onClicked: if (enabled) EpochController.transition()
                 Keys.onEscapePressed: root.close()
               }
@@ -468,16 +460,17 @@ Panel {
                 horizontalPadding: Style.space(8)
                 text: root.epoch.phase === "active" ? "Skip to end epoch" : "Skip to start epoch"
                 iconText: "\uDB81\uDCAD"
-                tooltipText: root.epoch.phase === "active"
+                property string helpText: root.epoch.phase === "active"
                   ? "End now; exclude this epoch from predictions."
                   : "Start now; exclude the off-time from predictions."
+                tooltipText: root.tooltipsEnabled ? helpText : ""
                 enabled: actionButton.enabled
                 focusable: true
                 bordered: true
                 foreground: root.foreground
                 Accessible.role: Accessible.Button
                 Accessible.name: text
-                Accessible.description: tooltipText
+                Accessible.description: helpText
                 onClicked: if (enabled) EpochController.transition(true)
                 Keys.onEscapePressed: root.close()
               }
@@ -543,6 +536,7 @@ Panel {
                         : index % 4 === 0 ? root.firstLabelWidth : root.secondLabelWidth
                       text: modelData.isValue ? root.detailValue(modelData.row, true) : modelData.row.label
                       readonly property string detailTooltip: root.detailLabel(modelData.row) + ": " + root.detailValue(modelData.row, false)
+                        + (modelData.row.format === "samples" ? "\n" + root.samplesExplanation : "")
                       Accessible.name: detailTooltip
                       MouseArea {
                         id: detailHover
@@ -552,30 +546,44 @@ Panel {
                       }
                       PanelToolTip {
                         id: detailTip
-                        visible: detailHover.containsMouse
+                        visible: root.tooltipsEnabled && detailHover.containsMouse
                         text: detailCell.detailTooltip
                         fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-                        contentItem: Row {
+                        contentItem: Column {
+                          spacing: Style.space(6)
                           leftPadding: Border.left(detailTip.panelBorderSpec) + Style.spacing.controlPaddingX
                           rightPadding: Border.right(detailTip.panelBorderSpec) + Style.spacing.controlPaddingX
                           topPadding: Border.top(detailTip.panelBorderSpec) + Style.spacing.controlPaddingY
                           bottomPadding: Border.bottom(detailTip.panelBorderSpec) + Style.spacing.controlPaddingY
-                          Text {
-                            text: root.detailLabel(detailCell.modelData.row) + ": "
-                            textFormat: Text.PlainText
-                            color: detailTip.panelForeground
-                            opacity: 0.55
-                            font.family: detailTip.fontFamily
-                            font.pixelSize: detailTip.fontSize
-                            font.weight: Font.Normal
+                          Row {
+                            id: tooltipHeading
+                            Text {
+                              text: root.detailLabel(detailCell.modelData.row) + ": "
+                              textFormat: Text.PlainText
+                              color: detailTip.panelForeground
+                              opacity: 0.55
+                              font.family: detailTip.fontFamily
+                              font.pixelSize: detailTip.fontSize
+                              font.weight: Font.Normal
+                            }
+                            Text {
+                              text: root.detailValue(detailCell.modelData.row, false)
+                              textFormat: Text.PlainText
+                              color: detailTip.panelForeground
+                              font.family: detailTip.fontFamily
+                              font.pixelSize: detailTip.fontSize
+                              font.weight: Font.Normal
+                            }
                           }
                           Text {
-                            text: root.detailValue(detailCell.modelData.row, false)
+                            visible: detailCell.modelData.row.format === "samples"
+                            width: tooltipHeading.width
+                            text: root.samplesExplanation
                             textFormat: Text.PlainText
+                            wrapMode: Text.WordWrap
                             color: detailTip.panelForeground
                             font.family: detailTip.fontFamily
                             font.pixelSize: detailTip.fontSize
-                            font.weight: Font.Normal
                           }
                         }
                       }
@@ -596,7 +604,8 @@ Panel {
                   visible: sectionGroup.modelData.section === "History"
                   anchors.horizontalCenter: parent.horizontalCenter
                   text: "View history"
-                  tooltipText: "Review recorded intervals and choose which to use for predictions."
+                  property string helpText: "Review recorded intervals and choose which to use for predictions."
+                  tooltipText: root.tooltipsEnabled ? helpText : ""
                   fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
                   fontSize: Style.font.caption
                   horizontalPadding: Style.space(4)
@@ -628,7 +637,8 @@ Panel {
               KeyNavigation.tab: resetButton
               visible: EpochController.error !== ""
               text: "Retry"
-              tooltipText: "Retry the pending action or reconnect to storage."
+              property string helpText: "Retry the pending action or reconnect to storage."
+              tooltipText: root.tooltipsEnabled ? helpText : ""
               enabled: !EpochController.busy && !root.confirmingReset
               focusable: true
               bordered: true
@@ -637,29 +647,76 @@ Panel {
               Keys.onEscapePressed: root.close()
             }
             PanelSeparator { foreground: root.foreground }
-            Button {
-              id: resetButton
-              objectName: "plancks_resetButton"
-              onActiveFocusChanged: if (activeFocus) root.revealButton(resetButton)
-              anchors.right: parent.right
-              text: "Reset all data…"
-              tooltipText: "Review and confirm deletion of all epoch data."
-              visible: !root.confirmingReset && !root.showingHistory
-              enabled: !EpochController.busy
-              focusable: true
-              bordered: false
-              fontSize: Style.font.bodySmall
-              foreground: root.foreground
-              KeyNavigation.tab: actionButton.enabled ? actionButton : retryButton
-              onClicked: {
-                if (!enabled) return
-                root.resetGeneration = root.epoch.generation
-                root.resetSequence = root.epoch.sequence
-                root.confirmingReset = true
-                cancelButton.forceActiveFocus()
-                Qt.callLater(function() { scroll.contentY = 0 })
+            Item {
+              width: parent.width
+              height: Math.max(tooltipControl.implicitHeight, resetButton.implicitHeight)
+              Row {
+                id: tooltipControl
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Style.space(4)
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "Tooltips"
+                  color: root.foreground
+                  opacity: 0.6
+                  font.family: root.bar ? root.bar.fontFamily : Style.font.family
+                  font.pixelSize: Style.font.caption
+                }
+                ToggleSwitch {
+                  id: tooltipSwitch
+                  objectName: "plancks_tooltipsSwitch"
+                  anchors.verticalCenter: parent.verticalCenter
+                  trackHeight: Style.space(16)
+                  cursorPad: Style.space(4)
+                  checked: root.tooltipsEnabled
+                  foreground: root.foreground
+                  activeFocusOnTab: true
+                  hasCursor: activeFocus
+                  Accessible.role: Accessible.CheckBox
+                  Accessible.name: "Show tooltips"
+                  Accessible.checkable: true
+                  Accessible.checked: checked
+                  KeyNavigation.tab: actionButton.enabled ? actionButton : retryButton
+                  KeyNavigation.backtab: resetButton
+                  onActiveFocusChanged: if (activeFocus) root.revealButton(tooltipControl)
+                  onToggled: {
+                    forceActiveFocus()
+                    if (root.hostWidget) root.hostWidget.setTooltipsEnabled(!checked)
+                  }
+                  Keys.onSpacePressed: toggled()
+                  Keys.onReturnPressed: toggled()
+                  Keys.onEnterPressed: toggled()
+                  Keys.onEscapePressed: root.close()
+                }
               }
-              Keys.onEscapePressed: root.close()
+              Button {
+                id: resetButton
+                objectName: "plancks_resetButton"
+                onActiveFocusChanged: if (activeFocus) root.revealButton(resetButton)
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                KeyNavigation.backtab: retryButton.visible ? retryButton : root.historyLink
+                text: "Reset all data…"
+                property string helpText: "Review and confirm deletion of all epoch data."
+                tooltipText: root.tooltipsEnabled ? helpText : ""
+                visible: !root.confirmingReset && !root.showingHistory
+                enabled: !EpochController.busy
+                focusable: true
+                bordered: false
+                fontSize: Style.font.bodySmall
+                foreground: root.foreground
+                KeyNavigation.tab: tooltipSwitch
+                onClicked: {
+                  if (!enabled) return
+                  root.resetGeneration = root.epoch.generation
+                  root.resetSequence = root.epoch.sequence
+                  root.confirmingReset = true
+                  cancelButton.forceActiveFocus()
+                  Qt.callLater(function() { scroll.contentY = 0 })
+                }
+                Keys.onEscapePressed: root.close()
+              }
             }
           }
           HistoryView {
@@ -668,6 +725,7 @@ Panel {
             width: parent.width
             visible: root.showingHistory
             backControl: historyBackButton
+            tooltipsEnabled: root.tooltipsEnabled
             foreground: root.foreground
             fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
             onBackRequested: root.closeHistory()
@@ -712,7 +770,8 @@ Panel {
                 objectName: "plancks_cancelButton"
                 onActiveFocusChanged: if (activeFocus) root.revealButton(cancelButton)
                 text: "Cancel"
-                tooltipText: "Keep all data and cancel reset."
+                property string helpText: "Keep all data and cancel reset."
+                tooltipText: root.tooltipsEnabled ? helpText : ""
                 width: (parent.width - parent.spacing) / 2
                 fontSize: Style.font.bodySmall
                 fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
@@ -730,7 +789,8 @@ Panel {
                 objectName: "plancks_confirmButton"
                 onActiveFocusChanged: if (activeFocus) root.revealButton(confirmButton)
                 text: "Delete all data"
-                tooltipText: "Permanently delete all epoch data."
+                property string helpText: "Permanently delete all epoch data."
+                tooltipText: root.tooltipsEnabled ? helpText : ""
                 width: cancelButton.width
                 fontSize: Style.font.bodySmall
                 fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
@@ -740,7 +800,7 @@ Panel {
                 bordered: true
                 foreground: root.bar ? root.bar.urgent : Color.urgent
                 Accessible.name: text
-                Accessible.description: tooltipText
+                Accessible.description: helpText
                 KeyNavigation.tab: cancelButton
                 KeyNavigation.backtab: cancelButton
                 onClicked: {
