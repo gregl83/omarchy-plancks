@@ -52,6 +52,37 @@ ShellRoot {
     if (!condition) { console.error("SMOKE_FAIL " + message); Qt.quit(); }
     return condition
   }
+  function checkCoffeeRefill(cup) {
+    var state = Plancks.EpochController.state
+    var saved = {phase: state.phase, timer: state.timer, elapsed: state.elapsed,
+                 predictedStartUtcMs: state.predictedStartUtcMs, predictedEndUtcMs: state.predictedEndUtcMs}
+    try {
+      state.phase = "off"
+      state.predictedStartUtcMs = 1
+      state.timer = "−01:00:00"
+      state.elapsed = "00:00:00"
+      if (!check(cup.predicted && cup.fill === 0, "off-time cup starts empty")) return false
+      state.timer = "−00:45:00"
+      state.elapsed = "00:15:00"
+      if (!check(cup.fill === 0.25, "off-time cup fills one quarter")) return false
+      state.timer = "−00:15:00"
+      state.elapsed = "00:45:00"
+      if (!check(cup.fill === 0.75, "off-time cup fills three quarters")) return false
+      state.timer = "+00:00:00"
+      state.elapsed = "01:00:00"
+      if (!check(cup.fill === 1 && !cup.overtime, "off-time cup full at zero")) return false
+      state.timer = "+00:05:00"
+      state.elapsed = "01:05:00"
+      if (!check(cup.fill === 1 && cup.overtime, "off-time cup stays full past the prediction")) return false
+      state.phase = "active"
+      state.predictedEndUtcMs = 1
+      state.timer = "−00:45:00"
+      state.elapsed = "00:15:00"
+      return check(cup.fill === 0.75 && !cup.overtime, "active cup consumes the same fraction")
+    } finally {
+      for (var key in saved) state[key] = saved[key]
+    }
+  }
   PanelWindow {
     visible: test.preview
     implicitWidth: 280
@@ -87,11 +118,24 @@ ShellRoot {
         test.step = 2
       } else if (test.step === 2) {
         if (widget.epoch.timer.indexOf("+") !== 0) return
+        if (test.preview) {
+          var cup = resetTest.findChild(widget, "plancks_coffee")
+          if (widget.epoch.timer === "+00:00:00") return
+          if (!test.check(cup && cup.predicted && cup.overtime && cup.fill === 0,
+                          "coffee cup stays empty past the prediction")) return
+        }
         if (!test.check(widget.epoch.indicator === "●", "overrun keeps active phase")) return
         test.toggleViaIpc()
         test.step = 3
       } else if (test.step === 3) {
         if (!test.check(widget.epoch.phase === "off" && second.epoch.phase === "off", "shared end transition")) return
+        if (test.preview) {
+          var learningCup = resetTest.findChild(widget, "plancks_coffee")
+          if (!test.check(learningCup && learningCup.learning && !learningCup.predicted
+                          && learningCup.fill === 0,
+                          "learning cup shows no predicted fill")) return
+          if (!test.checkCoffeeRefill(learningCup)) return
+        }
         if (!test.check(widget.epoch.workSampleCount === 1, "completed sample")) return
         second.bar = verticalBar
         if (!test.check(second.vertical && second.implicitHeight > 40, "vertical layout")) return
@@ -140,6 +184,15 @@ ShellRoot {
       catch (error) { console.error("SMOKE_FAIL UI: " + error); Qt.quit(); throw error }
     }
     function runConfirmation() {
+      var widgetButton = findChild(widget, "plancks_widgetButton")
+      verify(widgetButton !== null, "Find the bar button")
+      for (var fraction of [0.05, 0.25, 0.5, 0.75, 0.95]) {
+        mouseMove(widget, widget.width + 10, widget.height / 2)
+        wait(20)
+        mouseMove(widget, widget.width * fraction, widget.height / 2)
+        tryVerify(function() { return widgetButton.tooltipHovered }, 1000,
+                  "Tooltip hover covers the whole timer at " + fraction)
+      }
       var panel = findChild(widget, "plancks_root")
       verify(panel !== null, "Find the production panel")
       var keys = findChild(panel, "plancks_keys")
@@ -174,6 +227,27 @@ ShellRoot {
       var cancel = findChild(panel, "plancks_cancelButton")
       var confirm = findChild(panel, "plancks_confirmButton")
       var warning = findChild(panel, "plancks_resetWarning")
+      var tooltipSwitch = findChild(panel, "plancks_tooltipsSwitch")
+      verify(tooltipSwitch !== null && tooltipSwitch.checked, "Tooltips default to enabled")
+      var tooltipSequence = Plancks.EpochController.state.sequence
+      tooltipSwitch.forceActiveFocus()
+      keyClick(Qt.Key_Space)
+      verify(!tooltipSwitch.checked && !panel.tooltipsEnabled && !widget.tooltipsEnabled,
+             "Keyboard toggle disables tooltips")
+      compare(widget.settings.tooltipsEnabled, false, "Preference is stored in widget settings")
+      compare(widgetButton.tooltipText, "", "Bar tooltip is disabled")
+      compare(action.tooltipText, "", "Panel button tooltip is disabled")
+      verify(action.Accessible.description.length > 0, "Accessible action description is retained")
+      keyClick(Qt.Key_Backtab)
+      verify(reset.activeFocus, "Shift-Tab moves from tooltips to reset")
+      keyClick(Qt.Key_Tab)
+      verify(tooltipSwitch.activeFocus, "Tab moves from reset to tooltips")
+      keyClick(Qt.Key_Tab)
+      verify(action.activeFocus, "Tab returns from tooltips to the epoch action")
+      tooltipSwitch.forceActiveFocus()
+      keyClick(Qt.Key_Space)
+      verify(tooltipSwitch.checked && panel.tooltipsEnabled, "Tooltips can be enabled again")
+      compare(Plancks.EpochController.state.sequence, tooltipSequence, "Tooltip preference does not change epochs")
       wait(300)
       keys.forceActiveFocus()
       keyClick(Qt.Key_Tab)
@@ -240,9 +314,58 @@ ShellRoot {
       keyClick(Qt.Key_Return)
       tryVerify(function() { return !Plancks.EpochController.historyLoading })
       compare(Plancks.EpochController.history.page, 0)
-      back.forceActiveFocus()
+      // Search all pages, preserve input focus, and keep trends independent.
+      var search = findChild(panel, "plancks_historySearch")
+      var clearSearch = findChild(panel, "plancks_historyClearSearch")
+      search.forceActiveFocus()
+      keyClick(Qt.Key_O)
+      keyClick(Qt.Key_C)
+      keyClick(Qt.Key_T)
+      keyClick(Qt.Key_Space)
+      wait(500)
+      compare(search.text, "oct ", "Search preserves a trailing space across the debounce")
+      compare(search.cursorPosition, 4, "Search does not move the cursor after a request")
+      keyClick(Qt.Key_2)
+      tryVerify(function() { return !Plancks.EpochController.historyLoading && Plancks.EpochController.history.query === "oct 2" })
+      compare(search.text, "oct 2", "Typing a date preserves its space")
+      search.text = "epoch"
+      tryVerify(function() { return !Plancks.EpochController.historyLoading && Plancks.EpochController.history.query === "epoch" })
+      compare(Plancks.EpochController.history.total, 8)
+      compare(Plancks.EpochController.history.pages, 2)
+      verify(search.activeFocus, "Searching preserves text input focus")
+      var searchSequence = Plancks.EpochController.state.sequence
+      keyClick(Qt.Key_Return)
+      tryVerify(function() { return !Plancks.EpochController.historyLoading })
+      compare(Plancks.EpochController.state.sequence, searchSequence, "Enter in search does not change phase")
+      next.forceActiveFocus()
+      keyClick(Qt.Key_Return)
+      tryVerify(function() { return !Plancks.EpochController.historyLoading })
+      compare(Plancks.EpochController.history.page, 1)
+      compare(Plancks.EpochController.history.rows.length, 3)
+      verify(Plancks.EpochController.history.rows.every(function(row) { return row.kind === "epoch" }))
+      search.forceActiveFocus()
+      search.text = "no matching intervals"
+      tryVerify(function() { return !Plancks.EpochController.historyLoading && Plancks.EpochController.history.query === search.text })
+      compare(Plancks.EpochController.history.total, 0)
+      compare(Plancks.EpochController.history.page, 0)
+      compare(epochTrend.points.length, 8)
+      compare(offTrend.points.length, 7)
+      clearSearch.forceActiveFocus()
+      keyClick(Qt.Key_Return)
+      tryVerify(function() { return !Plancks.EpochController.historyLoading && Plancks.EpochController.history.query === "" })
+      compare(Plancks.EpochController.history.total, 15)
+      verify(search.activeFocus, "Clear returns focus to search")
+      // Escape also clears text that is still waiting for the search debounce.
+      search.text = "epoch"
       keyClick(Qt.Key_Escape)
-      verify(!panel.showingHistory && panel.opened, "Escape returns to the main panel")
+      compare(search.text, "")
+      verify(search.activeFocus && panel.showingHistory, "Escape clears search and keeps input focus")
+      tryVerify(function() { return !Plancks.EpochController.historyLoading && Plancks.EpochController.history.query === "" })
+      compare(Plancks.EpochController.history.total, 15)
+      wait(350)
+      compare(Plancks.EpochController.historyQuery, "", "Escape cancels the pending search")
+      keyClick(Qt.Key_Escape)
+      verify(!panel.showingHistory && panel.opened, "Escape in an empty search returns to the main panel")
       tryVerify(function() { return keys.activeFocus })
       reset.forceActiveFocus()
       verify(reset.activeFocus, "Reset receives keyboard focus")

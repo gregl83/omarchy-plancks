@@ -1,5 +1,9 @@
 FROM docker.io/library/archlinux:base
-RUN pacman -Syu --noconfirm --needed python quickshell sway jq git dbus ttf-dejavu \
+# Keep Qt and Quickshell on a tested package set; rolling upgrades can
+# introduce Qt ABI mismatches and QML name collisions in the pinned shell.
+ARG ARCH_SNAPSHOT=2026/10/06
+RUN printf 'Server = https://archive.archlinux.org/repos/%s/$repo/os/$arch\n' "$ARCH_SNAPSHOT" > /etc/pacman.d/mirrorlist \
+    && pacman -Syyuu --noconfirm --needed python quickshell sway jq git dbus ttf-dejavu \
     && pacman -Scc --noconfirm \
     && setcap -r /usr/bin/sway \
     && useradd --create-home tester

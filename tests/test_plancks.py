@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 import os
 from pathlib import Path
 import tempfile
@@ -83,6 +84,47 @@ class StoreTests(unittest.TestCase):
         state = self.store.load()
         return self.store.set_inclusion(sample_id, excluded, request_id, state['sequence'],
                                         state['generation'], **kwargs)[0]
+
+    def test_history_search_dates_times_durations_and_labels(self):
+        def local(day, hour, minute=0):
+            value = at(0)
+            value['utcMs'] = int(datetime(2026, 10, day, hour, minute).timestamp() * 1000)
+            value['bootMs'] = value['utcMs']
+            return value
+        for action, anchor, skip in [('start', local(6, 9, 30), False),
+                                     ('end', local(6, 18), True),
+                                     ('start', local(7, 9, 30), False),
+                                     ('end', local(7, 17, 30), False)]:
+            self.n += 1
+            self.store.transition(action, f'event-{self.n}', self.n - 1, now=anchor, skip_learning=skip)
+        for date in ('Oct 6', 'October 6', '2026-10-06', '2026/10/06', '10/6/2026', '6 Oct', 'Oct6'):
+            with self.subTest(date=date):
+                rows = self.store.history_page(query=date + ' epoch')['rows']
+                self.assertEqual([s['eventId'] for s in rows], ['event-2'])
+        for query in ('09:30 8h 30m', '8h30m', '08:30:00', '510m', ' EXCLUDED, EPOCH '):
+            with self.subTest(query=query):
+                self.assertEqual([s['eventId'] for s in self.store.history_page(query=query)['rows']], ['event-2'])
+        self.assertEqual(self.store.history_page(query='off time included')['rows'][0]['kind'], 'off')
+        self.assertEqual(self.store.history_page(query='8')['total'], 3)
+        self.assertEqual(self.store.history_page(query='nothing matches')['total'], 0)
+        self.assertEqual(self.store.history_page(query='   ')['total'], 3)
+        for query in (None, 1, 'x' * 257):
+            with self.assertRaises(ValueError):
+                self.store.history_page(query=query)
+
+    def test_history_search_filters_before_pagination_without_changing_trends(self):
+        for i in range(24):
+            self.transition('start' if i % 2 == 0 else 'end', i)
+        all_history = self.store.history_page()
+        first = self.store.history_page(query='epoch')
+        last = self.store.history_page(99, query='epoch')
+        self.assertEqual((first['total'], first['unfilteredTotal'], first['pages']), (12, 23, 3))
+        self.assertEqual((last['page'], len(last['rows'])), (2, 2))
+        self.assertEqual([s['eventId'] for s in last['rows']], ['event-4', 'event-2'])
+        self.assertEqual(last['trends'], all_history['trends'])
+        empty = self.store.history_page(99, query='no matches')
+        self.assertEqual((empty['page'], empty['pages'], empty['rows']), (0, 1, []))
+        self.assertEqual(empty['trends'], all_history['trends'])
 
     def test_history_trends_are_bounded_chronological_and_independent_of_page(self):
         self.assertEqual(self.store.history_page()['trends'], {'epoch': [], 'off': []})
@@ -633,6 +675,12 @@ class BridgeTests(unittest.TestCase):
         self.send({'action': 'history', 'requestId': 'history-updated'})
         reply = self.read()
         self.assertFalse(reply['history']['rows'][0]['excludedFromLearning'])
+        self.send({'action': 'history', 'query': 'excluded', 'requestId': 'history-search'})
+        reply = self.read()
+        self.assertEqual(reply['history']['total'], 0)
+        self.assertEqual(reply['history']['query'], 'excluded')
+        self.send({'action': 'history', 'query': 'included', 'requestId': 'history-search-included'})
+        self.assertEqual(self.read()['history']['total'], 1)
 
     def test_idle_sleeps_and_external_writer_wakes_it(self):
         self.assertFalse(select.select([self.process.stdout], [], [], 1.2)[0])

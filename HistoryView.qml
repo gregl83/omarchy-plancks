@@ -6,6 +6,7 @@ import "."
 Column {
   id: root
   spacing: Style.space(14)
+  property bool tooltipsEnabled: true
   property color foreground: Color.foreground
   property string fontFamily: Style.font.family
   property Item backControl: null
@@ -23,12 +24,30 @@ Column {
     return hours ? hours + "h" + (rest ? " " + rest + "m" : "") : rest + "m"
   }
   function focusBack() { if (backControl) backControl.forceActiveFocus() }
+  function searchHistory() {
+    searchDelay.stop()
+    focusSampleId = ""
+    EpochController.requestHistory(0, searchField.text)
+  }
+  function clearHistorySearch() {
+    searchField.text = ""
+    searchHistory()
+    searchField.forceActiveFocus()
+  }
   function changePage(page) {
     focusSampleId = ""
     EpochController.requestHistory(page)
     pageChanged()
   }
-  onVisibleChanged: if (!visible) focusSampleId = ""
+  onVisibleChanged: {
+    if (!visible) { focusSampleId = ""; searchDelay.stop() }
+    else if (searchField.text !== EpochController.historyQuery) searchHistory()
+  }
+  Timer {
+    id: searchDelay
+    interval: 250
+    onTriggered: root.searchHistory()
+  }
   onHistoryChanged: {
     if (!visible || !focusSampleId) return
     Qt.callLater(function() {
@@ -62,35 +81,102 @@ Column {
   Column {
     width: parent.width
     visible: !!root.history.trends && (root.history.trends.epoch.length > 0 || root.history.trends.off.length > 0)
-    spacing: Style.space(14)
-    Row {
+    spacing: Style.spacing.panelGap
+    Column {
       width: parent.width
-      spacing: Style.space(20)
-      HistoryTrend {
-        id: epochTrend
-        objectName: "plancks_epochTrend"
-        width: offTrend.visible ? (parent.width - parent.spacing) / 2 : parent.width
-        title: "Epochs"
-        points: root.history.trends ? root.history.trends.epoch : []
-        foreground: root.foreground
-        fontFamily: root.fontFamily
+      spacing: Style.spacing.panelGap
+      Row {
+        width: parent.width
+        spacing: Style.space(20)
+        HistoryTrend {
+          id: epochTrend
+          objectName: "plancks_epochTrend"
+          width: offTrend.visible ? (parent.width - parent.spacing) / 2 : parent.width
+          tooltipsEnabled: root.tooltipsEnabled
+          title: "Epochs"
+          points: root.history.trends ? root.history.trends.epoch : []
+          foreground: root.foreground
+          fontFamily: root.fontFamily
+        }
+        HistoryTrend {
+          id: offTrend
+          objectName: "plancks_offTrend"
+          width: epochTrend.visible ? (parent.width - parent.spacing) / 2 : parent.width
+          tooltipsEnabled: root.tooltipsEnabled
+          title: "Off-time"
+          points: root.history.trends ? root.history.trends.off : []
+          foreground: root.foreground
+          fontFamily: root.fontFamily
+        }
       }
-      HistoryTrend {
-        id: offTrend
-        objectName: "plancks_offTrend"
-        width: epochTrend.visible ? (parent.width - parent.spacing) / 2 : parent.width
-        title: "Off-time"
-        points: root.history.trends ? root.history.trends.off : []
-        foreground: root.foreground
-        fontFamily: root.fontFamily
+      Text {
+        width: parent.width
+        visible: !!root.history.query
+        text: "Latest intervals · unaffected by search"
+        textFormat: Text.PlainText
+        wrapMode: Text.WordWrap
+        color: root.foreground
+        opacity: 0.6
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
       }
     }
     PanelSeparator { foreground: root.foreground }
   }
+  Row {
+    width: parent.width
+    spacing: Style.space(8)
+    TextField {
+      id: searchField
+      objectName: "plancks_historySearch"
+      width: parent.width - (clearSearch.visible ? clearSearch.width + parent.spacing : 0)
+      placeholderText: "Search dates, times, durations…"
+      // Restore once; live request updates must never replace text being edited.
+      Component.onCompleted: text = EpochController.historyQuery
+      maximumLength: 256
+      foreground: root.foreground
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.bodySmall
+      Accessible.name: "Search history"
+      onTextChanged: if (root.visible && text !== EpochController.historyQuery) searchDelay.restart()
+      onAccepted: root.searchHistory()
+      onActiveFocusChanged: if (activeFocus) root.revealRequested(searchField)
+      Keys.onEscapePressed: {
+        if (text.length > 0) root.clearHistorySearch()
+        else root.backRequested()
+      }
+    }
+    Button {
+      id: clearSearch
+      objectName: "plancks_historyClearSearch"
+      anchors.verticalCenter: searchField.verticalCenter
+      visible: searchField.text.length > 0
+      text: "Clear"
+      foreground: root.foreground
+      fontFamily: root.fontFamily
+      fontSize: Style.font.caption
+      horizontalPadding: Style.space(4)
+      focusable: true
+      bordered: false
+      onClicked: root.clearHistorySearch()
+      Keys.onEscapePressed: root.backRequested()
+    }
+  }
+  Text {
+    width: parent.width
+    visible: !!root.history.query
+    text: EpochController.historyLoading ? "Searching…"
+      : root.history.total + (root.history.total === 1 ? " matching interval" : " matching intervals")
+    color: root.foreground
+    opacity: 0.6
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.caption
+  }
   Text {
     width: parent.width
     visible: root.history.total === 0 && EpochController.historyError === ""
-    text: EpochController.historyLoading ? "Loading history…" : "No completed intervals yet."
+    text: EpochController.historyLoading ? "Loading history…"
+      : root.history.query ? "No matching intervals." : "No completed intervals yet."
     textFormat: Text.PlainText
     wrapMode: Text.WordWrap
     color: root.foreground
@@ -161,7 +247,7 @@ Column {
                 acceptedButtons: Qt.NoButton
               }
               PanelToolTip {
-                visible: stampHover.containsMouse
+                visible: root.tooltipsEnabled && stampHover.containsMouse
                 text: Qt.formatDateTime(new Date(intervalRow.modelData.start.utcMs), "ddd, MMM d, yyyy · HH:mm:ss")
                   + " → " + Qt.formatDateTime(new Date(intervalRow.modelData.end.utcMs), "ddd, MMM d, yyyy · HH:mm:ss")
                 fontFamily: root.fontFamily
@@ -202,7 +288,7 @@ Column {
                 EpochController.setHistoryInclusion(intervalRow.modelData.eventId, checked)
               }
               PanelToolTip {
-                visible: inclusion.containsMouse
+                visible: root.tooltipsEnabled && inclusion.containsMouse
                 text: "Use for predictions · " + intervalRow.sampleStatus
                 fontFamily: root.fontFamily
               }

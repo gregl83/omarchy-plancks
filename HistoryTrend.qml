@@ -6,6 +6,7 @@ Column {
   id: root
   property string title: ""
   property var points: []
+  property bool tooltipsEnabled: true
   property color foreground: Color.foreground
   property string fontFamily: Style.font.family
   visible: points.length > 0
@@ -103,7 +104,7 @@ Column {
           Math.round((mouseX - plot.inset) / Math.max(1, plot.width - plot.inset * 2) * (root.points.length - 1))))
     }
     PanelToolTip {
-      visible: hover.containsMouse && root.points.length > 0
+      visible: root.tooltipsEnabled && hover.containsMouse && root.points.length > 0
       readonly property var sample: root.points.length ? root.points[hover.pointIndex] : null
       text: sample ? root.title + " · " + Qt.formatDateTime(new Date(sample.endUtcMs), "ddd, MMM d, yyyy")
         + " · " + root.length(sample.durationMs) + (sample.excludedFromLearning ? " · Excluded" : "") : ""
