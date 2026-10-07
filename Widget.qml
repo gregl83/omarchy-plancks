@@ -23,6 +23,7 @@ BarWidget {
 
   WidgetButton {
     id: button
+    objectName: "plancks_widgetButton"
     anchors.fill: parent
     bar: root.bar
     labelVisible: false
@@ -47,6 +48,8 @@ BarWidget {
     }
     Text {
       id: label
+      // Rich text handles hover itself; keep the button's input surface above it.
+      z: -1
       anchors.centerIn: parent
       textFormat: Text.RichText
       text: {

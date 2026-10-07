@@ -184,6 +184,15 @@ ShellRoot {
       catch (error) { console.error("SMOKE_FAIL UI: " + error); Qt.quit(); throw error }
     }
     function runConfirmation() {
+      var widgetButton = findChild(widget, "plancks_widgetButton")
+      verify(widgetButton !== null, "Find the bar button")
+      for (var fraction of [0.05, 0.25, 0.5, 0.75, 0.95]) {
+        mouseMove(widget, widget.width + 10, widget.height / 2)
+        wait(20)
+        mouseMove(widget, widget.width * fraction, widget.height / 2)
+        tryVerify(function() { return widgetButton.tooltipHovered }, 1000,
+                  "Tooltip hover covers the whole timer at " + fraction)
+      }
       var panel = findChild(widget, "plancks_root")
       verify(panel !== null, "Find the production panel")
       var keys = findChild(panel, "plancks_keys")
