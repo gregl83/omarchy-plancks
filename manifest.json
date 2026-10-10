@@ -4,7 +4,8 @@
   "name": "Plancks",
   "version": "1.4.0",
   "author": "gregl83",
-  "description": "Track your daily opportunity window with predictions learned from epochs and off-time intervals.",
+  "license": "Apache-2.0",
+  "description": "A second clock, tuned to your daily rhythm. An Omarchy bar timer for tracking epochs and off-time, with learned predictions, countdowns, searchable history, trend charts, animated graphics, motivational insights, and finish notifications. Local time tracking with no account or cloud service.",
   "kinds": [
     "bar-widget"
   ],
