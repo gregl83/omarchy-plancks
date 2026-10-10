@@ -21,7 +21,7 @@ class ReleaseValidationTests(unittest.TestCase):
             'id': 'test.plugin', 'name': 'Test', 'version': '1.0.0',
             'author': 'Test', 'description': 'Release validation fixture',
         }))
-        for name in ('README.md', 'LICENSE', 'assets/preview.png', 'assets/preview-history.png', 'assets/preview-settings.png', 'qmldir', 'plancks.py',
+        for name in ('README.md', 'LICENSE', 'assets/preview-main.png', 'assets/preview-history.png', 'assets/preview-settings.png', 'preview.png', 'qmldir', 'plancks.py',
                      'Widget.qml', 'EpochPanel.qml', 'EpochController.qml', 'HistoryView.qml', 'HistoryTrend.qml', 'AnimatedGraphic.qml', 'CoffeeGraphic.qml', 'StarshipGraphic.qml', 'InsightsSettings.qml', 'insights.py', 'GraphicPreview.qml', 'Graphics.js'):
             self.root.joinpath(name).parent.mkdir(parents=True, exist_ok=True)
             self.root.joinpath(name).write_text('fixture\n')
@@ -62,6 +62,12 @@ class ReleaseValidationTests(unittest.TestCase):
         result = self.validate('--tag', 'v1.0.0')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('checked-out commit', result.stderr)
+
+    def test_missing_marketplace_preview_fails(self):
+        self.root.joinpath('preview.png').unlink()
+        result = self.validate()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Missing or empty package file: preview.png', result.stderr)
 
     def test_missing_runtime_file_fails_without_tag(self):
         self.root.joinpath('EpochController.qml').unlink()
