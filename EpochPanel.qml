@@ -779,6 +779,8 @@ Panel {
                     color: selected ? Style.selectedFillFor(foreground, accent)
                       : activeFocus ? Style.focusFillFor(foreground, accent)
                       : hot ? Style.hoverFillFor(foreground, accent) : background
+                    // A selection is restored state, not a hover transition.
+                    Behavior on color { enabled: false }
                     foreground: root.foreground
                     bordered: true
                     focusable: true
@@ -787,7 +789,7 @@ Panel {
                     Accessible.checkable: true
                     Accessible.checked: selected
                     Accessible.description: "Preview cycles through ready, learning, countdown, and overrun in both phases."
-                    KeyNavigation.tab: index + 1 < graphicChoices.count ? graphicChoices.itemAt(index + 1) : resetButton
+                    KeyNavigation.tab: index + 1 < graphicChoices.count ? graphicChoices.itemAt(index + 1) : insightsSettings.firstControl
                     KeyNavigation.backtab: index > 0 ? graphicChoices.itemAt(index - 1) : tooltipSwitch
                     onClicked: if (root.hostWidget) root.hostWidget.setAnimatedGraphic(modelData.id)
                     onActiveFocusChanged: if (activeFocus) root.revealButton(graphicChoice)
@@ -827,29 +829,61 @@ Panel {
             }
 
             PanelSeparator { foreground: root.foreground }
-            Button {
-              id: resetButton
-              objectName: "plancks_resetButton"
-              text: "Reset all data…"
-              tooltipText: root.tooltipsEnabled ? "Review and confirm deletion of all epoch data." : ""
-              enabled: !EpochController.busy
-              focusable: true
-              bordered: false
-              fontFamily: title.font.family
-              fontSize: Style.font.bodySmall
+            InsightsSettings {
+              id: insightsSettings
+              objectName: "plancks_insightsSettings"
+              width: parent.width
+              hostWidget: root.hostWidget
               foreground: root.foreground
-              KeyNavigation.backtab: graphicChoices.itemAt(graphicChoices.count - 1)
-              KeyNavigation.tab: historyBackButton
-              onActiveFocusChanged: if (activeFocus) root.revealButton(resetButton)
-              onClicked: {
-                if (!enabled) return
-                root.resetGeneration = root.epoch.generation
-                root.resetSequence = root.epoch.sequence
-                root.confirmingReset = true
-                cancelButton.forceActiveFocus()
-                Qt.callLater(function() { scroll.contentY = 0 })
+              fontFamily: title.font.family
+              previousControl: graphicChoices.itemAt(graphicChoices.count - 1)
+              nextControl: resetButton
+              onBackRequested: root.closeSettings()
+              onRevealRequested: function(item) { root.revealButton(item) }
+            }
+            PanelSeparator { foreground: root.foreground }
+            Column {
+              width: parent.width
+              spacing: Style.space(8)
+              PanelSectionHeader {
+                text: "DATA"
+                foreground: root.foreground
+                fontFamily: title.font.family
               }
-              Keys.onEscapePressed: root.closeSettings()
+              Text {
+                width: parent.width
+                text: "Clear recorded history and learned predictions."
+                wrapMode: Text.WordWrap
+                color: root.foreground
+                opacity: 0.6
+                font.family: title.font.family
+                font.pixelSize: Style.font.caption
+              }
+              Button {
+                id: resetButton
+                objectName: "plancks_resetButton"
+                text: "Reset all data…"
+                tooltipText: root.tooltipsEnabled ? "Review and confirm deletion of all epoch data." : ""
+                enabled: !EpochController.busy
+                focusable: true
+                bordered: true
+                fontFamily: title.font.family
+                fontSize: Style.font.caption
+                height: insightsSettings.previewButtonHeight
+                foreground: root.foreground
+                KeyNavigation.backtab: insightsSettings.lastControl
+                KeyNavigation.tab: historyBackButton
+                onActiveFocusChanged: if (activeFocus) root.revealButton(resetButton)
+                onClicked: {
+                  if (!enabled) return
+                  root.resetGeneration = root.epoch.generation
+                  root.resetSequence = root.epoch.sequence
+                  root.confirmingReset = true
+                  cancelButton.forceActiveFocus()
+                  Qt.callLater(function() { scroll.contentY = 0 })
+                }
+                Keys.onEscapePressed: root.closeSettings()
+              }
             }
           }
           HistoryView {

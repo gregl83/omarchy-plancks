@@ -3,14 +3,15 @@ import "Graphics.js" as Graphics
 
 Loader {
   id: root
-  property string graphic: "coffee"
+  // Wait for the caller's graphic binding before creating a drawing.
+  property string graphic: ""
   property color foreground: "white"
   property real fill: 0
   property bool learning: false
   property bool animated: false
   property string phase: "off"
   property bool overtime: false
-  source: Qt.resolvedUrl(Graphics.option(graphic).source)
+  source: graphic ? Qt.resolvedUrl(Graphics.option(graphic).source) : ""
   onLoaded: {
     item.foreground = Qt.binding(function() { return root.foreground })
     item.fill = Qt.binding(function() { return root.fill })
