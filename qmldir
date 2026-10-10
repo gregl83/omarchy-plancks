@@ -3,3 +3,7 @@ Widget 1.0 Widget.qml
 EpochPanel 1.0 EpochPanel.qml
 HistoryView 1.0 HistoryView.qml
 HistoryTrend 1.0 HistoryTrend.qml
+AnimatedGraphic 1.0 AnimatedGraphic.qml
+CoffeeGraphic 1.0 CoffeeGraphic.qml
+GraphicPreview 1.0 GraphicPreview.qml
+StarshipGraphic 1.0 StarshipGraphic.qml

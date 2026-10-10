@@ -15,8 +15,8 @@ def validate(tag=None):
     version = manifest['version']
     if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version):
         raise ValueError('Use a stable MAJOR.MINOR.PATCH manifest version')
-    for name in ('README.md', 'LICENSE', 'preview.png', 'qmldir', 'plancks.py',
-                 'Widget.qml', 'EpochPanel.qml', 'EpochController.qml', 'HistoryView.qml', 'HistoryTrend.qml'):
+    for name in ('README.md', 'LICENSE', 'preview.png', 'preview-history.png', 'preview-settings.png', 'qmldir', 'plancks.py',
+                 'Widget.qml', 'EpochPanel.qml', 'EpochController.qml', 'HistoryView.qml', 'HistoryTrend.qml', 'AnimatedGraphic.qml', 'CoffeeGraphic.qml', 'StarshipGraphic.qml', 'GraphicPreview.qml', 'Graphics.js'):
         if not Path(name).is_file() or Path(name).stat().st_size == 0:
             raise ValueError(f'Missing or empty package file: {name}')
     if tag is not None:

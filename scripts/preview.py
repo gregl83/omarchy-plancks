@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Capture the production panels with isolated, frozen sample history."""
+"""Capture main, history, and settings panels with isolated, frozen sample history."""
 import json
 import os
 from pathlib import Path
@@ -46,7 +46,7 @@ with tempfile.TemporaryDirectory(prefix='plancks-preview-') as directory:
         (root / name).symlink_to(shell / name)
     plugin = root / 'Plancks'
     plugin.mkdir()
-    for name in ('qmldir', 'Widget.qml', 'EpochPanel.qml', 'HistoryView.qml', 'HistoryTrend.qml', 'plancks.py'):
+    for name in ('qmldir', 'Widget.qml', 'EpochPanel.qml', 'HistoryView.qml', 'HistoryTrend.qml', 'AnimatedGraphic.qml', 'CoffeeGraphic.qml', 'StarshipGraphic.qml', 'GraphicPreview.qml', 'Graphics.js', 'plancks.py'):
         (plugin / name).symlink_to(REPO / name)
     controller = (REPO / 'EpochController.qml').read_text()
     command = next(line for line in controller.splitlines() if line.strip().startswith('command:'))
@@ -171,6 +171,8 @@ ShellRoot {
         capture.card.parent = stage
         capture.card.x = 0
         capture.card.y = bar.barSize + Style.gapsOut
+        // The card is staged outside its popup; keep popup fades out of captures.
+        capture.card.opacity = 1
         capture.step = 2
         return
       }
@@ -181,7 +183,15 @@ ShellRoot {
         capture.save(HISTORY_PATH, 5)
         return
       }
-      if (capture.step === 5) { console.log("PREVIEW_PASS"); Qt.quit() }
+      if (capture.step === 5) { panel.openSettings(); capture.step = 6; return }
+      if (capture.step === 6) {
+        find(panel, "plancks_graphicPreviewTimer").stop()
+        find(panel, "plancks_settingsView").previewElapsed = 5800
+        capture.step = 7
+        return
+      }
+      if (capture.step === 7) { capture.step = -1; capture.save(SETTINGS_PATH, 8); return }
+      if (capture.step === 8) { console.log("PREVIEW_PASS"); Qt.quit() }
     }
   }
 }
@@ -190,6 +200,7 @@ ShellRoot {
     qml = qml.replace('CLOCK', json.dumps(now.strftime('%A %H:%M')))
     qml = qml.replace('MAIN_PATH', json.dumps(str(REPO / 'preview.png')))
     qml = qml.replace('HISTORY_PATH', json.dumps(str(REPO / 'preview-history.png')))
+    qml = qml.replace('SETTINGS_PATH', json.dumps(str(REPO / 'preview-settings.png')))
     (root / 'shell.qml').write_text(qml)
     env = dict(os.environ, XDG_STATE_HOME=str(root / 'state'))
     result = subprocess.run(['quickshell', '-p', str(root), '--no-color'], env=env,

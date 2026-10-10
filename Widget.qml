@@ -2,6 +2,7 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 import "."
+import "Graphics.js" as Graphics
 
 BarWidget {
   id: root
@@ -12,6 +13,12 @@ BarWidget {
     settings = Object.assign({}, settings, {tooltipsEnabled: enabled})
     if (bar && bar.shell) bar.shell.updateEntryInline(moduleName, settings)
     if (!enabled && bar) bar.hideTooltip(button)
+  }
+  readonly property string animatedGraphic: Graphics.option(setting("animatedGraphic", "coffee")).id
+  function setAnimatedGraphic(id) {
+    var selected = Graphics.option(id).id
+    settings = Object.assign({}, settings, {animatedGraphic: selected})
+    if (bar && bar.shell) bar.shell.updateEntryInline(moduleName, settings)
   }
   readonly property bool opened: panel.opened
   readonly property bool popoutSwitchClosing: panel.popoutSwitchClosing
