@@ -9,9 +9,9 @@
 Plancks sits alongside your standard clock in the Omarchy bar, tracking your daily opportunity window and predicting what comes next. Standard clocks keep people in sync; Plancks helps you understand your own daily rhythm.
 
 <p align="center">
-  <img align="top" src="preview.png" alt="Plancks between the clock and weather, with its active epoch panel open" width="360">
-  <img align="top" src="preview-history.png" alt="Plancks history with epoch and off-time trends, five intervals, inclusion switches, and pagination" width="360">
-  <img align="top" src="preview-settings.png" alt="Plancks settings with Tooltips, synchronized Coffee cup and Starship previews, Insights, and a Data section" width="360">
+  <img align="top" src="assets/preview.png" alt="Plancks between the clock and weather, with its active epoch panel open" width="320">
+  <img align="top" src="assets/preview-history.png" alt="Plancks history with epoch and off-time trends, five intervals, inclusion switches, and pagination" width="320">
+  <img align="top" src="assets/preview-settings.png" alt="Plancks settings with Tooltips, synchronized Coffee cup and Starship previews, Insights, and a Data section" width="320">
   <br>
   <em>Preview with sample history.</em>
 </p>
@@ -216,7 +216,7 @@ python3 tests/smoke_qml.py
 
 The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing epoch state through IPC, busy/not-ready guards, normal and skip transitions, overrun, vertical layout, and reset. With `--preview` (also used in CI), it exercises history navigation, inclusion switches, pagination, trends and their empty-state behavior, plus the reset warning, default Cancel focus, Cancel activation, Escape cancellation, and explicit deletion through keyboard input. Physical suspend/reboot still warrant a live-session check.
 
-Regenerate all three README previews with `python3 scripts/preview.py` in an active Wayland session. It renders the production panels with isolated, frozen sample history, preserves the preview’s bar framing and background strip, and leaves your saved history untouched.
+Regenerate all three README previews in `assets/` with `python3 scripts/preview.py` in an active Wayland session. It renders the production panels with isolated, frozen sample history, preserves the preview’s bar framing and background strip, and leaves your saved history untouched.
 
 ## CI and releases
 

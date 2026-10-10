@@ -25,7 +25,7 @@ def stamp(date):
 
 with tempfile.TemporaryDirectory(prefix='plancks-preview-') as directory:
     root = Path(directory)
-    shutil.copyfile(REPO / 'preview.png', root / 'backdrop.png')
+    shutil.copyfile(REPO / 'assets/preview.png', root / 'backdrop.png')
     state_dir = root / 'state' / 'omarchy' / 'gregl83.plancks'
     store = plancks.Store(state_dir)
     sequence = 0
@@ -198,9 +198,9 @@ ShellRoot {
 '''
     qml = qml.replace('BACKGROUND_PATH', json.dumps(str(root / 'backdrop.png')))
     qml = qml.replace('CLOCK', json.dumps(now.strftime('%A %H:%M')))
-    qml = qml.replace('MAIN_PATH', json.dumps(str(REPO / 'preview.png')))
-    qml = qml.replace('HISTORY_PATH', json.dumps(str(REPO / 'preview-history.png')))
-    qml = qml.replace('SETTINGS_PATH', json.dumps(str(REPO / 'preview-settings.png')))
+    qml = qml.replace('MAIN_PATH', json.dumps(str(REPO / 'assets/preview.png')))
+    qml = qml.replace('HISTORY_PATH', json.dumps(str(REPO / 'assets/preview-history.png')))
+    qml = qml.replace('SETTINGS_PATH', json.dumps(str(REPO / 'assets/preview-settings.png')))
     (root / 'shell.qml').write_text(qml)
     env = dict(os.environ, XDG_STATE_HOME=str(root / 'state'))
     result = subprocess.run(['quickshell', '-p', str(root), '--no-color'], env=env,

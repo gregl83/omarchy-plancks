@@ -21,8 +21,9 @@ class ReleaseValidationTests(unittest.TestCase):
             'id': 'test.plugin', 'name': 'Test', 'version': '1.0.0',
             'author': 'Test', 'description': 'Release validation fixture',
         }))
-        for name in ('README.md', 'LICENSE', 'preview.png', 'preview-history.png', 'preview-settings.png', 'qmldir', 'plancks.py',
+        for name in ('README.md', 'LICENSE', 'assets/preview.png', 'assets/preview-history.png', 'assets/preview-settings.png', 'qmldir', 'plancks.py',
                      'Widget.qml', 'EpochPanel.qml', 'EpochController.qml', 'HistoryView.qml', 'HistoryTrend.qml', 'AnimatedGraphic.qml', 'CoffeeGraphic.qml', 'StarshipGraphic.qml', 'InsightsSettings.qml', 'insights.py', 'GraphicPreview.qml', 'Graphics.js'):
+            self.root.joinpath(name).parent.mkdir(parents=True, exist_ok=True)
             self.root.joinpath(name).write_text('fixture\n')
         self.git('add', '.')
         self.git('-c', 'commit.gpgsign=false', 'commit', '-m', 'Initial package')
