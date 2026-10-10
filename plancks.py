@@ -21,6 +21,8 @@ import tempfile
 import time
 import uuid
 
+from insights import Insights
+
 VERSION = 1
 DEFAULT_ROTATE_BYTES = 5 * 1024 * 1024
 
@@ -221,6 +223,14 @@ class Store:
             path.unlink(missing_ok=True)
         for path in [self.root / "state.json", *self.root.glob(".state-*")]:
             path.unlink(missing_ok=True)
+        # Insight delivery metadata is separate from the journal, but belongs
+        # to this data reset. Coordinate with an in-flight notification claim.
+        insight_lock = self.root / "insights.lock"
+        if insight_lock.exists():
+            with insight_lock.open("a+b") as stream:
+                fcntl.flock(stream, fcntl.LOCK_EX)
+                for path in [self.root / "insights.json", *self.root.glob(".insights-*")]:
+                    path.unlink(missing_ok=True)
         sync_dir(self.events)
         sync_dir(self.root)
         self.write_json(dict(marker, pending=False), self.events / ".reset.json")
@@ -380,6 +390,8 @@ class Store:
                 length, basis = elapsed(state["anchor"], now)
                 sample = {"eventId": event_id, "start": state["anchor"], "end": now,
                           "durationMs": length, "timeBasis": basis}
+                if action == "end" and state["predictionMs"] is not None:
+                    sample["expectedDurationMs"] = state["predictionMs"]
                 if skip_learning:
                     sample["excludedFromLearning"] = True
             samples = state["workSamples" if action == "start" else "gapSamples"]
@@ -596,15 +608,30 @@ def serve(store):
     panel_open = False
     last_sent = {}
     buffer = b""
+    insights = Insights(store.root)
+    insights_error = ""
 
     def emit(result):
         print(json.dumps(result, separators=(",", ":")), flush=True)
+
+    def insight_failure(exc):
+        nonlocal insights_error
+        insights.failed = True
+        message = "Insights unavailable: " + str(exc)
+        if message != insights_error:
+            insights_error = message
+            emit({"ok": True, "insightsError": message})
 
     def refresh():
         nonlocal display
         with store.locked():
             state = store.load()
         display = Display(state, initial_ms)
+        try:
+            age = elapsed(state["anchor"], clock())[0] if state["anchor"] else 0
+            insights.sync(state, age)
+        except (OSError, ValueError, KeyError, TypeError, OverflowError) as exc:
+            insight_failure(exc)
         if persistent_warning:
             display.state = dict(state, warnings=state["warnings"] + [persistent_warning])
 
@@ -612,7 +639,16 @@ def serve(store):
         nonlocal last_sent
         if display is None:
             return
-        values = display.update(clock())
+        now = clock()
+        values = display.update(now)
+        if not insights.failed:
+            try:
+                age = elapsed(display.state["anchor"], now)[0] if display.state["anchor"] else 0
+                message = insights.tick(age, now)
+                if message:
+                    emit({"ok": True, "insight": message})
+            except (OSError, ValueError, KeyError, TypeError, OverflowError) as exc:
+                insight_failure(exc)
         if full:
             result = {"ok": True, "view": dict(values)}
             last_sent = dict(values)
@@ -630,7 +666,7 @@ def serve(store):
         emit(result)
 
     def respond(request):
-        nonlocal initial_ms, persistent_warning, panel_open, display
+        nonlocal initial_ms, persistent_warning, panel_open, display, insights_error
         ack = request.get("requestId")
         try:
             action = request["action"]
@@ -640,10 +676,19 @@ def serve(store):
                         or not (value == 0 or 1 <= value <= (2**53 - 1) / 1000)):
                     raise ValueError("Initial duration must be 0 (learn first) or at least one second, within the supported clock range")
                 initial_ms = value * 1000 if value > 0 else None
+                if insights.configure(request) and insights_error:
+                    insights_error = ""
+                    emit({"ok": True, "insightsError": ""})
             elif action == "panel":
                 if not isinstance(request.get("open"), bool):
                     raise ValueError("Panel open must be a boolean")
                 panel_open = request["open"]
+            elif action == "preview_insight":
+                if display is None:
+                    raise ValueError("Load history before previewing an insight")
+                age = elapsed(display.state["anchor"], clock())[0] if display.state["anchor"] else 0
+                emit({"ok": True, "insight": insights.preview(display.state, age)})
+                return
             elif action == "history":
                 emit({"ok": True, "history": store.history_page(request.get("page", 0), query=request.get("query", "")), "requestId": ack})
                 return

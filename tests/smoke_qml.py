@@ -24,6 +24,7 @@ with tempfile.TemporaryDirectory(prefix='plancks-smoke-') as directory:
 import Quickshell
 import QtTest
 import Quickshell.Io
+import qs.Commons
 import "Plancks" as Plancks
 ShellRoot {
   id: test
@@ -193,6 +194,8 @@ ShellRoot {
         tryVerify(function() { return widgetButton.tooltipHovered }, 1000,
                   "Tooltip hover covers the whole timer at " + fraction)
       }
+      widget.open()
+      wait(100)
       var panel = findChild(widget, "plancks_root")
       verify(panel !== null, "Find the production panel")
       var keys = findChild(panel, "plancks_keys")
@@ -227,6 +230,70 @@ ShellRoot {
       var cancel = findChild(panel, "plancks_cancelButton")
       var confirm = findChild(panel, "plancks_confirmButton")
       var warning = findChild(panel, "plancks_resetWarning")
+      var settingsButton = findChild(panel, "plancks_settingsButton")
+      var settingsView = findChild(panel, "plancks_settingsView")
+      verify(settingsButton.visible && !reset.visible, "Main navigation exposes Settings; reset stays in Settings")
+      // The bar can inject saved preferences after constructing a widget.
+      widget.settings = Object.assign({}, widget.settings, {animatedGraphic: "starship"})
+      settingsButton.forceActiveFocus()
+      keyClick(Qt.Key_Return)
+      verify(panel.showingSettings && settingsView.visible && !action.visible, "Settings replaces main content")
+      var graphicChoice = findVisual(scroll.contentItem, "plancks_graphic_coffee")
+      var graphicPreview = findVisual(scroll.contentItem, "plancks_graphicPreview_coffee")
+      var initialStarship = findVisual(scroll.contentItem, "plancks_graphic_starship")
+      verify(initialStarship.selected && !graphicChoice.selected && graphicPreview.running,
+             "Saved Starship selection is present when Settings first opens")
+      compare(initialStarship.color.toString(), Style.selectedFillFor(initialStarship.foreground, initialStarship.accent).toString(),
+              "Saved selection is painted immediately on first open")
+      var initialDrawing = findVisual(scroll.contentItem, "plancks_graphicPreview_starship")
+      verify(initialDrawing.item && initialDrawing.item.objectName === "plancks_starshipDrawing",
+             "Starship preview loads the correct drawing on first open")
+      var graphicSequence = Plancks.EpochController.state.sequence
+      graphicChoice.forceActiveFocus()
+      keyClick(Qt.Key_Return)
+      compare(widget.settings.animatedGraphic, "coffee", "Graphic choice is saved in widget settings")
+      compare(widget.animatedGraphic, "coffee")
+      compare(Plancks.EpochController.state.sequence, graphicSequence, "Choosing a graphic does not change epochs")
+      var starshipChoice = findVisual(scroll.contentItem, "plancks_graphic_starship")
+      var starshipPreview = findVisual(scroll.contentItem, "plancks_graphicPreview_starship")
+      compare(starshipChoice.y, graphicChoice.y, "Both graphics occupy the same row")
+      verify(starshipChoice.x > graphicChoice.x, "Starship is the second tile")
+      starshipChoice.forceActiveFocus()
+      keyClick(Qt.Key_Return)
+      verify(starshipChoice.selected && !graphicChoice.selected, "Only Starship is selected")
+      wait(160)
+      var selectionColor = starshipChoice.color.toString()
+      compare(selectionColor, Style.selectedFillFor(starshipChoice.foreground, starshipChoice.accent).toString(),
+              "Selected tile retains its selection fill while focused")
+      keys.forceActiveFocus()
+      wait(160)
+      compare(starshipChoice.color.toString(), selectionColor, "Selection styling stays the same after focus leaves")
+      compare(widget.settings.animatedGraphic, "starship", "Starship selection is saved")
+      var timerGraphic = findVisual(scroll.contentItem, "plancks_timerGraphic")
+      tryVerify(function() { return timerGraphic.item && timerGraphic.item.objectName === "plancks_starshipDrawing" })
+      compare(Plancks.EpochController.state.sequence, graphicSequence, "Graphic selection leaves epoch state intact")
+      for (var frame of [
+        {elapsed: 0, fill: 0, learning: false, opacity: 0.45},
+        {elapsed: 1600, fill: 0, learning: true, opacity: 1},
+        {elapsed: 4000, fill: 1, learning: false, opacity: 1},
+        {elapsed: 5800, fill: 0.5, learning: false, opacity: 1},
+        {elapsed: 7600, fill: 0, learning: false, opacity: 1},
+        {elapsed: 9200, fill: 0, learning: true, opacity: 0.45},
+        {elapsed: 13400, fill: 0.5, learning: false, opacity: 0.45},
+        {elapsed: 15200, fill: 1, learning: false, opacity: 0.45}
+      ]) {
+        settingsView.previewElapsed = frame.elapsed
+        compare(graphicPreview.fill, frame.fill, "Preview fill at " + frame.elapsed)
+        compare(graphicPreview.learning, frame.learning)
+        compare(graphicPreview.opacity, frame.opacity)
+        compare(starshipPreview.fill, graphicPreview.fill, "Both previews share the fuel level")
+        compare(starshipPreview.learning, graphicPreview.learning)
+        compare(starshipPreview.elapsed, graphicPreview.elapsed)
+        compare(starshipPreview.item.flameVisible, starshipPreview.phase === "active" && !starshipPreview.overtime, "Flame stops past the expected epoch end")
+        compare(starshipPreview.item.padVisible, starshipPreview.phase === "off", "Pad identifies off-time")
+        compare(starshipPreview.item.fuelConnectionVisible, starshipPreview.phase === "off", "Fuel connection stays visible throughout off-time")
+        compare(starshipPreview.item.overtime, starshipPreview.overtime)
+      }
       var tooltipSwitch = findChild(panel, "plancks_tooltipsSwitch")
       verify(tooltipSwitch !== null && tooltipSwitch.checked, "Tooltips default to enabled")
       var tooltipSequence = Plancks.EpochController.state.sequence
@@ -238,16 +305,68 @@ ShellRoot {
       compare(widgetButton.tooltipText, "", "Bar tooltip is disabled")
       compare(action.tooltipText, "", "Panel button tooltip is disabled")
       verify(action.Accessible.description.length > 0, "Accessible action description is retained")
+      keyClick(Qt.Key_Tab)
+      verify(graphicChoice.activeFocus, "Tab moves from tooltips to graphics")
+      keyClick(Qt.Key_Tab)
+      verify(starshipChoice.activeFocus, "Tab reaches the second graphic")
+      keyClick(Qt.Key_Tab)
+      var insightToggle = findChild(panel, "plancks_insightsToggle")
+      var finishToggle = findChild(panel, "plancks_finishNotificationsToggle")
+      var insightPreview = findChild(panel, "plancks_previewInsightButton")
+      var warningMinutes = findChild(panel, "plancks_finishWarningMinutes")
+      verify(insightToggle.activeFocus && !insightToggle.checked, "Insights start disabled")
+      keyClick(Qt.Key_Space)
+      verify(widget.insightsEnabled && insightToggle.checked, "Insights preference is stored")
+      keyClick(Qt.Key_Tab)
+      var cadence = findChild(panel, "plancks_insightFrequency")
+      verify(cadence.activeFocus, "Enabled cadence receives focus")
+      keyClick(Qt.Key_Tab)
+      verify(insightPreview.activeFocus, "Preview follows occasional insight controls")
+      keyClick(Qt.Key_Return)
+      tryVerify(function() { return Plancks.EpochController.notificationMessage.length > 0 }, 3000)
+      compare(Plancks.EpochController.state.sequence, tooltipSequence, "Preview does not change epoch history")
+      keyClick(Qt.Key_Tab)
+      verify(finishToggle.activeFocus && !finishToggle.checked, "Finish notifications are independent")
+      keyClick(Qt.Key_Space)
+      verify(widget.finishNotificationsEnabled, "Finish notifications can be enabled")
+      keyClick(Qt.Key_Tab)
+      verify(warningMinutes.activeFocus, "Warning minutes are editable")
+      warningMinutes.text = "20, 1"
+      keyClick(Qt.Key_Return)
+      compare(widget.finishWarningSeconds.join(","), "1200,60", "Warning minutes are saved as seconds")
+      warningMinutes.text = "invalid"
+      keyClick(Qt.Key_Return)
+      compare(widget.finishWarningSeconds.join(","), "1200,60", "Invalid warning values preserve preferences")
+      warningMinutes.text = "30, 1"
+      keyClick(Qt.Key_Return)
+      keyClick(Qt.Key_Tab)
+      insightToggle.forceActiveFocus()
+      keyClick(Qt.Key_Space)
+      finishToggle.forceActiveFocus()
+      keyClick(Qt.Key_Space)
+      verify(!widget.insightsEnabled && !widget.finishNotificationsEnabled, "Both options can be disabled")
+      finishToggle.forceActiveFocus()
+      keyClick(Qt.Key_Tab)
+      verify(reset.activeFocus, "Tab moves from finish notifications to reset")
       keyClick(Qt.Key_Backtab)
-      verify(reset.activeFocus, "Shift-Tab moves from tooltips to reset")
-      keyClick(Qt.Key_Tab)
-      verify(tooltipSwitch.activeFocus, "Tab moves from reset to tooltips")
-      keyClick(Qt.Key_Tab)
-      verify(action.activeFocus, "Tab returns from tooltips to the epoch action")
+      verify(finishToggle.activeFocus, "Disabled warning field is skipped")
+      keyClick(Qt.Key_Backtab)
+      verify(insightPreview.activeFocus, "Preview belongs to occasional insights")
+      keyClick(Qt.Key_Backtab)
+      verify(insightToggle.activeFocus, "Disabled cadence is skipped")
+      keyClick(Qt.Key_Backtab)
+      verify(starshipChoice.activeFocus, "Shift-Tab moves from insights to graphics")
+      keyClick(Qt.Key_Backtab)
+      verify(graphicChoice.activeFocus, "Shift-Tab reaches the first graphic")
+      keyClick(Qt.Key_Backtab)
+      verify(tooltipSwitch.activeFocus, "Shift-Tab moves from graphics to tooltips")
       tooltipSwitch.forceActiveFocus()
       keyClick(Qt.Key_Space)
       verify(tooltipSwitch.checked && panel.tooltipsEnabled, "Tooltips can be enabled again")
       compare(Plancks.EpochController.state.sequence, tooltipSequence, "Tooltip preference does not change epochs")
+      keyClick(Qt.Key_Escape)
+      verify(!panel.showingSettings && keys.activeFocus, "Escape returns focus to the panel without a persistent gear outline")
+      verify(!graphicPreview.running && graphicPreview.elapsed === 0, "Preview stops and resets outside Settings")
       wait(300)
       keys.forceActiveFocus()
       keyClick(Qt.Key_Tab)
@@ -263,7 +382,7 @@ ShellRoot {
       verify(historyView.visible)
       var back = findChild(panel, "plancks_historyBackButton")
       tryVerify(function() { return !Plancks.EpochController.historyLoading })
-      compare(Plancks.EpochController.history.total, 3)
+      compare(Plancks.EpochController.history.total, 3, "Three completed intervals before paging")
       var epochTrend = findVisual(scroll.contentItem, "plancks_epochTrend")
       var offTrend = findVisual(scroll.contentItem, "plancks_offTrend")
       verify(epochTrend.visible && offTrend.visible, "Both completed interval types have a trend")
@@ -284,10 +403,15 @@ ShellRoot {
       // Produce enough skipped intervals to exercise three pages without
       // changing the learned samples used by the reset checks below.
       for (var i = 0; i < 12; i++) {
+        tryVerify(function() { return Plancks.EpochController.ready && !Plancks.EpochController.busy })
+        var beforeSequence = Plancks.EpochController.state.sequence
         Plancks.EpochController.transition(true)
-        tryVerify(function() { return !Plancks.EpochController.busy && !Plancks.EpochController.historyLoading })
+        tryVerify(function() { return !Plancks.EpochController.busy && !Plancks.EpochController.historyLoading
+          && Plancks.EpochController.state.sequence === beforeSequence + 1 })
       }
-      compare(Plancks.EpochController.history.pages, 3)
+      Plancks.EpochController.requestHistory(0)
+      tryVerify(function() { return !Plancks.EpochController.historyLoading })
+      compare(Plancks.EpochController.history.pages, 3, "Three history pages after adding intervals")
       compare(Plancks.EpochController.history.rows.length, 5)
       var next = findChild(panel, "plancks_historyNextButton")
       var previous = findChild(panel, "plancks_historyPreviousButton")
@@ -367,6 +491,9 @@ ShellRoot {
       keyClick(Qt.Key_Escape)
       verify(!panel.showingHistory && panel.opened, "Escape in an empty search returns to the main panel")
       tryVerify(function() { return keys.activeFocus })
+      settingsButton.forceActiveFocus()
+      keyClick(Qt.Key_Return)
+      verify(panel.showingSettings && reset.visible, "Reset is available through Settings")
       reset.forceActiveFocus()
       verify(reset.activeFocus, "Reset receives keyboard focus")
       wait(100)
@@ -394,7 +521,7 @@ ShellRoot {
              "Reset action labels fit")
       unchanged()
       keyClick(Qt.Key_Return)
-      verify(!panel.confirmingReset, "Activating Cancel dismisses warning")
+      verify(!panel.confirmingReset && panel.showingSettings, "Activating Cancel returns to Settings")
       verify(reset.activeFocus)
       wait(150)
       unchanged()
@@ -439,10 +566,14 @@ ShellRoot {
   }
 }
 '''.replace('PREVIEW', 'true' if args.preview else 'false'))
-    env = dict(os.environ, XDG_STATE_HOME=str(root / 'state'))
-    result = subprocess.run(['quickshell', '-p', str(root), '--no-color'],
-                            env=env, text=True, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, timeout=35)
+    env = dict(os.environ, XDG_STATE_HOME=str(root / 'state'), PLANCKS_DISABLE_NOTIFICATIONS='1')
+    try:
+        result = subprocess.run(['quickshell', '-p', str(root), '--no-color'],
+                                env=env, text=True, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, timeout=35)
+    except subprocess.TimeoutExpired as exc:
+        print((exc.stdout or b'').decode(errors='replace'))
+        raise
     print(result.stdout)
     if result.returncode or 'PLANCKS_SMOKE_PASS' not in result.stdout or 'SMOKE_FAIL' in result.stdout or ' ERROR' in result.stdout or 'WARN scene:' in result.stdout or 'FAIL!' in result.stdout or (args.preview and 'PLANCKS_RESET_UI_PASS' not in result.stdout):
         raise SystemExit(1)

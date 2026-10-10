@@ -2,6 +2,7 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 import "."
+import "Graphics.js" as Graphics
 
 BarWidget {
   id: root
@@ -12,6 +13,30 @@ BarWidget {
     settings = Object.assign({}, settings, {tooltipsEnabled: enabled})
     if (bar && bar.shell) bar.shell.updateEntryInline(moduleName, settings)
     if (!enabled && bar) bar.hideTooltip(button)
+  }
+  readonly property string animatedGraphic: Graphics.option(setting("animatedGraphic", "coffee")).id
+  function setAnimatedGraphic(id) {
+    var selected = Graphics.option(id).id
+    settings = Object.assign({}, settings, {animatedGraphic: selected})
+    if (bar && bar.shell) bar.shell.updateEntryInline(moduleName, settings)
+  }
+  readonly property bool insightsEnabled: setting("insightsEnabled", false) === true
+  readonly property bool finishNotificationsEnabled: setting("finishNotificationsEnabled", false) === true
+  readonly property string insightFrequency: ["light", "standard", "frequent"].indexOf(setting("insightFrequency", "standard")) >= 0
+    ? setting("insightFrequency", "standard") : "standard"
+  readonly property var finishWarningSeconds: {
+    var raw = setting("finishWarningSeconds", [1800, 60])
+    if (!Array.isArray(raw) || raw.length < 1 || raw.length > 6
+        || raw.some(function(value) { return typeof value !== "number" || !isFinite(value) || value < 1 || value > 86400 }))
+      return [1800, 60]
+    return raw
+  }
+  function setInsightPreference(name, value) {
+    if (["insightsEnabled", "finishNotificationsEnabled", "insightFrequency", "finishWarningSeconds"].indexOf(name) < 0) return
+    var next = Object.assign({}, settings)
+    next[name] = value
+    settings = next
+    if (bar && bar.shell) bar.shell.updateEntryInline(moduleName, settings)
   }
   readonly property bool opened: panel.opened
   readonly property bool popoutSwitchClosing: panel.popoutSwitchClosing

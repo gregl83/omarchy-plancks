@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Capture the production panels with isolated, frozen sample history."""
+"""Capture the README panels and marketplace showcase with frozen sample history."""
 import json
 import os
 from pathlib import Path
@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 import plancks
+from preview_environment import stage_desktop
 
 shell = Path(os.environ.get('OMARCHY_PATH', '/usr/share/omarchy')) / 'shell'
 now = datetime.now().astimezone().replace(hour=13, minute=37, second=0, microsecond=0)
@@ -25,7 +26,7 @@ def stamp(date):
 
 with tempfile.TemporaryDirectory(prefix='plancks-preview-') as directory:
     root = Path(directory)
-    shutil.copyfile(REPO / 'preview.png', root / 'backdrop.png')
+    stage_desktop(root)
     state_dir = root / 'state' / 'omarchy' / 'gregl83.plancks'
     store = plancks.Store(state_dir)
     sequence = 0
@@ -46,10 +47,10 @@ with tempfile.TemporaryDirectory(prefix='plancks-preview-') as directory:
         (root / name).symlink_to(shell / name)
     plugin = root / 'Plancks'
     plugin.mkdir()
-    for name in ('qmldir', 'Widget.qml', 'EpochPanel.qml', 'HistoryView.qml', 'HistoryTrend.qml', 'plancks.py'):
+    for name in ('qmldir', 'Widget.qml', 'EpochPanel.qml', 'HistoryView.qml', 'HistoryTrend.qml', 'AnimatedGraphic.qml', 'CoffeeGraphic.qml', 'StarshipGraphic.qml', 'InsightsSettings.qml', 'insights.py', 'GraphicPreview.qml', 'Graphics.js', 'plancks.py'):
         (plugin / name).symlink_to(REPO / name)
     controller = (REPO / 'EpochController.qml').read_text()
-    command = next(line for line in controller.splitlines() if line.strip().startswith('command:'))
+    command = next(line for line in controller.splitlines() if line.strip().startswith('command: ["python3"'))
     controller = controller.replace(command, '    command: ' + json.dumps([sys.executable, '-u', str(helper)]))
     (plugin / 'EpochController.qml').write_text(controller)
     qml = r'''import QtQuick
@@ -58,6 +59,7 @@ import Quickshell
 import QtTest
 import qs.Commons
 import "Plancks" as Plancks
+import "PreviewContext.js" as Desktop
 ShellRoot {
   id: capture
   property var card: null
@@ -66,7 +68,7 @@ ShellRoot {
   QtObject {
     id: bar
     property bool vertical: false
-    property int barSize: 26
+    property int barSize: Style.bar.sizeHorizontal
     property color foreground: Color.foreground
     property color barForeground: Color.foreground
     property color urgent: Color.urgent
@@ -85,21 +87,18 @@ ShellRoot {
   PanelWindow {
     id: window
     visible: true
-    implicitWidth: 380
+    screen: Quickshell.screens.find(function(screen) { return screen.name === Desktop.screenName })
+    implicitWidth: stage.width
     implicitHeight: stage.height
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
     Item {
       id: stage
-      width: 380
-      height: capture.card ? capture.card.y + capture.card.height : 600
-      Image {
-        y: bar.barSize
-        width: parent.width
-        height: Style.gapsOut
-        source: BACKGROUND_PATH
-        sourceClipRect: Qt.rect(0, 83, 1216, 16)
-        fillMode: Image.Stretch
+      width: Style.space(380) + Style.gapsOut * 2
+      height: capture.card ? capture.card.y + capture.card.height + Style.gapsOut : 600
+      PreviewWallpaper {
+        id: wallpaper
+        anchors.fill: parent
       }
       Rectangle {
         width: parent.width
@@ -153,7 +152,7 @@ ShellRoot {
       if (!result.saveToFile(path)) { console.error("PREVIEW_FAIL saving " + path); Qt.quit(); return }
       console.log("PREVIEW_SAVED " + path)
       capture.step = nextStep
-    }, Qt.size(Math.round(1216 / window.devicePixelRatio), Math.round(stage.height * 3.2 / window.devicePixelRatio)))
+    }, Qt.size(Math.round(stage.width * 3.2 / window.devicePixelRatio), Math.round(stage.height * 3.2 / window.devicePixelRatio)))
     if (!started) { console.error("PREVIEW_FAIL capture"); Qt.quit() }
   }
   Timer {
@@ -162,15 +161,17 @@ ShellRoot {
     running: true
     onTriggered: {
       if (++capture.attempts > 80) { console.error("PREVIEW_FAIL timeout: " + Plancks.EpochController.error); Qt.quit(); return }
-      if (!Plancks.EpochController.ready) return
+      if (!Plancks.EpochController.ready || !wallpaper.ready) return
       var panel = find(widget, "plancks_root")
       if (capture.step === 0) { widget.open(); capture.step = 1; return }
       if (capture.step === 1) {
         var keys = find(panel, "plancks_keys")
         capture.card = keys.parent.parent
         capture.card.parent = stage
-        capture.card.x = 0
+        capture.card.x = Style.gapsOut
         capture.card.y = bar.barSize + Style.gapsOut
+        // The card is staged outside its popup; keep popup fades out of captures.
+        capture.card.opacity = 1
         capture.step = 2
         return
       }
@@ -181,15 +182,23 @@ ShellRoot {
         capture.save(HISTORY_PATH, 5)
         return
       }
-      if (capture.step === 5) { console.log("PREVIEW_PASS"); Qt.quit() }
+      if (capture.step === 5) { panel.openSettings(); capture.step = 6; return }
+      if (capture.step === 6) {
+        find(panel, "plancks_graphicPreviewTimer").stop()
+        find(panel, "plancks_settingsView").previewElapsed = 5800
+        capture.step = 7
+        return
+      }
+      if (capture.step === 7) { capture.step = -1; capture.save(SETTINGS_PATH, 8); return }
+      if (capture.step === 8) { console.log("PREVIEW_PASS"); Qt.quit() }
     }
   }
 }
 '''
-    qml = qml.replace('BACKGROUND_PATH', json.dumps(str(root / 'backdrop.png')))
     qml = qml.replace('CLOCK', json.dumps(now.strftime('%A %H:%M')))
-    qml = qml.replace('MAIN_PATH', json.dumps(str(REPO / 'preview.png')))
-    qml = qml.replace('HISTORY_PATH', json.dumps(str(REPO / 'preview-history.png')))
+    qml = qml.replace('MAIN_PATH', json.dumps(str(REPO / 'assets/preview-main.png')))
+    qml = qml.replace('HISTORY_PATH', json.dumps(str(REPO / 'assets/preview-history.png')))
+    qml = qml.replace('SETTINGS_PATH', json.dumps(str(REPO / 'assets/preview-settings.png')))
     (root / 'shell.qml').write_text(qml)
     env = dict(os.environ, XDG_STATE_HOME=str(root / 'state'))
     result = subprocess.run(['quickshell', '-p', str(root), '--no-color'], env=env,
@@ -197,3 +206,5 @@ ShellRoot {
     print(result.stdout)
     if result.returncode or 'PREVIEW_PASS' not in result.stdout or 'PREVIEW_FAIL' in result.stdout or ' ERROR' in result.stdout or 'WARN scene:' in result.stdout:
         raise SystemExit(1)
+
+subprocess.run([sys.executable, str(REPO / "scripts/showcase.py")], check=True)

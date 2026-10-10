@@ -72,12 +72,6 @@ Column {
       if (root.visible && !EpochController.busy) EpochController.requestHistory(EpochController.historyPage)
     }
   }
-  PanelSectionHeader {
-    width: parent.width
-    text: "HISTORY"
-    foreground: root.foreground
-    fontFamily: root.fontFamily
-  }
   Column {
     width: parent.width
     visible: !!root.history.trends && (root.history.trends.epoch.length > 0 || root.history.trends.off.length > 0)

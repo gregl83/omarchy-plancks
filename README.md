@@ -9,8 +9,9 @@
 Plancks sits alongside your standard clock in the Omarchy bar, tracking your daily opportunity window and predicting what comes next. Standard clocks keep people in sync; Plancks helps you understand your own daily rhythm.
 
 <p align="center">
-  <img align="top" src="preview.png" alt="Plancks between the clock and weather, with its active epoch panel open" width="360">
-  <img align="top" src="preview-history.png" alt="Plancks history with epoch and off-time trends, five intervals, inclusion switches, and pagination" width="360">
+  <img align="top" src="assets/preview-main.png" alt="Plancks between the clock and weather, with its active epoch panel open" width="320">
+  <img align="top" src="assets/preview-history.png" alt="Plancks history with epoch and off-time trends, five intervals, inclusion switches, and pagination" width="320">
+  <img align="top" src="assets/preview-settings.png" alt="Plancks settings with Tooltips, synchronized Coffee cup and Starship previews, Insights, and a Data section" width="320">
   <br>
   <em>Preview with sample history.</em>
 </p>
@@ -23,6 +24,8 @@ The widget renders Planck-time notation as italic **t** with an upright subscrip
 
 The bar and panel timer use normal text for an active epoch and Omarchy's standard dimmed styling for off-time. The tooltip, accessible label, and panel name the phase explicitly.
 
+Choose **Coffee cup** or **Starship** in Settings. Starship fills its fuel tank on the launch pad during off-time, then drains with a flickering nozzle flame during an active epoch. While learning, it shows a pulsing fuel connection on the pad or a flame during an epoch, without a fuel level. Past the expected time, the tank stays full on the pad during off-time, or empty with the flame off during an active epoch.
+
 The main panel frames the timer with subtle corner brackets, with a small coffee cup aligned to the left outside the brackets. During an active epoch it empties toward the expected end; during off-time it fills toward the expected next start. Past zero, the cup stays empty during an active epoch or full during off-time; the positive timer shows how far past the expected time you are. While learning without a prediction, steam rises without a fill level. Animations run only while the timer panel is open.
 
 | Appearance | Example | Meaning |
@@ -34,7 +37,17 @@ The main panel frames the timer with subtle corner brackets, with a small coffee
 
 The timer descriptions use **Until expected epoch end** / **Since expected epoch end** while an epoch is active, and **Until expected next epoch start** / **Since expected next epoch start** during off-time.
 
-Starting or ending an epoch changes its active/off-time appearance; passing an expected time does not. Resetting also returns the widget to off-time. Storage errors show an undimmed `!` marker. Click the widget to open its panel, then use **Start epoch** / **End epoch**. The panel groups forecasts under **Predictions** and actual timestamps, elapsed time, and sample counts under **History**. The **Tooltips** switch at the bottom right controls hover hints in the bar and both panels; its preference is saved across restarts. Hover details for full timestamps and durations; the Samples tooltip explains the epoch/off-time counts and which intervals qualify for predictions. Select **View history** in the History section to browse completed epochs and off-time intervals, five per page. Compact epoch and off-time trends show the latest ten completed intervals of each kind, independently of pagination. Charts disappear when there is no valid data; hover points for details, and hollow points mark excluded intervals. The **Included** / **Excluded** switch controls whether each interval is eligible for learning; skipped intervals can be included again. Recent eligible samples are marked, while intervals invalidated by backwards clock changes remain excluded. Changes save immediately and recalculate the current prediction when its sample window changes, keeping the original start time. **Back** or Escape returns to the main panel. Tab moves between buttons, and Enter or Space activates the focused button. With focus on the panel itself, Enter or Space starts or ends an epoch (or retries a storage error). Escape closes the panel, or cancels an open reset confirmation.
+Starting or ending an epoch changes its active/off-time appearance; passing an expected time does not. Resetting also returns the widget to off-time. Storage errors show an undimmed `!` marker. Click the widget to open its panel, then use **Start epoch** / **End epoch**. The panel groups forecasts under **Predictions** and actual timestamps, elapsed time, and sample counts under **History**. Open **Settings** using the gear in the main panel’s header. The **Animated graphic** section selects one graphic for the timer. Options appear two per row and preview ready, learning, countdown, and overrun states together in a sped-up loop, with one shared state caption above the tiles; the selected option is saved across restarts. The **Tooltips** switch controls hover hints in the bar and both panels; its preference is saved across restarts. Hover details for full timestamps and durations; the Samples tooltip explains the epoch/off-time counts and which intervals qualify for predictions. Select **View history** below the History details to browse completed epochs and off-time intervals, five per page. Compact epoch and off-time trends show the latest ten completed intervals of each kind, independently of pagination. Charts disappear when there is no valid data; hover points for details, and hollow points mark excluded intervals. The **Included** / **Excluded** switch controls whether each interval is eligible for learning; skipped intervals can be included again. Recent eligible samples are marked, while intervals invalidated by backwards clock changes remain excluded. Changes save immediately and recalculate the current prediction when its sample window changes, keeping the original start time. The **Plancks › History** header identifies the page; select **Plancks**, select **Back**, or press Escape to return to the main panel. Tab moves between buttons, and Enter or Space activates the focused button. With focus on the panel itself, Enter or Space starts or ends an epoch (or retries a storage error). Escape closes the panel, or cancels an open reset confirmation.
+
+## Insights
+
+Settings has two independent, optional notification controls. Both start off. **Occasional insights** offers concise, positive encouragement, historical observations, and one extra-time celebration. **Finish notifications** defaults to 30 minutes and 1 minute before the expected end; edit the comma-separated minute values to choose up to six thresholds. Alerts appear as normal desktop notifications while an epoch is active. Off-time is quiet. **Preview**, beside the frequency choices, sends a sample note through the same desktop notification path as scheduled alerts. It works even with notifications disabled or during off-time, without changing history or delivery progress. Repeated previews remember recent samples for the current shell session, varying the observation and wording independently of scheduled alerts.
+
+The first occasional note is scheduled 90–105 minutes into an epoch. Subsequent spacing varies randomly: **Light** every 3–4 hours, **Standard** every 2–3 hours, or **Frequent** every 1–2 hours. Passing the prediction produces one positive extra-time note after about 90 seconds, and occasional notes continue. Finish warnings take priority over occasional notes; closely spaced alerts are separated by a two-minute cooldown. Missed alerts after suspend or restart are skipped rather than delivered in a burst. Enabling notifications midway through an epoch does not send past warnings.
+
+The local catalog varies both wording and meaning, remembering recent messages and the historical facts already shown. Eligible observations include completed-epoch milestones, improving start-time consistency, steady epoch lengths, monthly opportunity totals, earlier starts, morning patterns, monthly duration records, and forecast accuracy. Statistics use valid, included history; monthly totals count completed epochs that started in the current local calendar month. Time recorded describes opportunity, not work accomplished. Forecast accuracy compares the prediction saved at completion with the actual finish, using predictions saved with newly completed epochs; older entries without that information are omitted.
+
+Scheduling runs in the existing Python helper. Ordinary ticks check an in-memory deadline; historical aggregates rebuild only when history changes. Delivery progress is saved atomically at scheduling or notification events, preventing duplicate delivery across restarts and helper instances. `notify-send` runs briefly for each actual alert; there is no additional resident process or network dependency. Insight errors appear in Settings without stopping the clock.
 
 ## Install
 
@@ -82,13 +95,13 @@ From the repository directory, validate and copy the runtime files to try edits 
 ```bash
 omarchy plugin validate .
 mkdir -p ~/.config/omarchy/plugins/gregl83.plancks
-cp manifest.json qmldir Widget.qml EpochPanel.qml EpochController.qml HistoryView.qml HistoryTrend.qml plancks.py \
+cp manifest.json qmldir Widget.qml EpochPanel.qml EpochController.qml HistoryView.qml HistoryTrend.qml AnimatedGraphic.qml CoffeeGraphic.qml StarshipGraphic.qml GraphicPreview.qml InsightsSettings.qml Graphics.js plancks.py insights.py \
   ~/.config/omarchy/plugins/gregl83.plancks/
 omarchy-shell shell rescanPlugins
 omarchy plugin enable gregl83.plancks --after omarchy.clock
 ```
 
-Repeat the copy step after editing. QML widget and panel changes hot-reload, but the shared controller and its long-running Python helper can survive plugin rescans. After changing `plancks.py` or `EpochController.qml`, restart the shell to load the new code:
+Repeat the copy step after editing. QML widget and panel changes hot-reload, but the shared controller and its long-running Python helper can survive plugin rescans. After changing `plancks.py`, `insights.py`, or `EpochController.qml`, restart the shell to load the new code:
 
 ```bash
 omarchy restart shell
@@ -154,7 +167,7 @@ Choose an unused combination, or explicitly unbind an existing assignment before
 
 ## Reset all data
 
-Open the widget panel and select **Reset all data…**. A warning explains what will be deleted; **Cancel** is focused by default. Select **Delete all data** to permanently delete recorded epochs, off-time intervals, and learned predictions and discard any active epoch. Escape cancels the confirmation. Reset cannot be undone; back up the [storage directory](#persistence-and-recovery) first if you want to keep your history.
+Open the widget panel, select **Settings**, then **Reset all data…** in the **Data** section. A warning explains what will be deleted; **Cancel** is focused by default. Select **Delete all data** to permanently delete recorded epochs, off-time intervals, and learned predictions and discard any active epoch. Escape cancels the confirmation. Reset cannot be undone; back up the [storage directory](#persistence-and-recovery) first if you want to keep your history.
 
 The widget returns to its initial off-time state and learns again from new epochs. Widget settings (`initialSeconds`, `rotateBytes`, and bar placement) stay intact. Reset is also available when damaged history prevents starting or ending an epoch. Other instances of the widget refresh automatically. Reset requires writable storage and valid reset metadata; it cannot repair filesystem permissions or a damaged `events/.reset.json` file.
 
@@ -184,6 +197,7 @@ Runtime history lives at `$XDG_STATE_HOME/omarchy/gregl83.plancks/`, falling bac
 - `events/events-00000001.jsonl`, etc.: append-only start/end and history inclusion-change records, rotated before the next record exceeds the segment limit. All segments are retained until you reset the data. One record may exceed a very small configured limit.
 - `state.json`: the single mutable snapshot, replaced atomically after a durable journal append. Includes phase, clock anchors, the current prediction, recent samples, complete interval history, and replay position.
 - `events/.reset.json`: a reset token and completion flag, containing no epoch history. It prevents stale commands and duplicate reset retries from deleting new history and allows interrupted deletion to finish on recovery.
+- `insights.json` and `insights.lock`: optional notification deadlines, delivery IDs, recent wording/facts, and coordination. Created when notifications are enabled during an active epoch and cleared by Reset all data.
 - `.lock`: an empty coordination file for serializing helper instances; it contains no epoch state.
 
 The journal is authoritative. Plancks replays and validates it on startup or when its files change, then caches the result in memory. A missing or damaged snapshot is rebuilt. An incomplete final record is preserved and the next append goes into a new segment. Malformed complete records or missing segments block updates and display an error. Back up the entire directory together; ordinary journal recovery never deletes history. Once a reset is confirmed, recovery finishes any interrupted deletion.
@@ -202,7 +216,7 @@ python3 tests/smoke_qml.py
 
 The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing epoch state through IPC, busy/not-ready guards, normal and skip transitions, overrun, vertical layout, and reset. With `--preview` (also used in CI), it exercises history navigation, inclusion switches, pagination, trends and their empty-state behavior, plus the reset warning, default Cancel focus, Cancel activation, Escape cancellation, and explicit deletion through keyboard input. Physical suspend/reboot still warrant a live-session check.
 
-Regenerate both README previews with `python3 scripts/preview.py` in an active Wayland session. It renders the production panels with isolated, frozen sample history, preserves the preview’s bar framing and background strip, and leaves your saved history untouched.
+Regenerate the three README previews in `assets/` and the root marketplace showcase with `python3 scripts/preview.py` in an active Omarchy session. It renders the production panels with isolated, frozen sample history, uses the active theme’s wallpaper, colors, and font, and leaves your saved history untouched. Backgrounds use the focused monitor’s logical dimensions and Omarchy’s centered aspect-preserving crop; panel captures retain desktop scale, while the showcase scales the desktop uniformly to fit its composition. The wide showcase at `preview.png` presents the timer, history, graphics, and an example insight together. `scripts/showcase.py` can regenerate it independently from the existing panel capture. The current Omarchy marketplace discovers this root-level `preview.png` automatically; the manifest has no supported preview-path field.
 
 ## CI and releases
 

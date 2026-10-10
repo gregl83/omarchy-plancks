@@ -1,5 +1,6 @@
 pragma Singleton
 import QtQuick
+import Quickshell
 import Quickshell.Io
 
 QtObject {
@@ -81,11 +82,28 @@ QtObject {
   property string pendingId: ""
   property var settings: ({})
   property var pendingCommand: null
+  property string insightsError: ""
+  property string notificationMessage: ""
+  signal insightDelivered(string message)
+  function requestInsightPreview() {
+    if (helper.running) helper.write(JSON.stringify({action: "preview_insight"}) + "\n")
+  }
+  property Process notification: Process {
+    command: ["notify-send", "--app-name=Plancks", "--urgency=normal", "--expire-time=8000", "Plancks", root.notificationMessage]
+    onExited: function(code, status) {
+      if (code !== 0) root.insightsError = "Could not deliver the notification. Check that notify-send and desktop notifications are available."
+    }
+  }
+
 
   function configure(values) {
     settings = values || {}
     if (helper.running)
-      helper.write(JSON.stringify({action: "configure", initialSeconds: Number(settings.initialSeconds || 0)}) + "\n")
+      helper.write(JSON.stringify({action: "configure", initialSeconds: Number(settings.initialSeconds || 0),
+        insightsEnabled: settings.insightsEnabled === true,
+        finishNotificationsEnabled: settings.finishNotificationsEnabled === true,
+        insightFrequency: settings.insightFrequency || "standard",
+        finishWarningSeconds: settings.finishWarningSeconds || [1800, 60]}) + "\n")
   }
 
   function transition(skipLearning) {
@@ -166,6 +184,17 @@ QtObject {
       onRead: function(line) {
         try {
           var result = JSON.parse(line)
+          if (result.insightsError !== undefined) {
+            root.insightsError = result.insightsError
+            return
+          }
+          if (result.insight) {
+            root.notificationMessage = result.insight.message
+            root.insightDelivered(result.insight.message)
+            if (Quickshell.env("PLANCKS_DISABLE_NOTIFICATIONS") !== "1")
+              root.notification.running = true
+            return
+          }
           if (result.requestId && result.requestId.indexOf("history-") === 0) {
             if (result.requestId !== root.historyRequestId) return
             root.historyWatchdog.stop()
