@@ -47,7 +47,7 @@ with tempfile.TemporaryDirectory(prefix='plancks-preview-') as directory:
         (root / name).symlink_to(shell / name)
     plugin = root / 'Plancks'
     plugin.mkdir()
-    for name in ('qmldir', 'Widget.qml', 'EpochPanel.qml', 'HistoryView.qml', 'HistoryTrend.qml', 'AnimatedGraphic.qml', 'CoffeeGraphic.qml', 'StarshipGraphic.qml', 'InsightsSettings.qml', 'insights.py', 'GraphicPreview.qml', 'Graphics.js', 'plancks.py'):
+    for name in ('qmldir', 'Widget.qml', 'EpochPanel.qml', 'HistoryView.qml', 'HistoryTrend.qml', 'AnimatedGraphic.qml', 'CoffeeGraphic.qml', 'StarshipGraphic.qml', 'InsightsSettings.qml', 'insights.py', 'GraphicPreview.qml', 'Graphics.js', 'plancks.py', 'BoundedTextField.qml', 'clipboard_read.py', 'assets'):
         (plugin / name).symlink_to(REPO / name)
     controller = (REPO / 'EpochController.qml').read_text()
     command = next(line for line in controller.splitlines() if line.strip().startswith('command: ["python3"'))

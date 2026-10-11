@@ -26,6 +26,7 @@ import QtTest
 import Quickshell.Io
 import qs.Commons
 import "Plancks" as Plancks
+import "Plancks/Graphics.js" as Graphics
 ShellRoot {
   id: test
   property bool resetUiDone: false
@@ -181,6 +182,15 @@ ShellRoot {
       verify(callback(), message || "UI condition timed out")
     }
     function test_resetConfirmation() {
+      var notificationState = {phase: "active", elapsed: "00:30:00", timer: "−00:30:00",
+                               predictedEndUtcMs: 1, predictedStartUtcMs: 1}
+      compare(Graphics.notificationImage("coffee", notificationState), "assets/notifications/coffee/active/fill-050.png")
+      notificationState.phase = "off"
+      compare(Graphics.notificationImage("starship", notificationState), "assets/notifications/starship/off-time/fill-050.png")
+      notificationState.timer = "+00:01:00"
+      compare(Graphics.notificationImage("starship", notificationState), "assets/notifications/starship/overtime/off-time.png")
+      notificationState.predictedStartUtcMs = null
+      compare(Graphics.notificationImage("starship", notificationState), "assets/notifications/starship/learning/off-time.png")
       try { runConfirmation() }
       catch (error) { console.error("SMOKE_FAIL UI: " + error); Qt.quit(); throw error }
     }
@@ -324,6 +334,9 @@ ShellRoot {
       verify(insightPreview.activeFocus, "Preview follows occasional insight controls")
       keyClick(Qt.Key_Return)
       tryVerify(function() { return Plancks.EpochController.notificationMessage.length > 0 }, 3000)
+      compare(Plancks.EpochController.notificationImage,
+              decodeURIComponent(Qt.resolvedUrl("Plancks/" + Graphics.notificationImage(Plancks.EpochController.settings.animatedGraphic, Plancks.EpochController.state)).toString().replace(/^file:\/\//, "")),
+              "Notification captures the selected graphic and current state")
       compare(Plancks.EpochController.state.sequence, tooltipSequence, "Preview does not change epoch history")
       keyClick(Qt.Key_Tab)
       verify(finishToggle.activeFocus && !finishToggle.checked, "Finish notifications are independent")

@@ -646,7 +646,7 @@ def serve(store):
                 age = elapsed(display.state["anchor"], now)[0] if display.state["anchor"] else 0
                 message = insights.tick(age, now)
                 if message:
-                    emit({"ok": True, "insight": message})
+                    emit({"ok": True, "insight": message, "view": values})
             except (OSError, ValueError, KeyError, TypeError, OverflowError) as exc:
                 insight_failure(exc)
         if full:
@@ -687,7 +687,7 @@ def serve(store):
                 if display is None:
                     raise ValueError("Load history before previewing an insight")
                 age = elapsed(display.state["anchor"], clock())[0] if display.state["anchor"] else 0
-                emit({"ok": True, "insight": insights.preview(display.state, age)})
+                emit({"ok": True, "insight": insights.preview(display.state, age), "view": display.update(clock())})
                 return
             elif action == "history":
                 emit({"ok": True, "history": store.history_page(request.get("page", 0), query=request.get("query", "")), "requestId": ack})
