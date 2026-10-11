@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "Graphics.js" as Graphics
 
 QtObject {
   id: root
@@ -84,12 +85,14 @@ QtObject {
   property var pendingCommand: null
   property string insightsError: ""
   property string notificationMessage: ""
+  property string notificationImage: ""
   signal insightDelivered(string message)
   function requestInsightPreview() {
     if (helper.running) helper.write(JSON.stringify({action: "preview_insight"}) + "\n")
   }
   property Process notification: Process {
-    command: ["notify-send", "--app-name=Plancks", "--urgency=normal", "--expire-time=8000", "Plancks", root.notificationMessage]
+    command: ["notify-send", "--app-name=Plancks", "--urgency=normal", "--expire-time=8000",
+              "--app-icon=" + root.notificationImage, "Plancks", root.notificationMessage]
     onExited: function(code, status) {
       if (code !== 0) root.insightsError = "Could not deliver the notification. Check that notify-send and desktop notifications are available."
     }
@@ -189,7 +192,9 @@ QtObject {
             return
           }
           if (result.insight) {
+            if (result.view) root.applyView(result.view)
             root.notificationMessage = result.insight.message
+            root.notificationImage = decodeURIComponent(Qt.resolvedUrl(Graphics.notificationImage(root.settings.animatedGraphic, root.state)).toString().replace(/^file:\/\//, ""))
             root.insightDelivered(result.insight.message)
             if (Quickshell.env("PLANCKS_DISABLE_NOTIFICATIONS") !== "1")
               root.notification.running = true

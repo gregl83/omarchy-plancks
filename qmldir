@@ -8,3 +8,4 @@ CoffeeGraphic 1.0 CoffeeGraphic.qml
 GraphicPreview 1.0 GraphicPreview.qml
 StarshipGraphic 1.0 StarshipGraphic.qml
 InsightsSettings 1.0 InsightsSettings.qml
+BoundedTextField 1.0 BoundedTextField.qml

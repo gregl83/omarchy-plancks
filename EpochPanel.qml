@@ -365,27 +365,11 @@ Panel {
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.verticalCenterOffset: -Style.space(3)
                 opacity: timerText.opacity
-                function seconds(value) {
-                  var parts = String(value).replace(/^[+−-]/, "").split(":")
-                  if (parts.length !== 3 || parts.some(function(p) { return !/^\d+$/.test(p) })) return NaN
-                  return Number(parts[0]) * 3600 + Number(parts[1]) * 60 + Number(parts[2])
-                }
-                readonly property real elapsedSeconds: seconds(root.epoch.elapsed)
-                readonly property real timerSeconds: seconds(timerText.timer)
-                readonly property bool predicted: (root.epoch.phase === "active"
-                  ? root.epoch.predictedEndUtcMs : root.epoch.predictedStartUtcMs) !== null
-                  && isFinite(timerSeconds) && isFinite(elapsedSeconds)
-                readonly property real remainingSeconds: timerText.countingDown ? timerSeconds : -timerSeconds
-                // Derive the anchored duration from elapsed + remaining, rather
-                // than a learned average that may change during this interval.
-                readonly property real durationSeconds: Math.max(1, elapsedSeconds + remainingSeconds)
-                readonly property real remainingFraction: Math.max(0, Math.min(1, remainingSeconds / durationSeconds))
-                // Epochs consume the cup; off-time replenishes it.
-                readonly property real fill: predicted
-                  ? root.epoch.phase === "active" ? remainingFraction : 1 - remainingFraction
-                  : 0
-                readonly property bool overtime: predicted && remainingSeconds < 0
-                readonly property bool learning: !predicted && isFinite(timerSeconds)
+                readonly property var frame: Graphics.stateFrame(root.epoch)
+                readonly property bool predicted: frame.predicted
+                readonly property real fill: frame.fill
+                readonly property bool overtime: frame.overtime
+                readonly property bool learning: frame.learning
                 AnimatedGraphic {
                   objectName: "plancks_timerGraphic"
                   anchors.fill: parent
