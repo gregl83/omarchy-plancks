@@ -53,6 +53,8 @@ Scheduling runs in the existing Python helper. Ordinary ticks check an in-memory
 
 Requires an Omarchy release with the Quickshell plugin system and shared `qs.Ui` components, plus Python 3.9 or later. The plugin uses only Python's standard library. It does not support the older Waybar shell.
 
+Pasting requires `wl-paste` from `wl-clipboard` (included with Omarchy).
+
 Install through Omarchy:
 
 ```bash

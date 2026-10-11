@@ -331,6 +331,30 @@ ShellRoot {
       verify(widget.finishNotificationsEnabled, "Finish notifications can be enabled")
       keyClick(Qt.Key_Tab)
       verify(warningMinutes.activeFocus, "Warning minutes are editable")
+      verify(!warningMinutes.readOnly && warningMinutes.cursorVisible, "Native editing and caret remain enabled")
+      warningMinutes.text = "1"
+      warningMinutes.selectAll()
+      keyClick(Qt.Key_2)
+      compare(warningMinutes.text, "2", "Typing replaces selected text")
+      keyClick(Qt.Key_Z, Qt.ControlModifier)
+      compare(warningMinutes.text, "1", "Native undo works")
+      warningMinutes.selectAll()
+      keyClick(Qt.Key_V, Qt.ControlModifier)
+      tryCompare(warningMinutes, "text", "20, 1")
+      warningMinutes.text = "1"
+      warningMinutes.selectAll()
+      keyClick(Qt.Key_Insert, Qt.ShiftModifier)
+      tryCompare(warningMinutes, "text", "20, 1")
+      warningMinutes.text = ""
+      keyClick(Qt.Key_Paste)
+      tryCompare(warningMinutes, "text", "20, 1")
+      warningMinutes.text = ""
+      mouseClick(warningMinutes, warningMinutes.width / 2, warningMinutes.height / 2, Qt.MiddleButton)
+      tryCompare(warningMinutes, "text", "20, 1")
+      warningMinutes.text = "1".repeat(80)
+      warningMinutes.cursorPosition = 80
+      keyClick(Qt.Key_2)
+      compare(warningMinutes.length, 80, "Typing respects the character limit")
       warningMinutes.text = "20, 1"
       keyClick(Qt.Key_Return)
       compare(widget.finishWarningSeconds.join(","), "1200,60", "Warning minutes are saved as seconds")
@@ -379,6 +403,11 @@ ShellRoot {
       keyClick(Qt.Key_Return)
       verify(panel.showingHistory, "History replaces the main panel")
       var historyView = findChild(panel, "plancks_historyView")
+      var search = findChild(panel, "plancks_historySearch")
+      search.forceActiveFocus()
+      keyClick(Qt.Key_V, Qt.ControlModifier)
+      tryCompare(search, "text", "20, 1")
+      search.text = ""
       verify(historyView.visible)
       var back = findChild(panel, "plancks_historyBackButton")
       tryVerify(function() { return !Plancks.EpochController.historyLoading })
@@ -566,7 +595,14 @@ ShellRoot {
   }
 }
 '''.replace('PREVIEW', 'true' if args.preview else 'false'))
-    env = dict(os.environ, XDG_STATE_HOME=str(root / 'state'), PLANCKS_DISABLE_NOTIFICATIONS='1')
+    # Exercise the paste helper without touching the desktop clipboard.
+    reader_dir = root / 'bin'
+    reader_dir.mkdir()
+    reader = reader_dir / 'wl-paste'
+    reader.write_text('#!/bin/sh\nprintf "20, 1"\n')
+    reader.chmod(0o755)
+    env = dict(os.environ, XDG_STATE_HOME=str(root / 'state'), PLANCKS_DISABLE_NOTIFICATIONS='1',
+               PATH=str(reader_dir) + os.pathsep + os.environ.get('PATH', ''))
     try:
         result = subprocess.run(['quickshell', '-p', str(root), '--no-color'],
                                 env=env, text=True, stdout=subprocess.PIPE,
