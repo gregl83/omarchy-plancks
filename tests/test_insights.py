@@ -125,6 +125,19 @@ class InsightTests(unittest.TestCase):
         self.assertEqual(self.due(age)['kind'], 'warning:1800')
         self.assertGreater(self.engine.book['next'], age)
 
+    def test_session_focus_suppresses_insights_but_preserves_finish_warning(self):
+        self.start(insightsEnabled=True, finishNotificationsEnabled=True)
+        age = self.engine.book['next']
+        self.engine.last_age = age - 1000
+        self.assertIsNone(self.engine.tick(age, {'utcMs': self.utc + age}, suppress_focus=True))
+        self.assertGreater(self.engine.book['next'], age)
+        # Leaving focus does not replay the suppressed insight.
+        self.assertIsNone(self.due(age + 1000))
+        age = self.state['predictionMs'] - 1800 * 1000
+        self.engine.last_age = age - 1000
+        message = self.engine.tick(age, {'utcMs': self.utc + age}, suppress_focus=True)
+        self.assertEqual(message['kind'], 'warning:1800')
+
     def test_invalid_settings_and_corrupt_progress(self):
         config = i.normalize_settings({'insightsEnabled': 'true', 'insightFrequency': 'no',
                                        'finishWarningSeconds': [True, -1]})

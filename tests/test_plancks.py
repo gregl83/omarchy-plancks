@@ -43,7 +43,7 @@ class ModelTests(unittest.TestCase):
         for phase, indicator in [('active', '●'), ('off', '○')]:
             state = p.blank_state()
             state.update(phase=phase, anchor=at(0), predictionMs=HOUR)
-            for now, expected in [(0, '−01:00:00'), (1, '00:00:00'), (2, '+01:00:00')]:
+            for now, expected in [(0, '−01:00:00'), (1, '+00:00:00'), (2, '+01:00:00')]:
                 result = p.view(state, at(now))
                 self.assertEqual(result['timer'], expected)
                 self.assertEqual(result['indicator'], indicator)

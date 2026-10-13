@@ -13,6 +13,38 @@ Panel {
   property var hostWidget: null
   readonly property bool tooltipsEnabled: !hostWidget || hostWidget.tooltipsEnabled
   readonly property var epoch: EpochController.state
+  property bool showingSession: false
+  property bool confirmingEpochEnd: false
+  property bool sessionHistoryMode: false
+  function openSession() {
+    if (epoch.phase !== "active" || epoch.session) return
+    showingHistory = false; showingSettings = false
+    sessionConfig.load(hostWidget ? hostWidget.settings.sessionConfig : null)
+    showingSession = true
+    Qt.callLater(function() { scroll.contentY = 0; keys.forceActiveFocus() })
+  }
+  function closeSession() { showingSession = false; Qt.callLater(function() { scroll.contentY = 0; keys.forceActiveFocus() }) }
+  function showEpochEndConfirmation() {
+    root.open()
+    showingSettings = false; showingHistory = false; showingSession = false; confirmingReset = false
+    confirmingEpochEnd = true
+    Qt.callLater(function() { scroll.contentY = 0; endCancel.forceActiveFocus() })
+  }
+  function cancelEpochEndConfirmation() { confirmingEpochEnd = false; EpochController.cancelEpochEnd(); keys.forceActiveFocus() }
+  Component.onCompleted: EpochController.registerPanel(root)
+  Connections {
+    target: EpochController
+    function onSessionStarted(config) {
+      if (root.showingSession) { if (root.hostWidget) root.hostWidget.saveSessionConfig(config); root.closeSession() }
+    }
+  }
+  Connections {
+    target: EpochController.state
+    function onPhaseChanged() { if (root.epoch.phase !== "active" && root.showingSession) root.closeSession() }
+    function onSessionChanged() {
+      if (root.confirmingEpochEnd && !root.epoch.session) root.cancelEpochEndConfirmation()
+    }
+  }
   property bool showingSettings: false
   function openSettings() {
     keys.forceActiveFocus()
@@ -33,7 +65,12 @@ Panel {
     EpochController.requestHistory(0)
     Qt.callLater(function() { scroll.contentY = 0; keys.forceActiveFocus() })
   }
-  function closeHistory() {
+  function closeHistory(toMain) {
+    if (!toMain && sessionHistoryMode && sessionHistory.detail) {
+      sessionHistory.detail = null
+      Qt.callLater(function() { scroll.contentY = 0; keys.forceActiveFocus() })
+      return
+    }
     keys.forceActiveFocus()
     showingHistory = false
     Qt.callLater(function() { scroll.contentY = 0; keys.forceActiveFocus() })
@@ -59,6 +96,9 @@ Panel {
   }
   property bool detailSubscription: false
   onOpenedChanged: {
+    if (opened) EpochController.lastPanel = root
+    if (!opened && confirmingEpochEnd) cancelEpochEndConfirmation()
+    showingSession = false
     confirmingReset = false
     showingHistory = false
     showingSettings = false
@@ -67,7 +107,7 @@ Panel {
       EpochController.setPanelOpen(opened)
     }
   }
-  Component.onDestruction: if (detailSubscription) EpochController.setPanelOpen(false)
+  Component.onDestruction: { EpochController.unregisterPanel(root); if (detailSubscription) EpochController.setPanelOpen(false) }
   readonly property color foreground: bar ? bar.foreground : Color.foreground
 
   function stamp(value) {
@@ -150,9 +190,11 @@ Panel {
       id: keys
       objectName: "plancks_keys"
       anchors.fill: parent
-      onCloseRequested: { if (root.showingHistory) root.closeHistory(); else if (root.confirmingReset) root.cancelReset(); else if (root.showingSettings) root.closeSettings(); else root.close() }
+      onCloseRequested: { if (root.confirmingEpochEnd) root.cancelEpochEndConfirmation(); else if (root.showingSession) root.closeSession(); else if (root.showingHistory) root.closeHistory(); else if (root.confirmingReset) root.cancelReset(); else if (root.showingSettings) root.closeSettings(); else root.close() }
       onTabRequested: function(direction) {
-        if (root.showingHistory) historyView.focusBack()
+        if (root.confirmingEpochEnd) endCancel.forceActiveFocus()
+        else if (root.showingSession) historyBackButton.forceActiveFocus()
+        else if (root.showingHistory) historyView.focusBack()
         else if (root.confirmingReset) cancelButton.forceActiveFocus()
         else if (root.showingSettings) tooltipSwitch.forceActiveFocus()
         else if (actionButton.enabled) actionButton.forceActiveFocus()
@@ -160,10 +202,12 @@ Panel {
       }
       onMoveRequested: function(dx, dy) { scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height, scroll.contentY + dy * Style.space(48))) }
       onActivateRequested: {
-        if (root.showingHistory) historyView.focusBack()
+        if (root.confirmingEpochEnd) endCancel.forceActiveFocus()
+        else if (root.showingSession) historyBackButton.forceActiveFocus()
+        else if (root.showingHistory) historyView.focusBack()
         else if (root.confirmingReset) root.cancelReset()
         else if (root.showingSettings) historyBackButton.forceActiveFocus()
-        else if (EpochController.ready && !EpochController.busy) EpochController.transition()
+        else if (EpochController.ready && !EpochController.busy) EpochController.transition(false, root)
         else if (EpochController.error && !EpochController.busy) EpochController.retry()
       }
       Flickable {
@@ -195,12 +239,14 @@ Panel {
               font.family: root.bar ? root.bar.fontFamily : Style.font.family
               font.pixelSize: Style.font.title
               font.bold: true
-              readonly property bool subview: root.showingHistory || root.showingSettings || root.confirmingReset
+              readonly property bool subview: root.showingHistory || root.showingSettings || root.confirmingReset || root.showingSession || root.confirmingEpochEnd
               activeFocusOnTab: subview
               Accessible.role: subview ? Accessible.Link : Accessible.StaticText
               Accessible.name: subview ? "Plancks: return to current epoch" : "Plancks"
               function returnToMain() {
-                if (root.showingHistory) root.closeHistory()
+                if (root.confirmingEpochEnd) root.cancelEpochEndConfirmation()
+                else if (root.showingSession) root.closeSession()
+                else if (root.showingHistory) root.closeHistory(true)
                 else if (root.showingSettings) root.closeSettings()
               }
               Keys.onReturnPressed: if (subview) returnToMain()
@@ -236,7 +282,7 @@ Panel {
               Text {
                 objectName: "plancks_pageTitle"
                 width: Math.min(implicitWidth, Math.max(0, header.width - Math.max(phaseBadge.implicitWidth, historyBackButton.implicitWidth) - breadcrumb.x - breadcrumbSeparator.width - breadcrumb.spacing - Style.space(12)))
-                text: root.showingHistory ? "History" : root.confirmingReset ? "Reset" : "Settings"
+                text: root.confirmingEpochEnd ? "End epoch" : root.showingSession ? "Session" : root.showingHistory ? (sessionHistory.detail ? "History › Session" : "History") : root.confirmingReset ? "Reset" : "Settings"
                 textFormat: Text.PlainText
                 color: root.foreground
                 font.family: title.font.family
@@ -291,7 +337,7 @@ Panel {
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
               text: "Back"
-              tooltipText: root.tooltipsEnabled ? (root.confirmingReset ? "Return to settings." : "Return to the current epoch.") : ""
+              tooltipText: root.tooltipsEnabled ? (root.confirmingReset ? "Return to settings." : root.showingHistory && sessionHistoryMode && sessionHistory.detail ? "Return to sessions." : "Return to the current epoch.") : ""
               foreground: Qt.darker(root.foreground, 1.4)
               fontFamily: title.font.family
               fontSize: Style.font.caption
@@ -300,7 +346,9 @@ Panel {
               bordered: false
               focusable: true
               onClicked: {
-                if (root.showingHistory) root.closeHistory()
+                if (root.confirmingEpochEnd) root.cancelEpochEndConfirmation()
+                else if (root.showingSession) root.closeSession()
+                else if (root.showingHistory) root.closeHistory()
                 else if (root.confirmingReset) root.cancelReset()
                 else root.closeSettings()
               }
@@ -315,7 +363,7 @@ Panel {
             id: normalContent
             width: parent.width
             spacing: Style.space(14)
-            visible: !root.confirmingReset && !root.showingHistory && !root.showingSettings
+            visible: !root.confirmingReset && !root.showingHistory && !root.showingSettings && !root.showingSession && !root.confirmingEpochEnd
             Item {
               width: parent.width
               height: Math.max(coffee.height, timerText.implicitHeight + Style.space(20))
@@ -365,27 +413,11 @@ Panel {
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.verticalCenterOffset: -Style.space(3)
                 opacity: timerText.opacity
-                function seconds(value) {
-                  var parts = String(value).replace(/^[+−-]/, "").split(":")
-                  if (parts.length !== 3 || parts.some(function(p) { return !/^\d+$/.test(p) })) return NaN
-                  return Number(parts[0]) * 3600 + Number(parts[1]) * 60 + Number(parts[2])
-                }
-                readonly property real elapsedSeconds: seconds(root.epoch.elapsed)
-                readonly property real timerSeconds: seconds(timerText.timer)
-                readonly property bool predicted: (root.epoch.phase === "active"
-                  ? root.epoch.predictedEndUtcMs : root.epoch.predictedStartUtcMs) !== null
-                  && isFinite(timerSeconds) && isFinite(elapsedSeconds)
-                readonly property real remainingSeconds: timerText.countingDown ? timerSeconds : -timerSeconds
-                // Derive the anchored duration from elapsed + remaining, rather
-                // than a learned average that may change during this interval.
-                readonly property real durationSeconds: Math.max(1, elapsedSeconds + remainingSeconds)
-                readonly property real remainingFraction: Math.max(0, Math.min(1, remainingSeconds / durationSeconds))
-                // Epochs consume the cup; off-time replenishes it.
-                readonly property real fill: predicted
-                  ? root.epoch.phase === "active" ? remainingFraction : 1 - remainingFraction
-                  : 0
-                readonly property bool overtime: predicted && remainingSeconds < 0
-                readonly property bool learning: !predicted && isFinite(timerSeconds)
+                readonly property var frame: Graphics.stateFrame(root.epoch)
+                readonly property bool predicted: frame.predicted
+                readonly property real fill: frame.fill
+                readonly property bool overtime: frame.overtime
+                readonly property bool learning: frame.learning
                 AnimatedGraphic {
                   objectName: "plancks_timerGraphic"
                   anchors.fill: parent
@@ -444,7 +476,6 @@ Panel {
               font.family: Style.font.family
               font.pixelSize: Style.font.bodySmall
             }
-            PanelSeparator { foreground: root.foreground }
             Row {
               id: actionRow
               width: parent.width
@@ -471,14 +502,14 @@ Panel {
                 Accessible.role: Accessible.Button
                 Accessible.name: text
                 Accessible.description: helpText
-                onClicked: if (enabled) EpochController.transition()
+                onClicked: if (enabled) EpochController.transition(false, root)
                 Keys.onEscapePressed: root.close()
               }
               Button {
                 id: skipButton
                 objectName: "plancks_skipButton"
                 onActiveFocusChanged: if (activeFocus) root.revealButton(skipButton)
-                KeyNavigation.tab: root.historyLink
+                KeyNavigation.tab: root.epoch.session ? (advanceSession.visible && advanceSession.enabled ? advanceSession : pauseSession) : configureSession.enabled ? configureSession : root.historyLink
                 KeyNavigation.backtab: actionButton
                 width: actionButton.width
                 fontSize: Style.font.bodySmall
@@ -496,8 +527,199 @@ Panel {
                 Accessible.role: Accessible.Button
                 Accessible.name: text
                 Accessible.description: helpText
-                onClicked: if (enabled) EpochController.transition(true)
+                onClicked: if (enabled) EpochController.transition(true, root)
                 Keys.onEscapePressed: root.close()
+              }
+            }
+            PanelSeparator { foreground: root.foreground }
+            Column {
+              width: parent.width
+              spacing: Style.space(8)
+              visible: !root.epoch.session
+              Button {
+                id: configureSession
+                objectName: "plancks_configureSession"
+                KeyNavigation.backtab: skipButton
+                KeyNavigation.tab: root.historyLink
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "Configure session…"
+                opacity: enabled ? 1 : 0.4
+                enabled: root.epoch.phase === "active" && EpochController.ready && !EpochController.busy
+                foreground: root.foreground; fontFamily: Style.font.family; fontSize: Style.font.bodySmall
+                focusable: enabled
+                onClicked: root.openSession()
+                onActiveFocusChanged: if (activeFocus) root.revealButton(configureSession)
+                Keys.onEscapePressed: root.close()
+              }
+              Text {
+                width: parent.width; visible: root.epoch.phase !== "active"
+                text: "Start an epoch to use sessions"; horizontalAlignment: Text.AlignHCenter
+                color: root.foreground; opacity: 0.6; font.family: Style.font.family; font.pixelSize: Style.font.caption
+              }
+            }
+            Column {
+              width: parent.width
+              spacing: Style.space(8)
+              visible: !!root.epoch.session
+              Item {
+                width: parent.width
+                height: Math.max(coffee.height, pauseSession.implicitHeight * 3 + Style.space(8))
+                Item {
+                  id: sessionProgress
+                  objectName: "plancks_sessionProgress"
+                  width: Style.space(9)
+                  height: sessionControls.height
+                  x: coffee.x + (coffee.width - width) / 2
+                  anchors.verticalCenter: sessionControls.verticalCenter
+                  readonly property real segmentGap: Style.space(2)
+                  readonly property real halfwayExtraGap: Style.space(3)
+                  readonly property real progress: root.epoch.session && !root.epoch.session.invalid && root.epoch.session.plannedMs > 0
+                    ? Math.max(0, Math.min(1, root.epoch.session.actualMs / root.epoch.session.plannedMs)) : 0
+                  readonly property int filledSegments: Math.floor(progress * 10)
+                  Accessible.role: Accessible.ProgressBar
+                  Accessible.name: "Current period progress"
+                  Accessible.description: root.epoch.session && root.epoch.session.invalid
+                    ? "Unavailable after clock change" : Math.floor(progress * 100) + "%"
+                  Repeater {
+                    model: 10
+                    delegate: Rectangle {
+                      required property int index
+                      width: sessionProgress.width
+                      height: (sessionProgress.height - sessionProgress.segmentGap * 9 - sessionProgress.halfwayExtraGap) / 10
+                      y: index * (height + sessionProgress.segmentGap) + (index >= 5 ? sessionProgress.halfwayExtraGap : 0)
+                      color: root.foreground
+                      opacity: 10 - index <= sessionProgress.filledSegments ? 0.75 : 0.12
+                    }
+                  }
+                }
+                Column {
+                  id: sessionControls
+                  objectName: "plancks_sessionControls"
+                  width: Style.space(72)
+                  anchors.left: sessionProgress.right
+                  anchors.leftMargin: Style.space(16)
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: Style.space(4)
+                Item {
+                  // Column ignores invisible children; keep this slot visible
+                  // so the contextual action never moves Pause or Stop.
+                  width: sessionControls.width
+                  height: advanceSession.implicitHeight
+                  Button {
+                    id: advanceSession
+                    width: parent.width
+                    horizontalPadding: Style.space(8)
+                    verticalPadding: Style.space(3)
+                    objectName: "plancks_advanceSession"
+                    visible: !!root.epoch.session && root.epoch.session.canAdvance
+                    opacity: enabled ? 1 : 0.4
+                    KeyNavigation.backtab: skipButton
+                    KeyNavigation.tab: pauseSession
+                    onActiveFocusChanged: if (activeFocus) root.revealButton(advanceSession)
+                    text: root.epoch.session ? (root.epoch.session.final ? "Finish" : root.epoch.session.kind === "focus" ? "Rest" : "Activity") : "Next"
+                    Accessible.name: root.epoch.session ? root.epoch.session.nextLabel : "Start next"
+                    tooltipText: root.tooltipsEnabled ? Accessible.name : ""
+                    bordered: true
+                    background: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
+                    foreground: root.foreground; fontSize: Style.font.caption; focusable: true
+                    enabled: EpochController.ready && !EpochController.busy && !!root.epoch.session && root.epoch.session.canAdvance
+                    onClicked: EpochController.sessionAction(root.epoch.session.final ? "session_completed" : "session_advanced")
+                  }
+                }
+                Button {
+                  id: pauseSession
+                  width: sessionControls.width
+                  horizontalPadding: Style.space(8)
+                  verticalPadding: Style.space(3)
+                  objectName: "plancks_pauseSession"
+                  KeyNavigation.backtab: advanceSession.visible && advanceSession.enabled ? advanceSession : skipButton
+                  KeyNavigation.tab: stopSession
+                  onActiveFocusChanged: if (activeFocus) root.revealButton(pauseSession)
+                  text: root.epoch.session && root.epoch.session.status === "paused" ? "Resume" : "Pause"
+                  Accessible.name: root.epoch.session && root.epoch.session.status === "paused" ? "Resume session" : "Pause session"
+                  tooltipText: root.tooltipsEnabled ? Accessible.name : ""
+                  bordered: false
+                  foreground: Qt.darker(root.foreground, 1.4); fontSize: Style.font.caption; focusable: true
+                  enabled: EpochController.ready && !EpochController.busy
+                  onClicked: EpochController.sessionAction(root.epoch.session.status === "paused" ? "session_resumed" : "session_paused")
+                }
+                Button {
+                  id: stopSession
+                  width: sessionControls.width
+                  horizontalPadding: Style.space(8)
+                  verticalPadding: Style.space(3)
+                  objectName: "plancks_stopSession"
+                  KeyNavigation.backtab: pauseSession
+                  KeyNavigation.tab: root.historyLink
+                  onActiveFocusChanged: if (activeFocus) root.revealButton(stopSession)
+                  text: "Stop";
+                  Accessible.name: "Stop session"
+                  tooltipText: root.tooltipsEnabled ? Accessible.name : ""
+                   bordered: false
+                  foreground: Qt.darker(root.foreground, 1.4); fontSize: Style.font.caption; focusable: true
+                  enabled: EpochController.ready && !EpochController.busy
+                  onClicked: EpochController.sessionAction("session_stopped")
+                }
+
+                }
+                Item {
+                  id: sessionTimerFrame
+                  objectName: "plancks_sessionTimerFrame"
+                  x: sessionControls.x + sessionControls.width + Style.space(12)
+                  width: Math.max(0, parent.width - x)
+                  height: parent.height
+                Repeater {
+                  model: 4
+                  delegate: Item {
+                    required property int index
+                    readonly property bool rightSide: index % 2 === 1
+                    readonly property bool bottomSide: index >= 2
+                    readonly property real lineWidth: Math.max(1, Style.normalBorderWidth)
+                    width: Style.space(10)
+                    height: Style.space(10)
+                    x: rightSide ? sessionTimerFrame.width - width : 0
+                    y: bottomSide ? sessionTimerFrame.height - height : 0
+                    opacity: 0.25
+                    Rectangle {
+                      width: parent.width
+                      height: parent.lineWidth
+                      y: parent.bottomSide ? parent.height - height : 0
+                      color: root.foreground
+                    }
+                    Rectangle {
+                      width: parent.lineWidth
+                      height: parent.height
+                      x: parent.rightSide ? parent.width - width : 0
+                      color: root.foreground
+                    }
+                  }
+                }
+                  Text {
+                    id: sessionTimerText
+                    objectName: "plancks_sessionTimer"
+                    anchors.centerIn: parent
+                    textFormat: Text.RichText
+                    text: root.epoch.session ? "<span style=\"font-size: " + Style.space(16) + "px;\"><i>t</i><sub>"
+                      + (root.epoch.session.kind === "focus" ? "A" : "R") + "</sub></span> " + root.epoch.session.timer : ""
+                    color: root.foreground
+                    font.family: Style.font.family
+                    font.pixelSize: Style.space(24)
+                    scale: Math.min(1, Math.max(0, sessionTimerFrame.width - Style.space(32)) / Math.max(1, implicitWidth))
+                    Accessible.name: root.epoch.session ? root.epoch.session.caption + ". " + root.epoch.session.timer : ""
+                  }
+                }
+              }
+              Text {
+                x: sessionTimerFrame.x
+                width: Math.max(0, parent.width - x)
+                text: root.epoch.session ? root.epoch.session.caption : ""
+                textFormat: Text.PlainText
+                color: root.foreground
+                opacity: 0.75
+                font.family: Style.font.family
+                font.pixelSize: Style.font.bodySmall
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
               }
             }
             PanelSeparator { foreground: root.foreground }
@@ -640,7 +862,7 @@ Panel {
                   focusable: true
                   bordered: false
                   KeyNavigation.tab: retryButton.visible ? retryButton : settingsButton
-                  KeyNavigation.backtab: skipButton
+                  KeyNavigation.backtab: root.epoch.session ? stopSession : configureSession.enabled ? configureSession : skipButton
                   Component.onCompleted: if (sectionGroup.modelData.section === "History") root.historyLink = historyButton
                   onActiveFocusChanged: if (activeFocus) root.revealButton(historyButton)
                   onClicked: root.openHistory()
@@ -659,6 +881,7 @@ Panel {
             }
             Button {
               id: retryButton
+              objectName: "plancks_retryButton"
               onActiveFocusChanged: if (activeFocus) root.revealButton(retryButton)
               KeyNavigation.tab: settingsButton
               visible: EpochController.error !== ""
@@ -886,11 +1109,129 @@ Panel {
               }
             }
           }
+          SessionConfig {
+            id: sessionConfig
+            objectName: "plancks_sessionConfig"
+            width: parent.width; visible: root.showingSession
+            foreground: root.foreground
+            onBackRequested: root.closeSession()
+            onRevealRequested: function(item) { root.revealButton(item) }
+          }
+          Column {
+            width: parent.width; spacing: Style.space(14); visible: root.confirmingEpochEnd
+            Text { width: parent.width; text: "End this session and epoch? The session will be recorded as stopped, including its partial progress."
+              color: root.foreground; font.family: Style.font.family; font.pixelSize: Style.font.bodySmall; wrapMode: Text.WordWrap }
+            Text { width: parent.width; text: EpochController.error; visible: text.length > 0
+              color: root.foreground; font.pixelSize: Style.font.bodySmall; wrapMode: Text.WordWrap }
+            Row {
+              width: parent.width; spacing: Style.space(8)
+              Button {
+                id: endCancel
+                objectName: "plancks_cancelEpochEnd"
+                text: "Cancel"; foreground: root.foreground; fontSize: Style.font.bodySmall; focusable: true
+                KeyNavigation.tab: endConfirm
+                onClicked: root.cancelEpochEndConfirmation()
+                Keys.onEscapePressed: root.cancelEpochEndConfirmation()
+              }
+              Button {
+                id: endConfirm
+                objectName: "plancks_confirmEpochEnd"
+                text: "End session and epoch"; foreground: root.foreground; fontSize: Style.font.bodySmall; focusable: true
+                enabled: EpochController.ready && !EpochController.busy
+                KeyNavigation.backtab: endCancel
+                onClicked: EpochController.confirmEpochEnd()
+                Keys.onEscapePressed: root.cancelEpochEndConfirmation()
+              }
+            }
+          }
+          Row {
+            id: historyMode
+            objectName: "plancks_historyMode"
+            visible: root.showingHistory
+            spacing: Style.spacing.md
+            // Reserve the bold label width so selection never moves hit targets.
+            readonly property real tabWidth: Math.ceil(historyTabMetrics.advanceWidth("Sessions"))
+              + Style.spacing.controlPaddingX * 2 + Style.space(8)
+            function selectSessions(value) {
+              if (root.sessionHistoryMode === value) {
+                if (value && sessionHistory.detail) root.closeHistory()
+                return
+              }
+              root.sessionHistoryMode = value
+              sessionHistory.detail = null
+              if (value) EpochController.requestSessionHistory(0, "")
+              else historyView.clearHistorySearch()
+            }
+            FontMetrics {
+              id: historyTabMetrics
+              font.family: root.bar ? root.bar.fontFamily : Style.font.family
+              font.pixelSize: Style.font.body
+              font.bold: true
+            }
+            Button {
+              id: epochsTab
+              objectName: "plancks_epochsTab"
+              width: historyMode.tabWidth
+              text: "Epochs"
+              selected: !root.sessionHistoryMode
+              borderSpec: Border.controlSpec(activeFocus ? "focus"
+                : selected ? (Border.controlHasWidth("selected") ? "selected" : "normal")
+                : hot ? "hover-cursor" : "normal", foreground, accent)
+              color: selected ? Style.selectedFillFor(foreground, accent)
+                : activeFocus ? Style.focusFillFor(foreground, accent)
+                : hot ? Style.hoverFillFor(foreground, accent) : background
+              bordered: true
+              focusable: true
+              foreground: root.foreground
+              fontFamily: historyTabMetrics.font.family
+              Accessible.role: Accessible.PageTab
+              Accessible.name: text
+              Accessible.selected: selected
+              KeyNavigation.right: sessionsTab
+              onClicked: historyMode.selectSessions(false)
+              onActiveFocusChanged: if (activeFocus) root.revealButton(epochsTab)
+            }
+            Button {
+              id: sessionsTab
+              objectName: "plancks_sessionsTab"
+              width: historyMode.tabWidth
+              text: "Sessions"
+              selected: root.sessionHistoryMode
+              borderSpec: Border.controlSpec(activeFocus ? "focus"
+                : selected ? (Border.controlHasWidth("selected") ? "selected" : "normal")
+                : hot ? "hover-cursor" : "normal", foreground, accent)
+              color: selected ? Style.selectedFillFor(foreground, accent)
+                : activeFocus ? Style.focusFillFor(foreground, accent)
+                : hot ? Style.hoverFillFor(foreground, accent) : background
+              bordered: true
+              focusable: true
+              foreground: root.foreground
+              fontFamily: historyTabMetrics.font.family
+              Accessible.role: Accessible.PageTab
+              Accessible.name: text
+              Accessible.selected: selected
+              KeyNavigation.left: epochsTab
+              onClicked: historyMode.selectSessions(true)
+              onActiveFocusChanged: if (activeFocus) root.revealButton(sessionsTab)
+            }
+          }
+          SessionHistory {
+            id: sessionHistory
+            objectName: "plancks_sessionHistory"
+            tooltipsEnabled: root.tooltipsEnabled
+            width: parent.width; visible: root.showingHistory && root.sessionHistoryMode
+            backControl: historyBackButton
+            fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+            onPageChanged: Qt.callLater(function() { scroll.contentY = 0; keys.forceActiveFocus() })
+            foreground: root.foreground
+            onBackRequested: root.closeHistory()
+            onRevealRequested: function(item) { root.revealButton(item) }
+          }
           HistoryView {
             id: historyView
             objectName: "plancks_historyView"
             width: parent.width
-            visible: root.showingHistory
+            visible: root.showingHistory && !root.sessionHistoryMode
             backControl: historyBackButton
             tooltipsEnabled: root.tooltipsEnabled
             foreground: root.foreground
@@ -905,7 +1246,7 @@ Panel {
             visible: root.confirmingReset
             Text {
               width: parent.width
-              text: "Delete recorded epochs, off-time intervals, and learned predictions. Any active epoch will be discarded."
+              text: "Delete recorded epochs, off-time intervals, sessions, and learned predictions. Any active epoch and session will be discarded."
               textFormat: Text.PlainText
               wrapMode: Text.WordWrap
               color: root.foreground

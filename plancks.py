@@ -22,8 +22,10 @@ import time
 import uuid
 
 from insights import Insights
+import sessions
 
 VERSION = 1
+SNAPSHOT_VERSION = 2
 DEFAULT_ROTATE_BYTES = 5 * 1024 * 1024
 
 
@@ -100,10 +102,10 @@ def duration(milliseconds):
 
 
 def blank_state():
-    return {"schemaVersion": VERSION, "sequence": 0, "lastEventId": None,
+    return {"schemaVersion": SNAPSHOT_VERSION, "sequence": 0, "lastEventId": None,
             "generation": "", "phase": "off", "anchor": None, "lastStart": None, "lastEnd": None,
             "epochId": None, "predictionMs": None, "deadlineUtcMs": None,
-            "workSamples": [], "gapSamples": [], "history": [], "warnings": [], "cursor": None}
+            "session": None, "sessions": [], "workSamples": [], "gapSamples": [], "history": [], "warnings": [], "cursor": None}
 
 
 def apply(state, event):
@@ -114,13 +116,25 @@ def apply(state, event):
             or not stamp["bootId"] or any(type(stamp.get(key)) is not int
             or abs(stamp[key]) > 2**53 - 1 for key in ("utcMs", "bootMs"))):
         raise ValueError("Invalid journal clock")
+    if event.get("schemaVersion") not in (1, 2) or event.get("sequence") != state["sequence"] + 1:
+        raise ValueError("Unsupported journal version or missing/out-of-order event")
+    if not isinstance(event.get("eventId"), str) or not event["eventId"]:
+        raise ValueError("Invalid journal event ID")
+    if not isinstance(event.get("type"), str):
+        raise ValueError("Invalid journal event type")
+    if event["type"].startswith("session_"):
+        if event["schemaVersion"] != 2:
+            raise ValueError("Session events require journal version 2")
+        sessions.reduce(state, event)
+        state.update(sequence=event["sequence"], lastEventId=event["eventId"])
+        return
     prediction = event["predictionMs"]
     if prediction is not None and (type(prediction) not in (int, float)
             or not 1000 <= prediction <= 2**53 - 1):
         raise ValueError("Invalid journal prediction")
     if not isinstance(event["eventId"], str) or not event["eventId"]:
         raise ValueError("Invalid journal event ID")
-    if event.get("schemaVersion") != VERSION or event.get("sequence") != state["sequence"] + 1:
+    if event.get("schemaVersion") not in (1, 2) or event.get("sequence") != state["sequence"] + 1:
         raise ValueError("Unsupported journal version or missing/out-of-order event")
     if event["type"] == "sample_inclusion_changed":
         target = event["sampleId"]
@@ -142,6 +156,10 @@ def apply(state, event):
         raise ValueError("Journal contains an invalid phase transition")
     if not starting and event["epochId"] != state["epochId"]:
         raise ValueError("End event does not match the active epoch")
+    if not starting and state["session"]:
+        if event.get("schemaVersion") != 2 or event.get("cascadeSessionId") != state["session"]["sessionId"]:
+            raise ValueError("Session active: explicitly confirm End session and epoch")
+        sessions.stop(state, stamp, 'epoch-ended')
     sample = event.get("completedSample")
     if sample is not None:
         if (not isinstance(sample, dict) or not isinstance(sample.get("eventId"), str)
@@ -286,13 +304,17 @@ class Store:
                     exclusion = sample.get("excludedFromLearning", False) if sample is not None else None
                     if event["type"] == "sample_inclusion_changed":
                         exclusion = (event["sampleId"], event["excludedFromLearning"])
+                    if event['type'].startswith('session_'):
+                        exclusion = (event.get('sessionId'), event.get('stageId'), event.get('config'))
+                    if event['type'] == 'session_inclusion_changed':
+                        exclusion = (event.get('sessionId'), event.get('excludedFromStatistics'))
                     ids[event["eventId"]] = (event["type"], path.name, exclusion)
                     state["cursor"] = {"segment": path.name, "offset": stream.tell()}
         try:
             snapshot = json.loads((self.root / "state.json").read_text())
         except (OSError, ValueError):
             snapshot = None
-        if (isinstance(snapshot, dict) and snapshot.get("schemaVersion") == VERSION
+        if (isinstance(snapshot, dict) and snapshot.get("schemaVersion") in (VERSION, SNAPSHOT_VERSION)
                 and isinstance(snapshot.get("sequence"), int)
                 and snapshot["sequence"] > state["sequence"]):
             raise ValueError("Journal ends before the saved snapshot; restore missing event history before continuing")
@@ -352,7 +374,7 @@ class Store:
 
     def transition(self, action, event_id, expected_sequence, initial_ms=None,
                    rotate_bytes=DEFAULT_ROTATE_BYTES, now=None, expected_generation="",
-                   skip_learning=False):
+                   skip_learning=False, cascade_session_id=None):
         if type(skip_learning) is not bool:
             raise ValueError("Skip learning must be a boolean")
         if action not in ("start", "end"):
@@ -384,6 +406,10 @@ class Store:
                 raise ValueError("State changed on another screen. Review the current phase and try again.")
             if (action == "start") != (state["phase"] == "off"):
                 raise ValueError("That phase transition has already happened")
+            if state['session'] and action == 'end' and cascade_session_id != state['session']['sessionId']:
+                raise ValueError('Session active: explicitly confirm End session and epoch')
+            if cascade_session_id and (not state['session'] or cascade_session_id != state['session']['sessionId']):
+                raise ValueError('Session changed; review the current epoch')
             now = now or clock()
             sample = None
             if state["anchor"]:
@@ -402,11 +428,97 @@ class Store:
                      "completedSample": sample, "predictionMs": prediction,
                      "deadlineUtcMs": now["utcMs"] + prediction if prediction is not None else None,
                      "predictionSampleIds": [s["eventId"] for s in samples]}
+            if cascade_session_id:
+                event.update(schemaVersion=2, cascadeSessionId=cascade_session_id)
             apply(state, event)
             cursor = self.append(event, rotate_bytes)
             state["cursor"] = cursor
             self._signature = None
             return state, self.snapshot_warning(state)
+
+    def session_action(self, action, event_id, expected_sequence, expected_generation="",
+                       config=None, session_id=None, stage_id=None, now=None,
+                       rotate_bytes=DEFAULT_ROTATE_BYTES, excluded=None):
+        if action not in ('session_started', 'session_paused', 'session_resumed', 'session_advanced',
+                          'session_completed', 'session_stopped', 'session_stage_target_reached', 'session_inclusion_changed'):
+            raise ValueError('Unknown session command')
+        if not isinstance(event_id, str) or not 1 <= len(event_id) <= 128:
+            raise ValueError('A stable event ID is required')
+        if type(rotate_bytes) is not int or rotate_bytes < 1:
+            raise ValueError('Rotation size must be a positive integer')
+        if action == 'session_started':
+            config = sessions.configuration(config)
+        payload = (session_id, excluded) if action == 'session_inclusion_changed' else (session_id, stage_id, config)
+        with self.locked():
+            state = self.load()
+            if state['generation'] != expected_generation:
+                raise ValueError('Data was reset. Review the current state.')
+            if event_id in self._ids:
+                if action == 'session_stage_target_reached':
+                    raise ValueError('Stage target already claimed')
+                saved_type, segment, saved_payload = self._ids[event_id]
+                if saved_type != action or saved_payload != payload:
+                    raise ValueError('Event ID already used for another action')
+                with (self.events / segment).open('rb') as stream:
+                    os.fsync(stream.fileno())
+                sync_dir(self.events)
+                return state, self.snapshot_warning(state)
+            target_only = (stage_id is not None and state['lastEventId'] == sessions.target_id(stage_id)
+                           and expected_sequence == state['sequence'] - 1)
+            if expected_sequence != state['sequence'] and not target_only:
+                raise ValueError('State changed. Review the current session and try again.')
+            event = dict(schemaVersion=2, sequence=state['sequence'] + 1, eventId=event_id,
+                         type=action, clock=now or clock(), epochId=state['epochId'],
+                         sessionId=session_id, stageId=stage_id, config=config)
+            if action == 'session_inclusion_changed':
+                event['excludedFromStatistics'] = excluded
+            if action == 'session_started':
+                event['config'] = sessions.configuration(config)
+                event['stages'] = sessions.stages(event['config'])
+            apply(state, event)
+            state['cursor'] = self.append(event, rotate_bytes)
+            self._signature = None
+            return state, self.snapshot_warning(state)
+
+    def session_history(self, page=0, query="", detail_id=None):
+        if type(page) is not int or page < 0 or not isinstance(query, str) or len(query) > 256:
+            raise ValueError('Invalid session history request')
+        with self.locked():
+            state = self.load()
+        if detail_id is not None and (not isinstance(detail_id, str) or len(detail_id) > 128):
+            raise ValueError("Invalid session detail ID")
+        rows = [sessions.summary(item) for item in reversed(state['sessions'])]
+        terms = search_terms(query)
+        def matches(row):
+            dates = [datetime.fromtimestamp(row[k]['utcMs'] / 1000).astimezone().strftime('%Y-%m-%d %b %d %B %d %H:%M') for k in ('start', 'end')]
+            fields = [row['status'], row['config']['preset'], row['config'].get('name', ''), 'excluded' if row.get('excludedFromStatistics') or row['invalid'] else 'included', *dates]
+            for key in ('start', 'end'):
+                date = datetime.fromtimestamp(row[key]['utcMs'] / 1000).astimezone()
+                fields.extend([f"{date:%b} {date.day}", f"{date:%B} {date.day}", f"{date.day} {date:%b}"])
+            for stage in row['stages']:
+                fields.extend([stage['kind'].replace('_', ' '), {'focus': 'activity', 'short_break': 'rest', 'long_break': 'long rest'}[stage['kind']], duration(stage.get('actualMs', 0)),
+                               f"{stage.get('actualMs', 0) // 60000}m", duration(stage['plannedMs']),
+                               f"{stage['plannedMs'] // 60000}m", stage.get('outcome', 'not started')])
+            return history_matches(' '.join(fields).casefold(), terms)
+        filtered = [r for r in rows if matches(r)] if terms else rows
+        pages = max(1, math.ceil(len(filtered) / 5))
+        page = min(page, pages - 1)
+        included = [r for r in rows if not r.get('excludedFromStatistics') and not r['invalid']]
+        current = [r for r in included if r['epochId'] == state['epochId']]
+        if state['session']:
+            current.append(sessions.summary(state['session']))
+        rounds_by_epoch = {}
+        for row in included:
+            rounds_by_epoch[row['epochId']] = rounds_by_epoch.get(row['epochId'], 0) + row['completedRounds']
+        trend = [dict(eventId=r['sessionId'], endUtcMs=r['end']['utcMs'], durationMs=r['focusMs'],
+                      stopped=r['status'] == 'stopped', excludedFromLearning=r.get('excludedFromStatistics', False),
+                      completedRounds=r['completedRounds'],
+                      rounds=r['config']['rounds']) for r in reversed([r for r in rows if not r['invalid']][:10])]
+        return dict(detail=next((r for r in rows if r["sessionId"] == detail_id), None), trend=trend, rows=filtered[page * 5:(page + 1) * 5], page=page, pages=pages, total=len(filtered),
+                    query=query.strip(), generation=state['generation'], sequence=state['sequence'],
+                    bestRounds=max(rounds_by_epoch.values(), default=0),
+                    completedRounds=sum(r['completedRounds'] for r in current),
+                    completedFocusMs=sum(r['completedFocusMs'] for r in current))
 
     def history_page(self, page=0, page_size=5, query=""):
         if type(page) is not int or page < 0:
@@ -506,7 +618,7 @@ def live_view(state, now):
     else:
         # Compare whole elapsed seconds, avoiding an early decrement at start.
         delta = elapsed_ms // 1000 - prediction // 1000
-        timer = ("−" if delta < 0 else "+" if delta > 0 else "") + duration(abs(delta) * 1000)
+        timer = ("−" if delta < 0 else "+") + duration(abs(delta) * 1000)
         boundary = "epoch end" if active else "next epoch start"
         detail = ("Until expected " if delta < 0 else "Since expected " if delta > 0 else "At expected ") + boundary
     return {"timer": timer, "status": ("Epoch active" if active else "Off-time") + " · " + detail,
@@ -531,7 +643,7 @@ class Display:
         self.gap = estimate(state["gapSamples"])
         active = state["phase"] == "active"
         self.values = {"phase": state["phase"], "sequence": state["sequence"],
-                       "generation": state["generation"],
+                       "generation": state["generation"], "epochId": state["epochId"] or "",
                        "indicator": "●" if active else "○",
                        "lastStartUtcMs": state["lastStart"]["utcMs"] if state["lastStart"] else None,
                        "lastEndUtcMs": state["lastEnd"]["utcMs"] if state["lastEnd"] else None,
@@ -547,6 +659,7 @@ class Display:
         offset = now["utcMs"] - now["bootMs"]
         was_invalid = self.values.get("timer") == "--:--:--"
         self.values.update(live_view(self.state, now))
+        self.values["session"] = sessions.live(self.state["session"], now)
         is_invalid = self.values["timer"] == "--:--:--"
         if self.offset is None or abs(offset - self.offset) >= 1000 or was_invalid != is_invalid:
             self.values.update(forecasts(self.state, now, self.work, self.gap))
@@ -636,24 +749,46 @@ def serve(store):
             display.state = dict(state, warnings=state["warnings"] + [persistent_warning])
 
     def publish(full=False, request_id=None):
-        nonlocal last_sent
+        nonlocal last_sent, persistent_warning
         if display is None:
             return
         now = clock()
         values = display.update(now)
+        current = values.get('session')
+        if current and current['targetDue']:
+            try:
+                # The milestone doubles as the durable notification claim.
+                event_id = sessions.target_id(current['stageId'])
+                _, persistent_warning = store.session_action('session_stage_target_reached', event_id,
+                    display.state['sequence'], display.state['generation'],
+                    session_id=current['sessionId'], stage_id=current['stageId'], now=now)
+                refresh()
+                values = display.update(now)
+                current = values.get('session')
+                if current:
+                    emit({'ok': True, 'sessionNotice': {'generation': display.state['generation'], 'message': (current['name'] + ' · ' if current.get('name') else '') + current['caption'].split(' · ')[0] +
+                          ' time reached · ' + current['nextLabel'] + ' when ready'}})
+                full = True
+            except ValueError:
+                refresh()
+                values = display.update(now)
+                full = True
+            except OSError as exc:
+                emit({'ok': False, 'error': 'Session target could not be saved: ' + str(exc)})
+                return
         if not insights.failed:
             try:
                 age = elapsed(display.state["anchor"], now)[0] if display.state["anchor"] else 0
-                message = insights.tick(age, now)
+                message = insights.tick(age, now, suppress_focus=bool(display.state["session"] and display.state["session"]["stages"][display.state["session"]["index"]]["kind"] == "focus"))
                 if message:
-                    emit({"ok": True, "insight": message})
+                    emit({"ok": True, "insight": message, "view": values})
             except (OSError, ValueError, KeyError, TypeError, OverflowError) as exc:
                 insight_failure(exc)
         if full:
             result = {"ok": True, "view": dict(values)}
             last_sent = dict(values)
         else:
-            keys = ["timer", "status", "warnings"]
+            keys = ["timer", "status", "warnings", "session"]
             if panel_open:
                 keys += ["elapsed", "timeBasis", "predictedEndUtcMs", "predictedStartUtcMs"]
             changes = {key: values[key] for key in keys if values[key] != last_sent.get(key)}
@@ -687,11 +822,19 @@ def serve(store):
                 if display is None:
                     raise ValueError("Load history before previewing an insight")
                 age = elapsed(display.state["anchor"], clock())[0] if display.state["anchor"] else 0
-                emit({"ok": True, "insight": insights.preview(display.state, age)})
+                emit({"ok": True, "insight": insights.preview(display.state, age), "view": display.update(clock())})
                 return
             elif action == "history":
                 emit({"ok": True, "history": store.history_page(request.get("page", 0), query=request.get("query", "")), "requestId": ack})
                 return
+            elif action == 'session_history':
+                emit({'ok': True, 'sessionHistory': store.session_history(request.get('page', 0), request.get('query', ''), request.get('detailId')), 'requestId': ack})
+                return
+            elif action.startswith('session_'):
+                _, persistent_warning = store.session_action(action, request['requestId'], request['sequence'],
+                    request.get('generation', ''), config=request.get('config'), session_id=request.get('sessionId'),
+                    stage_id=request.get('stageId'), rotate_bytes=request.get('rotateBytes', DEFAULT_ROTATE_BYTES),
+                    excluded=request.get('excludedFromStatistics'))
             elif action == "set_inclusion":
                 _, persistent_warning = store.set_inclusion(
                     request["sampleId"], request["excludedFromLearning"], request["requestId"],
@@ -704,7 +847,8 @@ def serve(store):
                 _, persistent_warning = store.transition(action, request["requestId"], request["sequence"],
                                                           initial_ms, request.get("rotateBytes", DEFAULT_ROTATE_BYTES),
                                                           expected_generation=request.get("generation", ""),
-                                                          skip_learning=request.get("skipLearning", False))
+                                                          skip_learning=request.get("skipLearning", False),
+                                                          cascade_session_id=request.get("cascadeSessionId"))
             else:
                 raise ValueError("Unknown command")
             # Disk validation is reserved for commands and filesystem events.
@@ -772,12 +916,14 @@ def serve(store):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("serve", "status", "start", "end"), nargs="?", default="status")
+    parser.add_argument("action", choices=("serve", "status", "start", "end", "session-start", "session-pause", "session-resume", "session-advance", "session-finish", "session-stop"), nargs="?", default="status")
     parser.add_argument("--state-dir", type=Path, help="Use isolated storage (for development/tests)")
     parser.add_argument("--request-id", default=None)
-    parser.add_argument("--sequence", type=int, help="Expected sequence for start/end")
+    parser.add_argument("--sequence", type=int, help="Expected sequence for timer commands")
     parser.add_argument("--initial-seconds", type=int, default=0)
     parser.add_argument("--skip", action="store_true", help="Exclude the completed interval from prediction learning")
+    parser.add_argument("--session-config", type=Path, help="JSON session configuration; defaults to Pomodoro")
+    parser.add_argument("--cascade-session", help="Explicit session ID to stop atomically when ending its epoch")
     args = parser.parse_args()
     try:
         store = Store(args.state_dir)
@@ -788,10 +934,21 @@ def main():
             warning = None
             if args.action != "status":
                 if args.sequence is None:
-                    parser.error("start/end requires --sequence from status")
-                state, warning = store.transition(args.action, args.request_id or str(uuid.uuid4()),
-                                                  args.sequence, args.initial_seconds * 1000 or None,
-                                                  expected_generation=state["generation"], skip_learning=args.skip)
+                    parser.error("Timer commands require --sequence from status")
+                if args.action.startswith('session-'):
+                    actions = {'session-start': 'session_started', 'session-pause': 'session_paused',
+                               'session-resume': 'session_resumed', 'session-advance': 'session_advanced',
+                               'session-finish': 'session_completed', 'session-stop': 'session_stopped'}
+                    current = state['session'] if args.action != 'session-start' else None
+                    config = (json.loads(args.session_config.read_text()) if args.session_config else dict(sessions.DEFAULTS)) if args.action == 'session-start' else None
+                    state, warning = store.session_action(actions[args.action], args.request_id or str(uuid.uuid4()),
+                        args.sequence, state['generation'], config=config,
+                        session_id=current['sessionId'] if current else None,
+                        stage_id=current['stages'][current['index']]['stageId'] if current else None)
+                else:
+                    state, warning = store.transition(args.action, args.request_id or str(uuid.uuid4()),
+                        args.sequence, args.initial_seconds * 1000 or None, expected_generation=state["generation"],
+                        skip_learning=args.skip, cascade_session_id=args.cascade_session)
             print(json.dumps({"ok": True, "view": view(state), "warning": warning}))
     except (OSError, ValueError, KeyError, TypeError) as exc:
         print(json.dumps({"ok": False, "error": str(exc)}), flush=True)

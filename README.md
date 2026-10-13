@@ -49,9 +49,13 @@ The local catalog varies both wording and meaning, remembering recent messages a
 
 Scheduling runs in the existing Python helper. Ordinary ticks check an in-memory deadline; historical aggregates rebuild only when history changes. Delivery progress is saved atomically at scheduling or notification events, preventing duplicate delivery across restarts and helper instances. `notify-send` runs briefly for each actual alert; there is no additional resident process or network dependency. Insight errors appear in Settings without stopping the clock.
 
+Notifications include a snapshot of the selected graphic when sent, using 5% fill steps and a neutral color on a transparent background.
+
 ## Install
 
 Requires an Omarchy release with the Quickshell plugin system and shared `qs.Ui` components, plus Python 3.9 or later. The plugin uses only Python's standard library. It does not support the older Waybar shell.
+
+Pasting requires `wl-paste` from `wl-clipboard` (included with Omarchy).
 
 Install through Omarchy:
 
@@ -95,8 +99,9 @@ From the repository directory, validate and copy the runtime files to try edits 
 ```bash
 omarchy plugin validate .
 mkdir -p ~/.config/omarchy/plugins/gregl83.plancks
-cp manifest.json qmldir Widget.qml EpochPanel.qml EpochController.qml HistoryView.qml HistoryTrend.qml AnimatedGraphic.qml CoffeeGraphic.qml StarshipGraphic.qml GraphicPreview.qml InsightsSettings.qml Graphics.js plancks.py insights.py \
+cp manifest.json qmldir Widget.qml EpochPanel.qml EpochController.qml HistoryView.qml HistoryTrend.qml AnimatedGraphic.qml CoffeeGraphic.qml StarshipGraphic.qml GraphicPreview.qml InsightsSettings.qml Graphics.js plancks.py insights.py sessions.py SessionConfig.qml SessionHistory.qml BoundedTextField.qml clipboard_read.py \
   ~/.config/omarchy/plugins/gregl83.plancks/
+cp -r assets ~/.config/omarchy/plugins/gregl83.plancks/
 omarchy-shell shell rescanPlugins
 omarchy plugin enable gregl83.plancks --after omarchy.clock
 ```
@@ -146,6 +151,28 @@ History shows five intervals per page, with inclusion switches and separate epoc
 
 The search box matches across all completed history before pagination. Search either endpoint's local date or time (`Oct 6`, `October 6`, `2026-10-06`, `09:30`), a duration (`8h 30m`, `8h30m`, `08:30:00`), or labels such as `epoch`, `off-time`, `included`, `excluded`, and `recent`. Matching ignores case, and combined terms narrow the results—for example, `Oct 6 epoch excluded`. Bare numbers make broad matches across dates, times, and durations. Results update as you type; **Clear** restores the full list. With the search field focused, Escape clears a nonempty search and keeps focus in the field; Escape when empty returns to the main panel. Trend graphs continue to show the latest intervals across all history.
 
+## Sessions
+
+Within an active epoch, select **Configure session…**. Pomodoro supplies 25-minute activity, 5-minute short rests, 15-minute long rests every four rounds, four rounds, and **Include final rest** enabled. Custom configurations support 1–180 whole minutes and 1–12 rounds/cadence. One round with no final rest is a standalone activity timer. The summary reflects the actual rest sequence; the final rest uses the same short/long cadence as other rests.
+
+Custom sessions support an optional **Session name** (up to 80 characters). The name is saved with the last-used configuration and each run, appears in the panel and history, and is searchable. Existing unnamed configurations remain supported.
+
+Configuration is unavailable during off-time. Opening or cancelling a draft creates no timer events. A successful start remembers its configuration; editing future defaults does not change the running session. An epoch forecast is informational and never prevents starting a longer session.
+
+Session timers count down with `−HH:MM:SS`, show `+00:00:00` at the target, and count up with `+HH:MM:SS` after the target. Each stage sends one silent desktop notification at its target. Select **Start rest**, **Start activity**, or **Finish session** yourself; no stage advances automatically. Early advancement is disabled. **Stop** ends the whole session and preserves partial progress. **Pause/Resume** freezes the signed timer and records paused time separately while the epoch continues.
+
+The bar switches to **t_A** for activity or **t_R** for rest, with a pause marker where applicable. The panel keeps the epoch timer and graphic above the session timer; Coffee/Starship retain their epoch meaning. Closing the panel, sleeping, rebooting, or working away from the computer does not stop an unpaused session. After recovery, the same stage includes any overrun, and a missed target notification is delivered once when possible. Already-paused sessions remain paused.
+
+Ending or skip-ending an epoch with an unfinished session opens **End session and epoch** confirmation, including from the keyboard shortcut when the panel is closed. Cancel/Escape leaves the timers alone; repeated shortcuts cannot confirm it. Confirmation records a stopped session and closes the epoch atomically, retaining the normal/skip learning choice. Without an unfinished session, the shortcut keeps its immediate behavior.
+
+History offers **Epochs | Sessions**. Session rows show preset, outcome, and completed/planned rounds, with **Details** and an **Included/Excluded** switch matching epoch history. Excluding a session removes it from session totals and personal bests without deleting or changing its recorded times. The change is reversible and independent of the parent epoch's prediction setting. Activity-time graphs retain excluded sessions as hollow points; stopped sessions use square points. Search also accepts `included` and `excluded`.
+
+Session detail shows completed/partial activity, the parent epoch, frozen configuration, and planned/actual durations, differences, overruns, and paused time per stage. Session durations never enter epoch prediction samples. Clock-invalid sessions cannot be manually included. Occasional motivational insights are suppressed during activity (including pause and overrun); configured epoch-finish warnings remain eligible.
+
+<img src="assets/preview-session-config.png" width="380" alt="Session configuration with preset, durations, rounds, and final-rest control"> <img src="assets/preview-session.png" width="380" alt="Epoch and session timers together"> <img src="assets/preview-session-history.png" width="380" alt="Session history">
+
+The helper also supports `session-start`, `session-pause`, `session-resume`, `session-advance`, `session-finish`, and `session-stop`, with `--sequence` from `status`. `session-start --session-config FILE` reads a complete JSON configuration; omitting it uses Pomodoro. Raw epoch `end` rejects an unfinished session unless `--cascade-session SESSION_ID` explicitly identifies it. All commands use the same journal and storage lock.
+
 ## Optional keyboard shortcut
 
 While the widget is enabled and loaded, start or end an epoch without opening its panel:
@@ -154,7 +181,7 @@ While the widget is enabled and loaded, start or end an epoch without opening it
 omarchy-shell gregl83.plancks toggleEpoch
 ```
 
-The command uses the same **Start epoch** / **End epoch** action as the panel. Use `omarchy-shell gregl83.plancks toggleEpochSkip` for the skip action. Both return `submitted` when the action is sent to storage, `busy` while an action is pending, or `not-ready` when storage is loading or unavailable. `submitted` does not mean the action has been saved yet. Any storage failure appears in the widget and panel, where you can select **Retry**.
+The command uses the same **Start epoch** / **End epoch** action as the panel. Use `omarchy-shell gregl83.plancks toggleEpochSkip` for the skip action. Both return `confirmation-pending` when an unfinished session requires the panel confirmation, `submitted` when the action is sent to storage, `busy` while an action is pending, or `not-ready` when storage is loading or unavailable. `submitted` does not mean the action has been saved yet. Any storage failure appears in the widget and panel, where you can select **Retry**.
 
 To assign **Super+Alt+P**, first check for conflicts with `omarchy menu keybindings --print`, then add this optional binding to `~/.config/hypr/bindings.lua`:
 
@@ -194,13 +221,15 @@ Plancks stores data locally and makes no network requests. It starts one Python 
 
 Runtime history lives at `$XDG_STATE_HOME/omarchy/gregl83.plancks/`, falling back to `~/.local/state/omarchy/gregl83.plancks/`. A relative XDG path is ignored.
 
-- `events/events-00000001.jsonl`, etc.: append-only start/end and history inclusion-change records, rotated before the next record exceeds the segment limit. All segments are retained until you reset the data. One record may exceed a very small configured limit.
-- `state.json`: the single mutable snapshot, replaced atomically after a durable journal append. Includes phase, clock anchors, the current prediction, recent samples, complete interval history, and replay position.
+- `events/events-00000001.jsonl`, etc.: append-only epoch, session, and history inclusion-change records, rotated before the next record exceeds the segment limit. All segments are retained until you reset the data. One record may exceed a very small configured limit.
+- `state.json`: the single mutable snapshot, replaced atomically after a durable journal append. Includes phase, clock anchors, the current prediction, recent samples, epoch/session history, and replay position. Snapshot schema 2 is rebuilt from the journal.
 - `events/.reset.json`: a reset token and completion flag, containing no epoch history. It prevents stale commands and duplicate reset retries from deleting new history and allows interrupted deletion to finish on recovery.
 - `insights.json` and `insights.lock`: optional notification deadlines, delivery IDs, recent wording/facts, and coordination. Created when notifications are enabled during an active epoch and cleared by Reset all data.
 - `.lock`: an empty coordination file for serializing helper instances; it contains no epoch state.
 
 The journal is authoritative. Plancks replays and validates it on startup or when its files change, then caches the result in memory. A missing or damaged snapshot is rebuilt. An incomplete final record is preserved and the next append goes into a new segment. Malformed complete records or missing segments block updates and display an error. Back up the entire directory together; ordinary journal recovery never deletes history. Once a reset is confirmed, recovery finishes any interrupted deletion.
+
+Session events and compound epoch/session closure use journal schema 2; legacy epoch schema 1 remains readable without rewriting it. Older Plancks releases reject schema-2 records: after starting sessions, do not downgrade against this history. Back up the entire state directory before upgrading or restoring a previous version. A target milestone is durably claimed before emitting its notification, preventing duplicate delivery across helpers/restarts; a crash between that claim and desktop delivery can lose the notification but never changes the running stage.
 
 Ordinary one-second updates use cached state and predictions: they do not scan, read, lock, or write history files. An in-process Linux inotify watch detects journal changes without another watcher process. The helper sends only changed timer/status fields; elapsed details update while a panel is open. Before there is any running display to update, it sleeps until a command or file change. Multiple monitor widgets share a controller, and storage also locks and checks revisions to reject stale commands. If storage fails, the panel reports the failure and offers **Retry**; retries reuse the request ID to avoid recording an action twice.
 
@@ -214,9 +243,11 @@ omarchy plugin validate .
 python3 tests/smoke_qml.py
 ```
 
-The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing epoch state through IPC, busy/not-ready guards, normal and skip transitions, overrun, vertical layout, and reset. With `--preview` (also used in CI), it exercises history navigation, inclusion switches, pagination, trends and their empty-state behavior, plus the reset warning, default Cancel focus, Cancel activation, Escape cancellation, and explicit deletion through keyboard input. Physical suspend/reboot still warrant a live-session check.
+The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing epoch state through IPC, busy/not-ready guards, normal and skip transitions, overrun, vertical layout, and reset. With `--preview` (also used in CI), it exercises history navigation, inclusion switches, pagination, trends and their empty-state behavior, plus the reset warning, default Cancel focus, Cancel activation, Escape cancellation, and explicit deletion through keyboard input. The same suite also covers draft validation/cancellation, saved session settings, shared state, pause/resume, closed-panel quick-key confirmation/cancellation, atomic skip closure, session detail navigation, and recovered overrun/final completion. Storage tests cover suspend-inclusive clocks and restart recovery; physical suspend/reboot still warrant a live-session check.
 
 Regenerate the three README previews in `assets/` and the root marketplace showcase with `python3 scripts/preview.py` in an active Omarchy session. It renders the production panels with isolated, frozen sample history, uses the active theme’s wallpaper, colors, and font, and leaves your saved history untouched. Backgrounds use the focused monitor’s logical dimensions and Omarchy’s centered aspect-preserving crop; panel captures retain desktop scale, while the showcase scales the desktop uniformly to fit its composition. The wide showcase at `preview.png` presents the timer, history, graphics, and an example insight together. `scripts/showcase.py` can regenerate it independently from the existing panel capture. The current Omarchy marketplace discovers this root-level `preview.png` automatically; the manifest has no supported preview-path field.
+
+Regenerate notification images with `python3 scripts/notification_assets.py`. This renders the production QML graphics offscreen into `assets/notifications/{coffee,starship}/`, with matching `active`, `off-time`, `learning`, and `overtime` folders.
 
 ## CI and releases
 

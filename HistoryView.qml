@@ -120,7 +120,7 @@ Column {
   Row {
     width: parent.width
     spacing: Style.space(8)
-    TextField {
+    BoundedTextField {
       id: searchField
       objectName: "plancks_historySearch"
       width: parent.width - (clearSearch.visible ? clearSearch.width + parent.spacing : 0)

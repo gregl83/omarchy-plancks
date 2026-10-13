@@ -202,7 +202,7 @@ Column {
     font.family: root.fontFamily
     font.pixelSize: Style.font.caption
   }
-  TextField {
+  BoundedTextField {
     id: thresholds
     objectName: "plancks_finishWarningMinutes"
     width: parent.width
@@ -218,8 +218,7 @@ Column {
     KeyNavigation.priority: KeyNavigation.BeforeItem
     KeyNavigation.backtab: finish
     KeyNavigation.tab: root.nextControl
-    Keys.onReturnPressed: root.saveThresholds()
-    Keys.onEnterPressed: root.saveThresholds()
+    onAccepted: root.saveThresholds()
     onEditingFinished: root.saveThresholds()
     onActiveFocusChanged: if (activeFocus) root.revealRequested(thresholds)
     Keys.onEscapePressed: { text = root.thresholdsText(); root.thresholdError = ""; root.backRequested() }

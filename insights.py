@@ -394,7 +394,7 @@ class Insights:
         finally:
             self.state, self.book = saved_state, saved_book
 
-    def tick(self, age, now):
+    def tick(self, age, now, suppress_focus=False):
         if (self.failed or not self.state or self.state["phase"] != "active" or age < 0
                 or not (self.config["enabled"] or self.config["finish"])):
             return None
@@ -431,7 +431,7 @@ class Insights:
             if occasional_due:
                 upcoming = [target for key, target, _ in self.targets()
                             if key not in self.book["delivered"] and age <= target <= age + 5 * MINUTE]
-                if not gap and message is None and not cooling and not upcoming:
+                if not suppress_focus and not gap and message is None and not cooling and not upcoming:
                     message = self.choose(age)
                 self.book["next"] = age + self.interval()
                 dirty = True

@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "Graphics.js" as Graphics
 
 QtObject {
   id: root
@@ -25,6 +26,8 @@ QtObject {
     property int workSampleCount: 0
     property int gapSampleCount: 0
     property var warnings: []
+    property var session: null
+    property string epochId: ""
   }
   property var history: ({rows: [], page: 0, pages: 1, total: 0})
   property bool historyLoading: false
@@ -43,6 +46,12 @@ QtObject {
       helper.write(JSON.stringify({action: "history", page: historyPage, query: historyQuery, requestId: historyRequestId}) + "\n")
       historyWatchdog.restart()
     } else helper.running = true
+  }
+
+  function setSessionInclusion(sessionId, excluded) {
+    if (!ready || busy || sessionHistoryLoading) return
+    sendAction("session_inclusion_changed", sessionHistory.generation, sessionHistory.sequence, false,
+      {sessionId: sessionId, excludedFromStatistics: excluded})
   }
 
   function setHistoryInclusion(sampleId, excluded) {
@@ -84,14 +93,30 @@ QtObject {
   property var pendingCommand: null
   property string insightsError: ""
   property string notificationMessage: ""
+  property string notificationImage: ""
+  property var noticeQueue: []
+  function deliverNotice(message) {
+    noticeQueue = noticeQueue.concat([{message: message, image: decodeURIComponent(Qt.resolvedUrl(Graphics.notificationImage(settings.animatedGraphic, state)).toString().replace(/^file:\/\//, ""))}])
+    if (!notification.running) nextNotice()
+  }
+  function nextNotice() {
+    if (!noticeQueue.length) return
+    notificationMessage = noticeQueue[0].message
+    notificationImage = noticeQueue[0].image
+    noticeQueue = noticeQueue.slice(1)
+    insightDelivered(notificationMessage)
+    if (Quickshell.env("PLANCKS_DISABLE_NOTIFICATIONS") !== "1") notification.running = true
+    else if (noticeQueue.length) Qt.callLater(nextNotice)
+  }
   signal insightDelivered(string message)
   function requestInsightPreview() {
     if (helper.running) helper.write(JSON.stringify({action: "preview_insight"}) + "\n")
   }
   property Process notification: Process {
-    command: ["notify-send", "--app-name=Plancks", "--urgency=normal", "--expire-time=8000", "Plancks", root.notificationMessage]
+    command: ["notify-send", "--app-name=Plancks", "--urgency=normal", "--hint=boolean:suppress-sound:true", "--expire-time=8000", "--app-icon=" + root.notificationImage, "Plancks", root.notificationMessage]
     onExited: function(code, status) {
       if (code !== 0) root.insightsError = "Could not deliver the notification. Check that notify-send and desktop notifications are available."
+      Qt.callLater(root.nextNotice)
     }
   }
 
@@ -106,9 +131,59 @@ QtObject {
         finishWarningSeconds: settings.finishWarningSeconds || [1800, 60]}) + "\n")
   }
 
-  function transition(skipLearning) {
-    if (!ready || busy) return
+  property var panels: []
+  property var lastPanel: null
+  property var endIntent: null
+  signal sessionStarted(var config)
+  property var sessionHistory: ({rows: [], page: 0, pages: 1, total: 0})
+  property bool sessionHistoryLoading: false
+  property string sessionHistoryError: ""
+  property string sessionHistoryId: ""
+  property string sessionQuery: ""
+  function registerPanel(panel) { panels = panels.concat([panel]) }
+  function unregisterPanel(panel) { if (lastPanel === panel) lastPanel = null; panels = panels.filter(function(p) { return p !== panel }); if (endIntent && endIntent.panel === panel) endIntent = null }
+  function requestSessionHistory(page, query, detailId) {
+    if (query !== undefined) sessionQuery = query
+    sessionHistoryLoading = true
+    sessionHistoryError = ""
+    sessionHistoryId = "sessions-" + Date.now() + "-" + Math.random()
+    if (helper.running) helper.write(JSON.stringify({action: "session_history", page: page || 0, query: sessionQuery, detailId: detailId || null, requestId: sessionHistoryId}) + "\n")
+    sessionHistoryWatchdog.restart()
+  }
+  property Timer sessionHistoryWatchdog: Timer {
+    interval: 10000
+    onTriggered: { root.sessionHistoryLoading = false; root.sessionHistoryError = "No response. Retry session history." }
+  }
+  function sessionAction(action, config) {
+    if (!ready || busy || (!config && !state.session)) return
+    var extra = config ? {config: config} : {sessionId: state.session.sessionId, stageId: state.session.stageId}
+    sendAction(action, undefined, undefined, false, extra)
+  }
+  function transition(skipLearning, sourcePanel) {
+    if (!ready || busy) return "not-ready"
+    if (state.phase === "active" && state.session) {
+      if (!endIntent) {
+        var panel = sourcePanel || panels.filter(function(p) { return p.opened })[0] || lastPanel || panels[0]
+        if (!panel) return "not-ready"
+        endIntent = {panel: panel, sessionId: state.session.sessionId, epochId: state.epochId,
+                     generation: state.generation, skip: skipLearning === true}
+        panel.showEpochEndConfirmation()
+      }
+      return "confirmation-pending"
+    }
     sendAction(state.phase === "active" ? "end" : "start", undefined, undefined, skipLearning === true)
+    return "submitted"
+  }
+  function cancelEpochEnd() { endIntent = null }
+  function confirmEpochEnd() {
+    if (!endIntent || busy || !ready) return
+    var intent = endIntent
+    if (intent.generation !== state.generation || intent.epochId !== state.epochId || !state.session || intent.sessionId !== state.session.sessionId) {
+      intent.panel.cancelEpochEndConfirmation()
+      error = "Session changed. Review the current epoch."
+      return
+    }
+    sendAction("end", intent.generation, state.sequence, intent.skip, {cascadeSessionId: intent.sessionId})
   }
 
   property IpcHandler ipc: IpcHandler {
@@ -117,20 +192,19 @@ QtObject {
     function toggleEpoch(): string {
       if (root.busy) return "busy"
       if (!root.ready) return "not-ready"
-      root.transition()
-      return "submitted"
+      return root.transition()
     }
 
     function toggleEpochSkip(): string {
       if (root.busy) return "busy"
       if (!root.ready) return "not-ready"
-      root.transition(true)
-      return "submitted"
+      return root.transition(true)
     }
   }
 
   function reset(generation, sequence) {
     if (busy) return
+    noticeQueue = []
     sendAction("reset", generation, sequence)
   }
 
@@ -188,11 +262,22 @@ QtObject {
             root.insightsError = result.insightsError
             return
           }
+          if (result.sessionNotice) {
+            if (root.pendingCommand && root.pendingCommand.action === "reset") return
+            if (root.ready && result.sessionNotice.generation !== root.state.generation) return
+            result.insight = result.sessionNotice
+          }
           if (result.insight) {
-            root.notificationMessage = result.insight.message
-            root.insightDelivered(result.insight.message)
-            if (Quickshell.env("PLANCKS_DISABLE_NOTIFICATIONS") !== "1")
-              root.notification.running = true
+            if (result.view) root.applyView(result.view)
+            root.deliverNotice(result.insight.message)
+            return
+          }
+          if (result.requestId && result.requestId.indexOf("sessions-") === 0) {
+            if (result.requestId !== root.sessionHistoryId) return
+            root.sessionHistoryWatchdog.stop()
+            root.sessionHistoryLoading = false
+            if (result.ok) root.sessionHistory = result.sessionHistory
+            else root.sessionHistoryError = result.error || "Unable to load sessions"
             return
           }
           if (result.requestId && result.requestId.indexOf("history-") === 0) {
@@ -217,6 +302,8 @@ QtObject {
             root.watchdog.stop()
             root.busy = false
             if (result.ok) {
+              if (root.pendingCommand && root.pendingCommand.action === "session_started") root.sessionStarted(root.pendingCommand.config)
+              if (root.endIntent && root.pendingCommand && root.pendingCommand.action === "end") root.endIntent.panel.cancelEpochEndConfirmation()
               root.pendingCommand = null
               root.pendingId = ""
               root.error = ""
@@ -243,6 +330,9 @@ QtObject {
     onExited: function(code, status) {
       root.watchdog.stop()
       root.historyWatchdog.stop()
+      root.sessionHistoryWatchdog.stop()
+      root.sessionHistoryLoading = false
+      root.sessionHistoryError = "Plancks storage stopped. Retry session history after reconnecting."
       root.historyLoading = false
       root.historyError = "Plancks storage stopped. Select Retry to reconnect."
       root.ready = false
