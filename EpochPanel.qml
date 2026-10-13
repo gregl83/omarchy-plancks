@@ -24,6 +24,11 @@ Panel {
     Qt.callLater(function() { scroll.contentY = 0; keys.forceActiveFocus() })
   }
   function closeSession() { showingSession = false; Qt.callLater(function() { scroll.contentY = 0; keys.forceActiveFocus() }) }
+  function showSessionControls() {
+    root.open()
+    showingSettings = false; showingHistory = false; showingSession = false; confirmingReset = false
+    Qt.callLater(function() { root.revealButton(pauseSession); pauseSession.forceActiveFocus() })
+  }
   function showEpochEndConfirmation() {
     root.open()
     showingSettings = false; showingHistory = false; showingSession = false; confirmingReset = false

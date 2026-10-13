@@ -159,6 +159,29 @@ QtObject {
     var extra = config ? {config: config} : {sessionId: state.session.sessionId, stageId: state.session.stageId}
     sendAction(action, undefined, undefined, false, extra)
   }
+  readonly property string primaryActionLabel: endIntent ? "Review epoch confirmation" : !state.session
+    ? (state.phase === "active" ? "End epoch" : "Start epoch")
+    : state.session.status === "paused" || !state.session.canAdvance
+      ? "Open session controls" : state.session.nextLabel
+  // Require a quiet interval between shortcut invocations. Repeated IPC calls
+  // cannot finish a session and then immediately end its parent epoch.
+  property Timer primaryRepeatGuard: Timer { interval: 600 }
+  function primaryAction() {
+    if (primaryRepeatGuard.running) { primaryRepeatGuard.restart(); return "repeat-ignored" }
+    if (busy) return "busy"
+    if (!ready) return "not-ready"
+    if (endIntent) return "confirmation-pending"
+    primaryRepeatGuard.restart()
+    if (!state.session) return transition()
+    if (state.session.status === "paused" || !state.session.canAdvance) {
+      var panel = panels.filter(function(p) { return p.opened })[0] || lastPanel || panels[0]
+      if (!panel) return "not-ready"
+      panel.showSessionControls()
+      return "controls-opened"
+    }
+    sessionAction(state.session.final ? "session_completed" : "session_advanced")
+    return "submitted"
+  }
   function transition(skipLearning, sourcePanel) {
     if (!ready || busy) return "not-ready"
     if (state.phase === "active" && state.session) {
@@ -188,6 +211,8 @@ QtObject {
 
   property IpcHandler ipc: IpcHandler {
     target: "gregl83.plancks"
+
+    function primaryAction(): string { return root.primaryAction() }
 
     function toggleEpoch(): string {
       if (root.busy) return "busy"

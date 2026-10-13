@@ -50,7 +50,8 @@ ShellRoot {
   }
   Process {
     id: seedSession
-    command: ["python3", "-c", "import sys;sys.path.insert(0,sys.argv[1]);import plancks,sessions; s=plancks.Store(); state=s.recover(); now=plancks.clock();now['utcMs']-=61000;now['bootMs']-=61000; c=dict(sessions.DEFAULTS,preset='custom',focusMinutes=1,rounds=1,finalBreak=False);s.session_action('session_started','seed-session',state['sequence'],state['generation'],config=c,now=now)", decodeURIComponent(Qt.resolvedUrl("Plancks").toString().replace(/^file:\/\//, ""))]
+    property bool withRest: false
+    command: ["python3", "-c", "import sys;sys.path.insert(0,sys.argv[1]);import plancks,sessions,uuid; s=plancks.Store(); state=s.recover(); now=plancks.clock();now['utcMs']-=61000;now['bootMs']-=61000; c=dict(sessions.DEFAULTS,preset='custom',focusMinutes=1,rounds=1,finalBreak=sys.argv[2]=='true');s.session_action('session_started',str(uuid.uuid4()),state['sequence'],state['generation'],config=c,now=now)", decodeURIComponent(Qt.resolvedUrl("Plancks").toString().replace(/^file:\/\//, "")), String(withRest)]
   }
   property int attempts: 0
   property bool preview: PREVIEW
@@ -109,10 +110,12 @@ ShellRoot {
       if (test.step === 0) {
         if (!test.check(widget.epoch.phase === "off", "initial phase")) return
         Plancks.EpochController.busy = true
+        if (!test.check(Plancks.EpochController.ipc.primaryAction() === "busy", "Primary IPC busy guard")) return
         if (!test.check(Plancks.EpochController.ipc.toggleEpoch() === "busy", "IPC busy guard")) return
         if (!test.check(Plancks.EpochController.ipc.toggleEpochSkip() === "busy", "skip IPC busy guard")) return
         Plancks.EpochController.busy = false
         Plancks.EpochController.ready = false
+        if (!test.check(Plancks.EpochController.ipc.primaryAction() === "not-ready", "Primary IPC readiness guard")) return
         if (!test.check(Plancks.EpochController.ipc.toggleEpoch() === "not-ready", "IPC readiness guard")) return
         if (!test.check(Plancks.EpochController.ipc.toggleEpochSkip() === "not-ready", "skip IPC readiness guard")) return
         Plancks.EpochController.ready = true
@@ -728,6 +731,14 @@ ShellRoot {
       verify(widgetButton.Accessible.name.indexOf("Activity") >= 0, "Bar identifies session activity")
       verify(!findChild(panel, "plancks_advanceSession").visible, "Advance action hidden before target")
       verify(!findChild(panel, "plancks_advanceSession").enabled, "Early advancement disabled")
+      var earlySequence = widget.epoch.sequence
+      widget.close()
+      compare(Plancks.EpochController.ipc.primaryAction(), "controls-opened")
+      tryVerify(function() { return panel.opened && findChild(panel, "plancks_pauseSession").activeFocus })
+      compare(widget.epoch.sequence, earlySequence, "Early primary action does not change timers")
+      compare(Plancks.EpochController.primaryActionLabel, "Open session controls")
+      verify(widgetButton.tooltipText.indexOf("Primary action: Open session controls") >= 0)
+      wait(650)
       var runningBarWidth = widget.implicitWidth
       var pause = findChild(panel, "plancks_pauseSession")
       compare(pause.text, "Pause")
@@ -740,6 +751,11 @@ ShellRoot {
       var frozen = widget.epoch.session.timer
       wait(1100)
       compare(widget.epoch.session.timer, frozen, "Paused time stays frozen")
+      widget.close()
+      compare(Plancks.EpochController.ipc.primaryAction(), "controls-opened")
+      tryVerify(function() { return panel.opened && pause.activeFocus })
+      compare(widget.epoch.session.status, "paused", "Primary action never resumes a paused session")
+      wait(650)
       pause.forceActiveFocus(); keyClick(Qt.Key_Return)
       tryVerify(function() { return widget.epoch.session.status === "running" && !Plancks.EpochController.busy })
       console.log("SESSION_UI_PAUSE_OK")
@@ -751,6 +767,7 @@ ShellRoot {
       var endConfirm = findChild(panel, "plancks_confirmEpochEnd")
       tryVerify(function() { return endCancel.activeFocus })
       compare(Plancks.EpochController.ipc.toggleEpochSkip(), "confirmation-pending")
+      compare(Plancks.EpochController.ipc.primaryAction(), "confirmation-pending", "Primary action cannot bypass epoch confirmation")
       compare(widget.epoch.sequence, pausedSequence, "Repeated shortcut cannot close session")
       keyClick(Qt.Key_Escape)
       verify(!panel.confirmingEpochEnd && widget.epoch.session, "Escape preserves session")
@@ -849,6 +866,18 @@ ShellRoot {
       Plancks.EpochController.transition()
       tryVerify(function() { return widget.epoch.phase === "active" && !Plancks.EpochController.busy })
       console.log("SESSION_UI_HISTORY_OK")
+      seedSession.withRest = true
+      seedSession.running = true
+      tryVerify(function() { return !seedSession.running && !!widget.epoch.session && widget.epoch.session.canAdvance }, 5000)
+      compare(Plancks.EpochController.primaryActionLabel, "Start rest")
+      compare(Plancks.EpochController.ipc.primaryAction(), "submitted")
+      compare(Plancks.EpochController.ipc.primaryAction(), "repeat-ignored")
+      tryVerify(function() { return !Plancks.EpochController.busy && widget.epoch.session.kind === "short_break" })
+      compare(widget.epoch.phase, "active")
+      Plancks.EpochController.sessionAction("session_stopped")
+      tryVerify(function() { return !Plancks.EpochController.busy && !widget.epoch.session })
+      wait(650)
+      seedSession.withRest = false
       seedSession.running = true
       tryVerify(function() { return !seedSession.running && !!widget.epoch.session && widget.epoch.session.canAdvance }, 5000)
       tryVerify(function() { return Plancks.EpochController.notificationMessage.indexOf("time reached") >= 0 }, 5000)
@@ -867,9 +896,25 @@ ShellRoot {
       verify(pause.activeFocus, "Tab follows visual order from advance to pause")
       keyClick(Qt.Key_Backtab)
       verify(finish.activeFocus, "Backtab returns to advance")
-      finish.forceActiveFocus(); keyClick(Qt.Key_Return)
+      compare(Plancks.EpochController.primaryActionLabel, "Finish session")
+      Plancks.EpochController.sessionAction("session_paused")
+      tryVerify(function() { return !Plancks.EpochController.busy && widget.epoch.session.status === "paused" })
+      compare(Plancks.EpochController.ipc.primaryAction(), "controls-opened", "Paused overrun opens controls instead of finishing")
+      verify(!!widget.epoch.session)
+      Plancks.EpochController.sessionAction("session_resumed")
+      tryVerify(function() { return !Plancks.EpochController.busy && widget.epoch.session.status === "running" })
+      wait(650)
+      compare(Plancks.EpochController.ipc.primaryAction(), "submitted")
       tryVerify(function() { return !widget.epoch.session && !Plancks.EpochController.busy })
       compare(widget.epoch.phase, "active", "Finishing session leaves epoch active")
+      compare(Plancks.EpochController.ipc.primaryAction(), "repeat-ignored", "Repeat after session finish cannot end epoch")
+      compare(widget.epoch.phase, "active")
+      wait(650)
+      compare(Plancks.EpochController.ipc.primaryAction(), "submitted")
+      tryVerify(function() { return !Plancks.EpochController.busy && widget.epoch.phase === "off" })
+      wait(650)
+      compare(Plancks.EpochController.ipc.primaryAction(), "submitted")
+      tryVerify(function() { return !Plancks.EpochController.busy && widget.epoch.phase === "active" })
       Plancks.EpochController.reset()
       tryVerify(function() { return widget.epoch.sequence === 0 && !Plancks.EpochController.busy })
       console.log("PLANCKS_SESSION_UI_PASS")

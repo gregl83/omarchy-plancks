@@ -163,7 +163,7 @@ Session timers count down with `−HH:MM:SS`, show `+00:00:00` at the target, an
 
 The bar switches to **t_A** for activity or **t_R** for rest, with a pause marker where applicable. The panel keeps the epoch timer and graphic above the session timer; Coffee/Starship retain their epoch meaning. Closing the panel, sleeping, rebooting, or working away from the computer does not stop an unpaused session. After recovery, the same stage includes any overrun, and a missed target notification is delivered once when possible. Already-paused sessions remain paused.
 
-Ending or skip-ending an epoch with an unfinished session opens **End session and epoch** confirmation, including from the keyboard shortcut when the panel is closed. Cancel/Escape leaves the timers alone; repeated shortcuts cannot confirm it. Confirmation records a stopped session and closes the epoch atomically, retaining the normal/skip learning choice. Without an unfinished session, the shortcut keeps its immediate behavior.
+Ending or skip-ending an epoch with an unfinished session opens **End session and epoch** confirmation, including from the explicit epoch or skip shortcut when the panel is closed. Cancel/Escape leaves the timers alone; repeated shortcuts cannot confirm it. Confirmation records a stopped session and closes the epoch atomically, retaining the normal/skip learning choice. Without an unfinished session, epoch actions remain immediate. The primary shortcut advances sessions instead; see below.
 
 History offers **Epochs | Sessions**. Session rows show preset, outcome, and completed/planned rounds, with **Details** and an **Included/Excluded** switch matching epoch history. Excluding a session removes it from session totals and personal bests without deleting or changing its recorded times. The change is reversible and independent of the parent epoch's prediction setting. Activity-time graphs retain excluded sessions as hollow points; stopped sessions use square points. Search also accepts `included` and `excluded`.
 
@@ -175,22 +175,36 @@ The helper also supports `session-start`, `session-pause`, `session-resume`, `se
 
 ## Optional keyboard shortcut
 
-While the widget is enabled and loaded, start or end an epoch without opening its panel:
+While the widget is loaded, **Primary action** follows the current timer:
+
+| State | Primary action |
+|---|---|
+| No session | Start epoch / End epoch |
+| Activity or rest before target | Open session controls |
+| Paused session (including overrun) | Open session controls |
+| Stage at or beyond target | Start rest / Start activity |
+| Final stage at or beyond target | Finish session |
 
 ```bash
-omarchy-shell gregl83.plancks toggleEpoch
+omarchy-shell gregl83.plancks primaryAction
 ```
 
-The command uses the same **Start epoch** / **End epoch** action as the panel. Use `omarchy-shell gregl83.plancks toggleEpochSkip` for the skip action. Both return `confirmation-pending` when an unfinished session requires the panel confirmation, `submitted` when the action is sent to storage, `busy` while an action is pending, or `not-ready` when storage is loading or unavailable. `submitted` does not mean the action has been saved yet. Any storage failure appears in the widget and panel, where you can select **Retry**.
+The bar tooltip shows the current **Primary action**, or **Review epoch confirmation** while confirmation is pending. Opening session controls never advances, pauses, or resumes a stage. An invalid clock also opens controls. Finishing a session leaves its epoch running. An open epoch-end confirmation stays pending until explicitly confirmed or canceled.
 
-To assign **Super+Alt+P**, first check for conflicts with `omarchy menu keybindings --print`, then add this optional binding to `~/.config/hypr/bindings.lua`:
+**Skip epoch** remains `omarchy-shell gregl83.plancks toggleEpochSkip`: skip to start/end the epoch and exclude the completed interval from predictions. With an unfinished session, it opens **End session and epoch** confirmation. The explicit `toggleEpoch` command still starts/ends epochs with the same confirmation; panel epoch buttons and their Enter/Space action retain that behavior.
+
+IPC results: `submitted` means sent to storage (not yet saved); `controls-opened` means session controls opened; `confirmation-pending` means explicit confirmation is required; `repeat-ignored` means a rapid repeat was suppressed; `busy` and `not-ready` mean no action was taken. Storage failures appear in the widget and panel with **Retry**.
+
+To assign **Super+Alt+P**, first check conflicts with `omarchy menu keybindings --print`, then add these optional bindings to `~/.config/hypr/bindings.lua`:
 
 ```lua
-o.bind("SUPER + ALT + P", "Plancks: Start/end epoch", "omarchy-shell gregl83.plancks toggleEpoch")
-o.bind("SUPER + ALT + SHIFT + P", "Plancks: Skip to start/end epoch", "omarchy-shell gregl83.plancks toggleEpochSkip")
+o.bind("SUPER + ALT + P", "Plancks: Epoch / next stage", "omarchy-shell gregl83.plancks primaryAction")
+o.bind("SUPER + ALT + SHIFT + P", "Plancks: Skip epoch", "omarchy-shell gregl83.plancks toggleEpochSkip")
 ```
 
-Choose an unused combination, or explicitly unbind an existing assignment before replacing it. Validate the configuration with `hyprctl reload` and `hyprctl configerrors`. The plugin installer does not install keybindings automatically. After updating the controller in an existing installation, run `omarchy restart shell` to register the new IPC action.
+Existing primary bindings must change from `toggleEpoch` to `primaryAction` to get situational behavior. Keep key repeat disabled (the default): holding either shortcut must not repeat transitions. Primary action also suppresses repeated calls until 600 ms pass without another invocation, preventing a burst from finishing a session and then ending its epoch.
+
+Choose an unused combination, or explicitly unbind an existing assignment before replacing it. Validate with `hyprctl reload` and `hyprctl configerrors`. The plugin installer does not install keybindings automatically. After updating the controller in an existing installation, run `omarchy restart shell` to register the new IPC action.
 
 ## Reset all data
 
@@ -208,7 +222,7 @@ Remove the plugin with:
 omarchy plugin remove gregl83.plancks
 ```
 
-If you added the optional keyboard shortcut, remove the `o.bind(...)` entry containing `omarchy-shell gregl83.plancks toggleEpoch` from `~/.config/hypr/bindings.lua`. Then reload and check the configuration:
+If you added the optional keyboard shortcut, remove the Plancks `o.bind(...)` entries containing `omarchy-shell gregl83.plancks` from `~/.config/hypr/bindings.lua`. Then reload and check the configuration:
 
 ```bash
 hyprctl reload
@@ -243,7 +257,7 @@ omarchy plugin validate .
 python3 tests/smoke_qml.py
 ```
 
-The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing epoch state through IPC, busy/not-ready guards, normal and skip transitions, overrun, vertical layout, and reset. With `--preview` (also used in CI), it exercises history navigation, inclusion switches, pagination, trends and their empty-state behavior, plus the reset warning, default Cancel focus, Cancel activation, Escape cancellation, and explicit deletion through keyboard input. The same suite also covers draft validation/cancellation, saved session settings, shared state, pause/resume, closed-panel quick-key confirmation/cancellation, atomic skip closure, session detail navigation, and recovered overrun/final completion. Storage tests cover suspend-inclusive clocks and restart recovery; physical suspend/reboot still warrant a live-session check.
+The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing epoch state through IPC, busy/not-ready guards, normal and skip transitions, overrun, vertical layout, and reset. With `--preview` (also used in CI), it exercises history navigation, inclusion switches, pagination, trends and their empty-state behavior, plus the reset warning, default Cancel focus, Cancel activation, Escape cancellation, and explicit deletion through keyboard input. The same suite also covers draft validation/cancellation, saved session settings, shared state, pause/resume, situational primary actions, repeat suppression, paused-overrun guards, closed-panel epoch confirmation/cancellation, atomic skip closure, session detail navigation, and recovered overrun/final completion. Storage tests cover suspend-inclusive clocks and restart recovery; physical suspend/reboot still warrant a live-session check.
 
 Regenerate the three README previews in `assets/` and the root marketplace showcase with `python3 scripts/preview.py` in an active Omarchy session. It renders the production panels with isolated, frozen sample history, uses the active theme’s wallpaper, colors, and font, and leaves your saved history untouched. Backgrounds use the focused monitor’s logical dimensions and Omarchy’s centered aspect-preserving crop; panel captures retain desktop scale, while the showcase scales the desktop uniformly to fit its composition. The wide showcase at `preview.png` presents the timer, history, graphics, and an example insight together. `scripts/showcase.py` can regenerate it independently from the existing panel capture. The current Omarchy marketplace discovers this root-level `preview.png` automatically; the manifest has no supported preview-path field.
 

@@ -66,7 +66,8 @@ BarWidget {
     dimmed: root.epoch.phase !== "active" && EpochController.error === ""
     fixedWidth: root.vertical ? root.barSize : label.implicitWidth + Style.space(18)
     fixedHeight: root.vertical ? label.implicitHeight + Style.space(14) : root.barSize
-    tooltipText: root.tooltipsEnabled ? EpochController.error || (root.epoch.session ? root.epoch.session.caption + ". " : "") + root.epoch.status : ""
+    tooltipText: root.tooltipsEnabled ? EpochController.error || (root.epoch.session ? root.epoch.session.caption + ". " : "")
+      + root.epoch.status + "\nPrimary action: " + EpochController.primaryActionLabel : ""
     activeFocusOnTab: true
     Accessible.role: Accessible.Button
     Accessible.name: "Plancks. " + (root.epoch.session ? root.epoch.session.caption + ". " + root.epoch.session.timer + ". " : "") + root.epoch.status + ". " + root.epoch.timer
