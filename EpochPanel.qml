@@ -567,12 +567,14 @@ Panel {
                 Item {
                   id: sessionProgress
                   objectName: "plancks_sessionProgress"
-                  width: Style.space(9)
+                  width: Style.space(11)
                   height: sessionControls.height
                   x: coffee.x + (coffee.width - width) / 2
                   anchors.verticalCenter: sessionControls.verticalCenter
                   readonly property real segmentGap: Style.space(2)
                   readonly property real halfwayExtraGap: Style.space(3)
+                  readonly property int segmentHeight: Math.floor((height - segmentGap * 9 - halfwayExtraGap) / 10)
+                  readonly property real middleGap: height - segmentHeight * 10 - segmentGap * 8
                   readonly property real progress: root.epoch.session && !root.epoch.session.invalid && root.epoch.session.plannedMs > 0
                     ? Math.max(0, Math.min(1, root.epoch.session.actualMs / root.epoch.session.plannedMs)) : 0
                   readonly property int filledSegments: Math.floor(progress * 10)
@@ -585,10 +587,11 @@ Panel {
                     delegate: Rectangle {
                       required property int index
                       width: sessionProgress.width
-                      height: (sessionProgress.height - sessionProgress.segmentGap * 9 - sessionProgress.halfwayExtraGap) / 10
-                      y: index * (height + sessionProgress.segmentGap) + (index >= 5 ? sessionProgress.halfwayExtraGap : 0)
-                      color: root.foreground
-                      opacity: 10 - index <= sessionProgress.filledSegments ? 0.75 : 0.12
+                      height: sessionProgress.segmentHeight
+                      y: index * (height + sessionProgress.segmentGap)
+                        + (index >= 5 ? sessionProgress.middleGap - sessionProgress.segmentGap : 0)
+                      color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b,
+                        10 - index <= sessionProgress.filledSegments ? 0.3 : 0.12)
                     }
                   }
                 }
@@ -1029,7 +1032,6 @@ Panel {
                         height: Style.space(54)
                         anchors.horizontalCenter: parent.horizontalCenter
                         // Center the drawing's visible bounds, including its handle.
-                        anchors.horizontalCenterOffset: Style.space(graphicChoice.modelData.previewOffsetX || 0)
                         graphic: graphicChoice.modelData.id
                         foreground: root.foreground
                         running: root.opened && settingsView.visible

@@ -28,6 +28,9 @@ Item {
         ctx.reset()
         ctx.clearRect(0, 0, width, height)
         ctx.scale(width / 58, height / 54)
+        // Center the complete silhouette, including handle and saucer.
+        // Its original horizontal bounds are approximately 5..44.91.
+        ctx.translate(4.045, 0)
         ctx.strokeStyle = root.foreground.toString()
         ctx.fillStyle = root.foreground.toString()
         ctx.lineWidth = 1.5

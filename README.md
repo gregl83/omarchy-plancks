@@ -249,6 +249,8 @@ Regenerate the three README previews in `assets/` and the root marketplace showc
 
 Regenerate notification images with `python3 scripts/notification_assets.py`. This renders the production QML graphics offscreen into `assets/notifications/{coffee,starship}/`, with matching `active`, `off-time`, `learning`, and `overtime` folders.
 
+All current and future animated graphics **must horizontally center their complete visible silhouette within their canvas**, including handles, bases, flames, and other attachments. Use the midpoint of the full rendered horizontal bounds, not just the main body or control points. Maintain this alignment through every state and animation frame; allow at most one rendered pixel of rasterization error. Correct the drawing itself, never compensate with offsets in the panel, settings previews, or notification images. Verify transparent-image bounds across states and regenerate notification assets after geometry changes.
+
 ## CI and releases
 
 The `ci` workflow validates pull requests targeting `main`, pushes to `main`, and `v*` tags. It runs the Python tests on Python 3.9 and 3.14, checks package metadata, validates the plugin with Omarchy's official validator, and loads the QML in an isolated headless Wayland session. Plancks ships as Python and QML source, so there is no separate compilation step.
