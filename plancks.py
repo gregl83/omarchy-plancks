@@ -41,13 +41,10 @@ def history_matches(text, terms):
                else term in text for term in terms)
 
 
-def history_search_text(sample, recent):
-    """Search the local dates, times, durations, and labels shown in history."""
-    excluded = sample["durationMs"] < 0 or sample.get("excludedFromLearning", False)
-    fields = ["epoch" if sample["kind"] == "epoch" else "off-time off time",
-              "excluded" if excluded else "included",
-              "recent sample" if recent else "older"]
-    for anchor in (sample["start"], sample["end"]):
+def date_search_fields(anchors):
+    """Shared local date/time aliases for epoch and session history."""
+    fields = []
+    for anchor in anchors:
         try:
             date = datetime.fromtimestamp(anchor["utcMs"] / 1000).astimezone()
         except (ValueError, OverflowError, OSError):
@@ -58,15 +55,30 @@ def history_search_text(sample, recent):
                        f"{date.day} {date.strftime('%b')} {date.day} {date.strftime('%B')}",
                        f"{date.strftime('%b')}{date.day} {date.strftime('%B')}{date.day}",
                        f"{date.hour}:{date.minute:02d}"])
-    if sample["durationMs"] < 0:
-        fields.append("clock changed backwards")
-    else:
-        seconds = sample["durationMs"] // 1000
-        hours, minutes = divmod(seconds // 60, 60)
-        fields.extend([duration(sample["durationMs"]), f"{hours}h {minutes}m", f"{hours}h{minutes}m",
-                       f"{hours} hours {minutes} minutes", f"{seconds // 60}m", f"{seconds}s"])
-        if seconds < 60:
-            fields.append("<1m" if sample["durationMs"] > 0 else "0m")
+    return fields
+
+
+def duration_search_fields(ms):
+    """Shared exact and compact duration aliases."""
+    if ms < 0:
+        return ["clock changed backwards"]
+    seconds = ms // 1000
+    hours, minutes = divmod(seconds // 60, 60)
+    fields = [duration(ms), f"{hours}h {minutes}m", f"{hours}h{minutes}m",
+              f"{hours} hours {minutes} minutes", f"{seconds // 60}m", f"{seconds}s"]
+    if seconds < 60:
+        fields.append("<1m" if ms > 0 else "0m")
+    return fields
+
+
+def history_search_text(sample, recent):
+    """Search the local dates, times, durations, and labels shown in history."""
+    excluded = sample["durationMs"] < 0 or sample.get("excludedFromLearning", False)
+    fields = ["epoch" if sample["kind"] == "epoch" else "off-time off time",
+              "excluded" if excluded else "included",
+              "recent sample" if recent else "older"]
+    fields.extend(date_search_fields((sample["start"], sample["end"])))
+    fields.extend(duration_search_fields(sample["durationMs"]))
     return " ".join(search_terms(" ".join(fields)))
 
 
@@ -490,16 +502,23 @@ class Store:
         rows = [sessions.summary(item) for item in reversed(state['sessions'])]
         terms = search_terms(query)
         def matches(row):
-            dates = [datetime.fromtimestamp(row[k]['utcMs'] / 1000).astimezone().strftime('%Y-%m-%d %b %d %B %d %H:%M') for k in ('start', 'end')]
-            fields = [row['status'], row['config']['preset'], row['config'].get('name', ''), 'excluded' if row.get('excludedFromStatistics') or row['invalid'] else 'included', *dates]
-            for key in ('start', 'end'):
-                date = datetime.fromtimestamp(row[key]['utcMs'] / 1000).astimezone()
-                fields.extend([f"{date:%b} {date.day}", f"{date:%B} {date.day}", f"{date.day} {date:%b}"])
+            fields = [row['status'], row['config']['preset'], row['config'].get('name', ''),
+                      'excluded' if row.get('excludedFromStatistics') or row['invalid'] else 'included']
+            fields.extend(date_search_fields((row['start'], row['end'])))
+            if row['invalid']:
+                fields.append('clock changed backwards')
+            else:
+                fields.extend(duration_search_fields(sessions.elapsed(row['start'], row['end'])))
+            for key in ('completedFocusMs', 'partialFocusMs', 'focusMs', 'breakMs', 'pausedMs'):
+                fields.extend(duration_search_fields(row[key]))
             for stage in row['stages']:
-                fields.extend([stage['kind'].replace('_', ' '), {'focus': 'activity', 'short_break': 'rest', 'long_break': 'long rest'}[stage['kind']], duration(stage.get('actualMs', 0)),
-                               f"{stage.get('actualMs', 0) // 60000}m", duration(stage['plannedMs']),
-                               f"{stage['plannedMs'] // 60000}m", stage.get('outcome', 'not started')])
-            return history_matches(' '.join(fields).casefold(), terms)
+                fields.extend([stage['kind'].replace('_', ' '),
+                               {'focus': 'activity', 'short_break': 'rest', 'long_break': 'long rest'}[stage['kind']],
+                               stage.get('outcome', 'not started')])
+                fields.extend(duration_search_fields(stage['plannedMs']))
+                if 'actualMs' in stage:
+                    fields.extend(duration_search_fields(-1 if stage['invalid'] else stage['actualMs']))
+            return history_matches(' '.join(search_terms(' '.join(fields))), terms)
         filtered = [r for r in rows if matches(r)] if terms else rows
         pages = max(1, math.ceil(len(filtered) / 5))
         page = min(page, pages - 1)

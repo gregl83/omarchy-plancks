@@ -1212,7 +1212,7 @@ Panel {
               }
               root.sessionHistoryMode = value
               sessionHistory.detail = null
-              if (value) EpochController.requestSessionHistory(0, "")
+              if (value) sessionHistory.clearHistorySearch()
               else historyView.clearHistorySearch()
             }
             FontMetrics {

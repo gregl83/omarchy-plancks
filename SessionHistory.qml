@@ -12,6 +12,7 @@ Column {
   signal pageChanged()
   signal stagePageChanged(var heading)
   function changePage(page) {
+    focusSessionId = ""
     EpochController.requestSessionHistory(page)
     pageChanged()
   }
@@ -71,7 +72,23 @@ Column {
       fontFamily: root.fontFamily
     }
   }
-  onVisibleChanged: if (visible) { search.text = ""; delay.stop(); EpochController.requestSessionHistory(0, "") } else { detail = null; focusSessionId = ""; delay.stop() }
+  function searchHistory() {
+    delay.stop()
+    focusSessionId = ""
+    EpochController.requestSessionHistory(0, search.text)
+  }
+  function clearHistorySearch() {
+    search.text = ""
+    searchHistory()
+    search.forceActiveFocus()
+  }
+  onVisibleChanged: {
+    if (!visible) { detail = null; focusSessionId = ""; delay.stop() }
+    else if (search.text !== EpochController.sessionQuery) searchHistory()
+    else EpochController.requestSessionHistory(0)
+  }
+  onDetailChanged: if (detail) delay.stop()
+
   Keys.onEscapePressed: backRequested()
   Connections {
     target: EpochController.state
@@ -107,22 +124,75 @@ Column {
       color: root.foreground; opacity: 0.6; font.pixelSize: Style.font.caption; font.family: root.fontFamily; wrapMode: Text.WordWrap }
     PanelSeparator { foreground: root.foreground }
   }
-  BoundedTextField {
-    id: search
-    objectName: "plancks_sessionSearch"
-    width: parent.width; visible: !root.detail; placeholderText: "Search names, dates, presets…"
-    foreground: root.foreground; maximumLength: 256
-    font.family: Style.font.family; font.pixelSize: Style.font.bodySmall
-    Accessible.name: "Search sessions"
-    onTextChanged: if (root.visible) delay.restart()
-    onAccepted: { delay.stop(); EpochController.requestSessionHistory(0, text) }
-    Keys.onEscapePressed: { if (text.length) { text = ""; delay.stop(); EpochController.requestSessionHistory(0, "") } else root.backRequested() }
-    onActiveFocusChanged: if (activeFocus) root.revealRequested(search)
+  Row {
+    width: parent.width
+    visible: !root.detail
+    spacing: Style.space(8)
+    BoundedTextField {
+      id: search
+      objectName: "plancks_sessionSearch"
+      width: parent.width - (clearSearch.visible ? clearSearch.width + parent.spacing : 0)
+      placeholderText: "Search dates, times, durations…"
+      Component.onCompleted: text = EpochController.sessionQuery
+      foreground: root.foreground
+      maximumLength: 256
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.bodySmall
+      Accessible.name: "Search sessions"
+      Accessible.description: "Search names, presets, dates, times, durations, and status."
+      onTextChanged: if (root.visible && text !== EpochController.sessionQuery) delay.restart()
+      onAccepted: root.searchHistory()
+      Keys.onEscapePressed: { if (text.length) root.clearHistorySearch(); else root.backRequested() }
+      onActiveFocusChanged: if (activeFocus) root.revealRequested(search)
+    }
+    Button {
+      id: clearSearch
+      objectName: "plancks_sessionsClearSearch"
+      anchors.verticalCenter: search.verticalCenter
+      visible: search.text.length > 0
+      text: "Clear"
+      foreground: root.foreground
+      fontFamily: root.fontFamily
+      fontSize: Style.font.caption
+      horizontalPadding: Style.space(4)
+      focusable: true
+      bordered: false
+      onClicked: root.clearHistorySearch()
+      Keys.onEscapePressed: root.backRequested()
+    }
   }
-  Timer { id: delay; interval: 250; onTriggered: EpochController.requestSessionHistory(0, search.text) }
-  Text { width: parent.width; visible: !root.detail && (EpochController.sessionHistoryError.length > 0 || EpochController.error.length > 0 || root.history.total === 0)
-    text: EpochController.sessionHistoryError || EpochController.error || (EpochController.sessionHistoryLoading ? "Loading sessions…" : "No matching sessions.")
-    color: root.foreground; font.pixelSize: Style.font.bodySmall; wrapMode: Text.WordWrap }
+  Timer { id: delay; interval: 250; onTriggered: root.searchHistory() }
+  Text {
+    objectName: "plancks_sessionsSearchCount"
+    width: parent.width
+    visible: !root.detail && !!root.history.query
+    text: EpochController.sessionHistoryLoading ? "Searching…"
+      : root.history.total + (root.history.total === 1 ? " matching session" : " matching sessions")
+    color: root.foreground
+    opacity: 0.6
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.caption
+  }
+  Text {
+    width: parent.width
+    visible: !root.detail && root.history.total === 0 && EpochController.sessionHistoryError === "" && EpochController.error === ""
+    text: EpochController.sessionHistoryLoading ? "Loading history…"
+      : root.history.query ? "No matching sessions." : "No completed sessions yet."
+    color: root.foreground
+    opacity: 0.6
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.bodySmall
+    wrapMode: Text.WordWrap
+  }
+  Text {
+    width: parent.width
+    visible: !root.detail && text.length > 0
+    text: EpochController.sessionHistoryError || EpochController.error
+    color: root.foreground
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.bodySmall
+    wrapMode: Text.WordWrap
+  }
   Button { visible: EpochController.sessionHistoryError.length > 0; text: "Retry"; foreground: root.foreground; focusable: true
     onClicked: EpochController.requestSessionHistory(root.history.page, search.text) }
   Column {

@@ -333,6 +333,34 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(self.state['workSamples'], [])
         self.assertEqual(self.store.session_history()['total'], 7)
 
+    def test_history_search_weekdays_at_both_endpoints(self):
+        self.start()
+        self.command('session_stopped', 86400000)
+        for ms in (0, 86400000):
+            date = plancks.datetime.fromtimestamp(clock(ms)['utcMs'] / 1000).astimezone()
+            for format_string in ('%a', '%A'):
+                query = date.strftime(format_string).upper() + ' custom stopped'
+                with self.subTest(query=query):
+                    self.assertEqual(self.store.session_history(query=query)['total'], 1)
+
+    def test_search_uses_epoch_date_duration_and_normalization_rules(self):
+        self.start()
+        elapsed_ms = (8 * 3600 + 30 * 60 + 37) * 1000
+        self.command('session_stopped', elapsed_ms)
+        queries = ['8h30m', '8h 30m', '08:30:37', '510m', '30637s', '8 hours 30 minutes',
+                   ' INCLUDED, CUSTOM ', 'stopped activity', '1m']
+        for ms in (0, elapsed_ms):
+            date = plancks.datetime.fromtimestamp(clock(ms)['utcMs'] / 1000).astimezone()
+            queries.extend(date.strftime(fmt) for fmt in (
+                '%Y-%m-%d', '%Y/%m/%d', '%m/%d/%Y', '%H:%M:%S', '%I:%M %p',
+                '%A', '%a', '%B %d', '%d %B', '%b%d'))
+            queries.extend([f'{date.month}/{date.day}/{date.year}', f'{date:%b}, {date.day}',
+                            f'{date.day} {date:%B}', f'{date.hour}:{date.minute:02d}'])
+        for query in queries:
+            with self.subTest(query=query):
+                self.assertEqual(self.store.session_history(query=query)['total'], 1)
+        self.assertEqual(self.store.session_history(query='8h30m nonexistent')['total'], 0)
+
 
 class SessionBridgeTests(unittest.TestCase):
     def test_target_notification_once_across_restart_and_no_per_tick_writes(self):
