@@ -44,7 +44,7 @@ Column {
       : minutes >= 60 ? Math.floor(minutes / 60) + "h" + (minutes % 60 ? " " + minutes % 60 + "m" : "") : minutes + "m"
   }
   function durationRecord(label, ms) { return [label, compactLength(ms), length(ms)] }
-  function sessionTitle(config) { return config.name ? config.name + " · Custom" : config.preset === "pomodoro" ? "Pomodoro" : "Custom" }
+  function sessionTitle(config) { return config.name ? config.name : config.preset === "pomodoro" ? "Pomodoro" : "Custom" }
   function stamp(ms) { return Qt.formatDateTime(new Date(ms), "ddd, MMM d yyyy HH:mm") }
   function fullStamp(ms) { return Qt.formatDateTime(new Date(ms), "ddd, MMM d, yyyy · HH:mm:ss") }
   function timeRange(session) { return session ? fullStamp(session.start.utcMs) + " → " + fullStamp(session.end.utcMs) : "" }

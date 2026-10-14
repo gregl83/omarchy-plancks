@@ -81,7 +81,7 @@ ShellRoot {
         }
         Rectangle { width: 48; height: 2; color: capture.accent }
         Text {
-          text: "Built for your bar.\nLocal. Personal. Quiet."
+          text: "Pomodoro + custom sessions.\nLocal. Personal. Quiet."
           color: capture.muted
           font.family: capture.fontFamily
           font.pixelSize: 17
@@ -189,7 +189,7 @@ ShellRoot {
           Rectangle { x: 0; y: 20; width: 3; height: parent.height - 40; color: capture.accent }
           Text {
             x: 24; y: 24
-            text: "PLANCKS  /  INSIGHTS"
+            text: "POMODORO + CUSTOM SESSIONS"
             font.family: capture.fontFamily
             font.pixelSize: 16
             font.letterSpacing: 1
@@ -197,7 +197,7 @@ ShellRoot {
           }
           Text {
             x: 24; y: 67; width: parent.width - 48
-            text: "Extra time.\nSolid momentum."
+            text: "Activity, rest,\nand repeat rounds."
             font.family: capture.fontFamily
             font.pixelSize: 24
             lineHeight: 1.25
@@ -208,7 +208,7 @@ ShellRoot {
       Rectangle { x: 76; y: 931; width: 1448; height: 1; color: Qt.rgba(capture.ink.r, capture.ink.g, capture.ink.b, 0.2) }
       Text {
         x: 76; y: 952
-        text: "PREDICTIONS  /  HISTORY  /  INSIGHTS"
+        text: "PREDICTIONS  /  SESSIONS  /  HISTORY  /  INSIGHTS"
         font.family: capture.fontFamily
         font.pixelSize: 15
         font.letterSpacing: 1.5
