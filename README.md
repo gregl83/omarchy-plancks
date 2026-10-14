@@ -53,7 +53,7 @@ Notifications include a snapshot of the selected graphic when sent, using 5% fil
 
 ## Install
 
-Requires an Omarchy release with the Quickshell plugin system and shared `qs.Ui` components, plus Python 3.9 or later. The plugin uses only Python's standard library. It does not support the older Waybar shell.
+Requires an Omarchy release with the Quickshell plugin system and shared `qs.Ui` components, plus Python 3.9 or later. The timer uses Python's standard library; desktop notifications also use Python GObject, included in standard Omarchy installations. It does not support the older Waybar shell.
 
 Pasting requires `wl-paste` from `wl-clipboard` (included with Omarchy).
 
