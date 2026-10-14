@@ -7,6 +7,7 @@ Column {
   id: root
   property color foreground: Color.foreground
   property string fontFamily: Style.font.family
+  property bool tooltipsEnabled: true
   property var draft: defaults()
   property int revision: 0
   signal backRequested()
@@ -124,6 +125,14 @@ Column {
         Accessible.name: optionRow.modelData.label
         Accessible.checked: checked
         Accessible.checkable: true
+        Accessible.description: optionRow.modelData.key === "finalBreak"
+          ? "Add a rest after the final activity round."
+          : "Replace regular rests with long rests at the configured cadence."
+        PanelToolTip {
+          visible: root.tooltipsEnabled && option.containsMouse
+          text: option.Accessible.description
+          fontFamily: root.fontFamily
+        }
         onToggled: root.edit(optionRow.modelData.key, !checked)
         Keys.onSpacePressed: toggled()
         Keys.onReturnPressed: toggled()
@@ -168,6 +177,8 @@ Column {
   Button {
     objectName: "plancks_startSession"
     text: "Start session"
+    Accessible.description: "Start the first activity stage; save these settings for next time."
+    tooltipText: root.tooltipsEnabled ? Accessible.description : ""
     foreground: root.foreground; fontFamily: root.fontFamily; fontSize: Style.font.bodySmall
     focusable: true
     bordered: true

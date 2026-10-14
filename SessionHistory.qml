@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
 import "."
@@ -9,6 +10,7 @@ Column {
   property bool tooltipsEnabled: true
   property string fontFamily: Style.font.family
   signal pageChanged()
+  signal stagePageChanged(var heading)
   function changePage(page) {
     EpochController.requestSessionHistory(page)
     pageChanged()
@@ -35,8 +37,40 @@ Column {
   signal revealRequested(var item)
   spacing: Style.space(12)
   function length(ms) { var s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 3600).toString().padStart(2, "0") + ":" + Math.floor(s / 60 % 60).toString().padStart(2, "0") + ":" + (s % 60).toString().padStart(2, "0") }
+  function compactLength(ms) {
+    var minutes = Math.floor(Math.abs(ms) / 60000)
+    return minutes === 0 ? (ms === 0 ? "0m" : "<1m")
+      : minutes >= 60 ? Math.floor(minutes / 60) + "h" + (minutes % 60 ? " " + minutes % 60 + "m" : "") : minutes + "m"
+  }
+  function durationRecord(label, ms) { return [label, compactLength(ms), length(ms)] }
   function sessionTitle(config) { return config.name ? config.name + " · Custom" : config.preset === "pomodoro" ? "Pomodoro" : "Custom" }
   function stamp(ms) { return Qt.formatDateTime(new Date(ms), "ddd, MMM d yyyy HH:mm") }
+  function fullStamp(ms) { return Qt.formatDateTime(new Date(ms), "ddd, MMM d, yyyy · HH:mm:ss") }
+  function timeRange(session) { return session ? fullStamp(session.start.utcMs) + " → " + fullStamp(session.end.utcMs) : "" }
+  function valueHelp(entry) {
+    var explanations = {"Completed rounds": "Activity rounds completed manually.",
+      "Completed activity": "Time in completed activity stages.", "Partial activity": "Time in stopped activity stages.",
+      "Rest": "Rest duration.", "Paused": "Paused time; excluded from stage duration.",
+      "Planned": "Configured stage duration.", "Actual": "Elapsed stage time, excluding pauses.",
+      "Difference": "Actual minus planned duration.", "Overrun": "Time beyond the stage target, excluding pauses.",
+      "Activity": "Configured duration of each activity stage.", "Long rest": "Long-rest duration and cadence.",
+      "Final rest": "Whether a rest follows the final activity round.", "Parent epoch": "Epoch containing this session."}
+    var explanation = entry[3] || explanations[entry[0]]
+    return entry[0] + ": " + (entry[2] || entry[1]) + (explanation ? "\n" + explanation : "")
+  }
+  component HoverHelp: MouseArea {
+    id: helpHover
+    property string helpText: ""
+    anchors.fill: parent
+    hoverEnabled: true
+    acceptedButtons: Qt.NoButton
+    PanelToolTip {
+      objectName: helpHover.objectName + "Tip"
+      visible: root.tooltipsEnabled && helpHover.containsMouse
+      text: helpHover.helpText
+      fontFamily: root.fontFamily
+    }
+  }
   onVisibleChanged: if (visible) { search.text = ""; delay.stop(); EpochController.requestSessionHistory(0, "") } else { detail = null; focusSessionId = ""; delay.stop() }
   Keys.onEscapePressed: backRequested()
   Connections {
@@ -130,6 +164,10 @@ Column {
             }
             Text {
               id: rowTiming
+              HoverHelp {
+                objectName: "plancks_sessionTimeHelp_" + sessionRow.index
+                helpText: root.timeRange(sessionRow.modelData)
+              }
               width: parent.width
               readonly property bool sameDay: Qt.formatDateTime(new Date(sessionRow.modelData.start.utcMs), "yyyy-MM-dd")
                 === Qt.formatDateTime(new Date(sessionRow.modelData.end.utcMs), "yyyy-MM-dd")
@@ -205,15 +243,16 @@ Column {
               objectName: "plancks_sessionDetail_" + sessionRow.index
               anchors.horizontalCenter: parent.horizontalCenter
               text: "View"
-              foreground: root.foreground
+              foreground: Qt.darker(root.foreground, 1.4)
               fontFamily: root.fontFamily
               fontSize: Style.font.caption
               horizontalPadding: Style.space(8)
               verticalPadding: Style.space(2)
               focusable: true
-              bordered: true
+              bordered: false
               Accessible.name: "View session: " + rowTitle.text
               Accessible.description: rowTiming.text + ", " + sessionRow.modelData.status
+              tooltipText: root.tooltipsEnabled ? "View session totals, stages, and saved settings." : ""
               onClicked: { root.focusSessionId = ""; root.detail = sessionRow.modelData; root.revealRequested(root) }
               onActiveFocusChanged: if (activeFocus) root.revealRequested(sessionRow)
             }
@@ -282,20 +321,28 @@ Column {
       }
     }
   }
-  component DetailValues: Column {
+  component DetailValues: GridLayout {
     id: values
     property var entries: []
-    spacing: Style.space(6)
+    property bool singleColumn: false
+    columns: !singleColumn && width >= Style.space(320) ? 2 : 1
+    columnSpacing: Style.space(20)
+    rowSpacing: Style.spacing.labelGap
     Repeater {
       model: values.entries
       delegate: Item {
         required property var modelData
-        width: values.width
+        Layout.fillWidth: true
+        Layout.preferredWidth: (values.width - values.columnSpacing * (values.columns - 1)) / values.columns
         implicitHeight: Math.max(label.implicitHeight, value.implicitHeight)
         height: implicitHeight
+        HoverHelp {
+          objectName: "plancks_sessionValueHelp_" + modelData[0]
+          helpText: root.valueHelp(modelData)
+        }
         Text {
           id: label
-          width: parent.width * 0.45
+          width: Math.max(0, parent.width - value.width - Style.space(8))
           text: modelData[0]
           textFormat: Text.PlainText
           color: root.foreground
@@ -307,7 +354,7 @@ Column {
         Text {
           id: value
           anchors.right: parent.right
-          width: parent.width * 0.55 - Style.space(12)
+          width: Math.min(implicitWidth, parent.width * 0.6)
           text: modelData[1]
           textFormat: Text.PlainText
           color: root.foreground
@@ -319,73 +366,67 @@ Column {
       }
     }
   }
-  Column {
+  Loader {
+    width: parent.width
+    active: !!root.detail
+    visible: active
+    // Initialize controls with the selected session's state, rather than
+    // animating a persistent empty view from unchecked to included on entry.
+    sourceComponent: Column {
     id: detailView
     objectName: "plancks_sessionDetailSummary"
     readonly property var session: root.detail
+    property int stagePage: 0
+    readonly property int stagePages: Math.max(1, Math.ceil((session ? session.stages.length : 0) / 4))
+    onStagePagesChanged: stagePage = Math.min(stagePage, stagePages - 1)
+    function changeStagePage(page) {
+      stagePage = Math.max(0, Math.min(stagePages - 1, page))
+      Qt.callLater(function() { stageHeading.forceActiveFocus(); root.stagePageChanged(stageHeading) })
+    }
     width: parent.width
     visible: !!session
     spacing: Style.space(14)
-    Column {
-      width: parent.width
-      spacing: Style.spacing.labelGap
-      Text {
-        width: parent.width
-        text: detailView.session ? root.sessionTitle(detailView.session.config)
-          + " · " + Qt.formatDateTime(new Date(detailView.session.start.utcMs), "ddd, MMM d, yyyy")
-          + (detailView.session.status === "stopped" ? " · Stopped" : "") : ""
-        textFormat: Text.PlainText
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.bodySmall
-        font.weight: Font.Medium
-        wrapMode: Text.WordWrap
-      }
-      Text {
-        width: parent.width
-        text: {
-          if (!detailView.session) return ""
-          var start = new Date(detailView.session.start.utcMs)
-          var end = new Date(detailView.session.end.utcMs)
-          var sameDay = Qt.formatDateTime(start, "yyyy-MM-dd") === Qt.formatDateTime(end, "yyyy-MM-dd")
-          return Qt.formatDateTime(start, "HH:mm:ss") + " → " + Qt.formatDateTime(end, sameDay ? "HH:mm:ss" : "MMM d, yyyy HH:mm:ss")
-        }
-        color: root.foreground
-        opacity: 0.6
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.bodySmall
-        wrapMode: Text.WordWrap
-      }
-    }
-    PanelSeparator { foreground: root.foreground }
-    PanelSectionHeader { width: parent.width; text: "SESSION TOTALS"; foreground: root.foreground; fontFamily: root.fontFamily }
-    DetailValues {
-      objectName: "plancks_sessionDetailTotals"
-      width: parent.width
-      entries: detailView.session ? [
-        ["Completed rounds", detailView.session.completedRounds + " / " + detailView.session.config.rounds],
-        ["Completed activity", root.length(detailView.session.completedFocusMs)],
-        ["Partial activity", root.length(detailView.session.partialFocusMs)],
-        ["Rest", root.length(detailView.session.breakMs)],
-        ["Paused", root.length(detailView.session.pausedMs)]
-      ] : []
-    }
     Item {
       width: parent.width
-      height: Math.max(statisticsLabel.implicitHeight, detailInclusionControl.implicitHeight)
-      Text {
-        id: statisticsLabel
-        anchors.left: parent.left
+      height: Math.max(sessionTitleBlock.implicitHeight, detailInclusionControl.implicitHeight)
+      Column {
+        id: sessionTitleBlock
+        width: Math.max(0, parent.width - detailInclusionControl.width - Style.space(12))
         anchors.verticalCenter: parent.verticalCenter
-        text: "Statistics"
-        color: root.foreground
-        opacity: 0.6
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.bodySmall
+        spacing: Style.spacing.labelGap
+        Text {
+          width: parent.width
+          text: detailView.session ? root.sessionTitle(detailView.session.config)
+            + " · " + Qt.formatDateTime(new Date(detailView.session.start.utcMs), "ddd, MMM d, yyyy")
+            + (detailView.session.status === "stopped" ? " · Stopped" : "") : ""
+          textFormat: Text.PlainText
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.bodySmall
+          font.weight: Font.Medium
+          wrapMode: Text.WordWrap
+        }
+        Text {
+          width: parent.width
+          text: {
+            if (!detailView.session) return ""
+            var start = new Date(detailView.session.start.utcMs)
+            var end = new Date(detailView.session.end.utcMs)
+            var sameDay = Qt.formatDateTime(start, "yyyy-MM-dd") === Qt.formatDateTime(end, "yyyy-MM-dd")
+            return Qt.formatDateTime(start, "HH:mm:ss") + " → " + Qt.formatDateTime(end, sameDay ? "HH:mm:ss" : "MMM d, yyyy HH:mm:ss")
+          }
+          HoverHelp { helpText: root.timeRange(detailView.session) }
+          color: root.foreground
+          opacity: 0.6
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.bodySmall
+          wrapMode: Text.WordWrap
+        }
       }
       Column {
         id: detailInclusionControl
         anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
         width: Math.max(detailInclusion.implicitWidth, detailInclusionLabel.implicitWidth)
         spacing: Style.space(2)
         ToggleSwitch {
@@ -431,6 +472,34 @@ Column {
         }
       }
     }
+    PanelSeparator { foreground: root.foreground }
+    PanelSectionHeader { width: parent.width; text: "SAVED SETTINGS"; foreground: root.foreground; fontFamily: root.fontFamily }
+    DetailValues {
+      width: parent.width
+      entries: {
+        if (!detailView.session) return []
+        var c = detailView.session.config
+        return [["Activity", c.focusMinutes + "m"], ["Rest", c.shortBreakMinutes + "m"],
+          ["Long rest", c.longBreakEnabled ? c.longBreakMinutes + "m / " + c.longBreakEvery : "Off",
+            c.longBreakEnabled ? c.longBreakMinutes + " minutes every " + c.longBreakEvery + " activity rounds" : "Off"],
+          ["Final rest", c.finalBreak ? "Included" : "None"],
+          ["Parent epoch", root.stamp(detailView.session.epochStart.utcMs),
+            root.fullStamp(detailView.session.epochStart.utcMs)]]
+      }
+    }
+    PanelSeparator { foreground: root.foreground }
+    PanelSectionHeader { width: parent.width; text: "SESSION TOTALS"; foreground: root.foreground; fontFamily: root.fontFamily }
+    DetailValues {
+      objectName: "plancks_sessionDetailTotals"
+      width: parent.width
+      entries: detailView.session ? [
+        root.durationRecord("Completed activity", detailView.session.completedFocusMs),
+        root.durationRecord("Partial activity", detailView.session.partialFocusMs),
+        root.durationRecord("Rest", detailView.session.breakMs),
+        root.durationRecord("Paused", detailView.session.pausedMs),
+        ["Completed rounds", detailView.session.completedRounds + " / " + detailView.session.config.rounds]
+      ] : []
+    }
     Text {
       width: parent.width
       visible: !!detailView.session && (detailView.session.invalid || detailView.session.reason === "epoch-ended")
@@ -442,12 +511,13 @@ Column {
       wrapMode: Text.WordWrap
     }
     PanelSeparator { foreground: root.foreground }
-    PanelSectionHeader { width: parent.width; text: "STAGES"; foreground: root.foreground; fontFamily: root.fontFamily }
+    PanelSectionHeader { id: stageHeading; objectName: "plancks_stageHeading"; width: parent.width; text: "STAGES"; foreground: root.foreground; fontFamily: root.fontFamily }
     Column {
       width: parent.width
       spacing: Style.space(8)
       Repeater {
-        model: detailView.session ? detailView.session.stages : []
+        objectName: "plancks_stageRows"
+        model: detailView.session ? detailView.session.stages.slice(detailView.stagePage * 4, (detailView.stagePage + 1) * 4) : []
         delegate: Column {
           id: stageRow
           required property var modelData
@@ -483,30 +553,79 @@ Column {
             width: parent.width
             entries: {
               var s = stageRow.modelData
-              var rows = [["Planned", root.length(s.plannedMs)]]
+              var rows = [root.durationRecord("Planned", s.plannedMs)]
               if (s.actualMs !== undefined) rows.push(
-                ["Actual", root.length(s.actualMs)],
-                ["Difference", (s.differenceMs < 0 ? "−" : s.differenceMs > 0 ? "+" : "") + root.length(Math.abs(s.differenceMs))],
-                ["Overrun", root.length(s.overrunMs)],
-                ["Paused", root.length(s.pausedMs)])
+                root.durationRecord("Actual", s.actualMs),
+                ["Difference", (s.differenceMs < 0 ? "−" : "+") + root.compactLength(s.differenceMs),
+                  (s.differenceMs < 0 ? "−" : "+") + root.length(Math.abs(s.differenceMs)),
+                  "Actual minus planned duration. Overrun: " + root.length(s.overrunMs)],
+                root.durationRecord("Paused", s.pausedMs))
               return rows
             }
           }
         }
       }
     }
-    PanelSeparator { foreground: root.foreground }
-    PanelSectionHeader { width: parent.width; text: "SAVED SETTINGS"; foreground: root.foreground; fontFamily: root.fontFamily }
-    DetailValues {
+    PanelSeparator { visible: detailView.stagePages > 1; foreground: root.foreground }
+    Item {
+      id: stagePagination
+      visible: detailView.stagePages > 1
       width: parent.width
-      entries: {
-        if (!detailView.session) return []
-        var c = detailView.session.config
-        return [["Activity", c.focusMinutes + "m"], ["Rest", c.shortBreakMinutes + "m"],
-          ["Long rest", c.longBreakEnabled ? c.longBreakMinutes + "m every " + c.longBreakEvery + " rounds" : "Off"],
-          ["Final rest", c.finalBreak ? "Included" : "None"],
-          ["Parent epoch", root.stamp(detailView.session.epochStart.utcMs)]]
+      readonly property real navigationWidth: Math.max(previousStagePage.implicitWidth, nextStagePage.implicitWidth)
+      implicitHeight: Math.max(previousStagePage.implicitHeight, nextStagePage.implicitHeight, stagePageLabel.implicitHeight)
+      height: implicitHeight
+      Button {
+        id: previousStagePage
+        width: stagePagination.navigationWidth
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        objectName: "plancks_stagesPrevious"
+        text: "Previous"
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+        fontSize: Style.font.bodySmall
+        horizontalPadding: Style.space(8)
+        bordered: enabled
+        focusable: enabled
+        opacity: enabled ? 1 : 0.35
+        enabled: detailView.stagePage > 0
+        onActiveFocusChanged: if (activeFocus) root.revealRequested(previousStagePage)
+        onClicked: if (enabled) detailView.changeStagePage(detailView.stagePage - 1)
       }
+      Text {
+        id: stagePageLabel
+        objectName: "plancks_stagesPageLabel"
+        width: Math.max(0, parent.width - stagePagination.navigationWidth * 2 - Style.space(16))
+        anchors.centerIn: parent
+        text: "Page " + (detailView.stagePage + 1) + " of " + detailView.stagePages
+        textFormat: Text.PlainText
+        horizontalAlignment: Text.AlignHCenter
+        wrapMode: Text.WordWrap
+        color: root.foreground
+        opacity: 0.6
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.bodySmall
+      }
+      Button {
+        id: nextStagePage
+        width: stagePagination.navigationWidth
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        objectName: "plancks_stagesNext"
+        text: "Next"
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+        fontSize: Style.font.bodySmall
+        horizontalPadding: Style.space(8)
+        bordered: enabled
+        focusable: enabled
+        opacity: enabled ? 1 : 0.35
+        enabled: detailView.stagePage + 1 < detailView.stagePages
+        onActiveFocusChanged: if (activeFocus) root.revealRequested(nextStagePage)
+        onClicked: if (enabled) detailView.changeStagePage(detailView.stagePage + 1)
+        KeyNavigation.tab: root.backControl
+      }
+    }
     }
   }
 }

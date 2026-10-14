@@ -100,13 +100,22 @@ Panel {
     })
   }
   property bool detailSubscription: false
-  onOpenedChanged: {
-    if (opened) EpochController.lastPanel = root
-    if (!opened && confirmingEpochEnd) cancelEpochEndConfirmation()
+  function resetPanelView() {
     showingSession = false
     confirmingReset = false
     showingHistory = false
     showingSettings = false
+    confirmingEpochEnd = false
+  }
+  onOpenedChanged: {
+    if (opened) {
+      EpochController.lastPanel = root
+      resetPanelView()
+    } else if (confirmingEpochEnd) {
+      // Cancel the pending action immediately, but keep the current view
+      // intact until KeyboardPanel finishes its closing fade.
+      EpochController.cancelEpochEnd()
+    }
     if (detailSubscription !== opened) {
       detailSubscription = opened
       EpochController.setPanelOpen(opened)
@@ -183,6 +192,8 @@ Panel {
 
   KeyboardPanel {
     id: popup
+    objectName: "plancks_popup"
+    onVisibleChanged: if (!visible && !root.opened) root.resetPanelView()
     anchorItem: root.anchorItem
     owner: root.hostWidget || root
     bar: root.bar
@@ -548,6 +559,8 @@ Panel {
                 KeyNavigation.tab: root.historyLink
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "Configure session…"
+                Accessible.description: "Choose activity and rest durations before starting a session."
+                tooltipText: root.tooltipsEnabled ? Accessible.description : ""
                 opacity: enabled ? 1 : 0.4
                 enabled: root.epoch.phase === "active" && EpochController.ready && !EpochController.busy
                 foreground: root.foreground; fontFamily: Style.font.family; fontSize: Style.font.bodySmall
@@ -587,6 +600,19 @@ Panel {
                   Accessible.name: "Current period progress"
                   Accessible.description: root.epoch.session && root.epoch.session.invalid
                     ? "Unavailable after clock change" : Math.floor(progress * 100) + "%"
+                  MouseArea {
+                    id: progressHover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.NoButton
+                  }
+                  PanelToolTip {
+                    objectName: "plancks_sessionProgressTip"
+                    visible: root.tooltipsEnabled && progressHover.containsMouse
+                    text: root.epoch.session && root.epoch.session.invalid ? "Clock changed · progress unavailable"
+                      : "Current stage: " + Math.floor(sessionProgress.progress * 100) + "%\nEach segment: 10% · middle gap: 50%"
+                    fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+                  }
                   Repeater {
                     model: 10
                     delegate: Rectangle {
@@ -626,7 +652,10 @@ Panel {
                     onActiveFocusChanged: if (activeFocus) root.revealButton(advanceSession)
                     text: root.epoch.session ? (root.epoch.session.final ? "Finish" : root.epoch.session.kind === "focus" ? "Rest" : "Activity") : "Next"
                     Accessible.name: root.epoch.session ? root.epoch.session.nextLabel : "Start next"
-                    tooltipText: root.tooltipsEnabled ? Accessible.name : ""
+                    Accessible.description: root.epoch.session && root.epoch.session.final
+                      ? "Finish session; keep the epoch running."
+                      : Accessible.name + "; keep the completed stage's time."
+                    tooltipText: root.tooltipsEnabled ? Accessible.description : ""
                     bordered: true
                     background: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
                     foreground: root.foreground; fontSize: Style.font.caption; focusable: true
@@ -645,7 +674,10 @@ Panel {
                   onActiveFocusChanged: if (activeFocus) root.revealButton(pauseSession)
                   text: root.epoch.session && root.epoch.session.status === "paused" ? "Resume" : "Pause"
                   Accessible.name: root.epoch.session && root.epoch.session.status === "paused" ? "Resume session" : "Pause session"
-                  tooltipText: root.tooltipsEnabled ? Accessible.name : ""
+                  Accessible.description: root.epoch.session && root.epoch.session.status === "paused"
+                    ? "Resume session; paused time stays excluded."
+                    : "Pause session; keep the epoch running."
+                  tooltipText: root.tooltipsEnabled ? Accessible.description : ""
                   bordered: false
                   foreground: Qt.darker(root.foreground, 1.4); fontSize: Style.font.caption; focusable: true
                   enabled: EpochController.ready && !EpochController.busy
@@ -662,7 +694,8 @@ Panel {
                   onActiveFocusChanged: if (activeFocus) root.revealButton(stopSession)
                   text: "Stop";
                   Accessible.name: "Stop session"
-                  tooltipText: root.tooltipsEnabled ? Accessible.name : ""
+                  Accessible.description: "Stop session; keep recorded progress and the epoch running."
+                  tooltipText: root.tooltipsEnabled ? Accessible.description : ""
                    bordered: false
                   foreground: Qt.darker(root.foreground, 1.4); fontSize: Style.font.caption; focusable: true
                   enabled: EpochController.ready && !EpochController.busy
@@ -721,6 +754,18 @@ Panel {
                 x: sessionTimerFrame.x
                 width: Math.max(0, parent.width - x)
                 text: root.epoch.session ? root.epoch.session.caption : ""
+                MouseArea {
+                  id: sessionCaptionHover
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  acceptedButtons: Qt.NoButton
+                }
+                PanelToolTip {
+                  visible: root.tooltipsEnabled && sessionCaptionHover.containsMouse
+                  text: root.epoch.session ? root.epoch.session.caption + "\nPlanned: " + root.length(root.epoch.session.plannedMs)
+                    + " · Actual: " + (root.epoch.session.invalid ? "Unavailable" : root.length(root.epoch.session.actualMs)) : ""
+                  fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+                }
                 textFormat: Text.PlainText
                 color: root.foreground
                 opacity: 0.75
@@ -1118,6 +1163,7 @@ Panel {
           }
           SessionConfig {
             id: sessionConfig
+            tooltipsEnabled: root.tooltipsEnabled
             objectName: "plancks_sessionConfig"
             width: parent.width; visible: root.showingSession
             foreground: root.foreground
@@ -1225,6 +1271,10 @@ Panel {
           SessionHistory {
             id: sessionHistory
             objectName: "plancks_sessionHistory"
+            onStagePageChanged: function(heading) {
+              scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height,
+                heading.mapToItem(scroll.contentItem, 0, 0).y))
+            }
             tooltipsEnabled: root.tooltipsEnabled
             width: parent.width; visible: root.showingHistory && root.sessionHistoryMode
             backControl: historyBackButton
