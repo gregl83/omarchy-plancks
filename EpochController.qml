@@ -113,9 +113,11 @@ QtObject {
     if (helper.running) helper.write(JSON.stringify({action: "preview_insight"}) + "\n")
   }
   property Process notification: Process {
-    command: ["notify-send", "--app-name=Plancks", "--urgency=normal", "--hint=boolean:suppress-sound:true", "--expire-time=8000", "--app-icon=" + root.notificationImage, "Plancks", root.notificationMessage]
+    command: ["python3", decodeURIComponent(Qt.resolvedUrl("notification_send.py").toString().replace(/^file:\/\//, ""))]
+    stdinEnabled: true
+    onStarted: write(JSON.stringify({message: root.notificationMessage, image: root.notificationImage}) + "\n")
     onExited: function(code, status) {
-      if (code !== 0) root.insightsError = "Could not deliver the notification. Check that notify-send and desktop notifications are available."
+      if (code !== 0) root.insightsError = "Could not deliver the notification. Check that desktop notifications and Python GObject are available."
       Qt.callLater(root.nextNotice)
     }
   }

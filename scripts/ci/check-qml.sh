@@ -3,6 +3,10 @@ set -euo pipefail
 
 : "${OMARCHY_PATH:?Set OMARCHY_PATH to the pinned Omarchy checkout}"
 bash "$OMARCHY_PATH/bin/omarchy-plugin-validate" /package
+# Require the shipped notification dependency here; generic Python matrix jobs
+# also cover pure helpers without the desktop's GObject bindings.
+python3 -c 'from gi.repository import Gio, GLib'
+python3 -m unittest discover -s tests -p test_notification_send.py -v
 export XDG_RUNTIME_DIR
 XDG_RUNTIME_DIR=$(mktemp -d)
 chmod 700 "$XDG_RUNTIME_DIR"
