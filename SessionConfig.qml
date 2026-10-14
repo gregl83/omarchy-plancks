@@ -95,8 +95,10 @@ Column {
       font.family: root.fontFamily
       font.pixelSize: Style.font.bodySmall
     }
-    TextField {
+    BoundedTextField {
       id: number
+      maximumLength: 3
+      wrapMode: TextEdit.NoWrap
       objectName: "plancks_session_" + fieldRow.settingKey
       width: parent.width
       Component.onCompleted: text = String(root.draft[fieldRow.settingKey])
@@ -109,7 +111,11 @@ Column {
       font.family: root.fontFamily
       font.pixelSize: Style.font.bodySmall
       Accessible.name: fieldRow.label
-      onTextEdited: root.edit(fieldRow.settingKey, text.trim() === "" ? 0 : Number(text))
+      onTextChanged: {
+        if (!activeFocus) return
+        var value = text.trim() === "" ? 0 : Number(text)
+        if (value !== root.draft[fieldRow.settingKey]) root.edit(fieldRow.settingKey, value)
+      }
       onActiveFocusChanged: if (activeFocus) root.revealRequested(fieldRow)
       Keys.onEscapePressed: root.backRequested()
     }

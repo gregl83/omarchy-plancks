@@ -698,6 +698,17 @@ ShellRoot {
       config.edit("finalBreak", false)
       compare(config.draft.preset, "custom")
       compare(config.summary.minutes, 115)
+      var numericKeys = ["focusMinutes", "shortBreakMinutes", "rounds", "longBreakMinutes", "longBreakEvery"]
+      for (var numericKey of numericKeys) {
+        var numericField = findVisual(config, "plancks_session_" + numericKey)
+        verify(typeof numericField.boundedPaste === "function", numericKey + " uses bounded clipboard input")
+        numericField.forceActiveFocus()
+        keyClick(Qt.Key_A, Qt.ControlModifier); keyClick(Qt.Key_Backspace)
+        keyClick(Qt.Key_1)
+        compare(config.draft[numericKey], 1, numericKey + " updates from typing")
+      }
+      config.load(null)
+      compare(config.draft.preset, "pomodoro", "Programmatic field refresh preserves preset identity")
       var focusMinutes = findVisual(config, "plancks_session_focusMinutes")
       focusMinutes.forceActiveFocus()
       keyClick(Qt.Key_A, Qt.ControlModifier); keyClick(Qt.Key_Backspace)
@@ -706,6 +717,15 @@ ShellRoot {
       keyClick(Qt.Key_1)
       compare(focusMinutes.text, "1", "Typing a duration preserves the entered value")
       compare(config.draft.focusMinutes, 1)
+      focusMinutes.selectAll()
+      keyClick(Qt.Key_V, Qt.ControlModifier)
+      tryCompare(focusMinutes, "text", "20,", 3000)
+      verify(config.validation.length > 0 && !findChild(config, "plancks_startSession").enabled,
+             "Bounded paste of invalid numeric text cannot start a session")
+      focusMinutes.selectAll()
+      keyClick(Qt.Key_1); keyClick(Qt.Key_8); keyClick(Qt.Key_0); keyClick(Qt.Key_9)
+      compare(focusMinutes.text, "180", "Numeric input is limited to three characters")
+      compare(config.draft.focusMinutes, 180)
       config.load(null)
       compare(focusMinutes.text, "25", "Restoring the preset refreshes numeric fields")
       keys.forceActiveFocus(); keyClick(Qt.Key_Escape)

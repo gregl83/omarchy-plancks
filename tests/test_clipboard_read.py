@@ -1,3 +1,5 @@
+from pathlib import Path
+import re
 import sys
 import time
 import unittest
@@ -31,3 +33,16 @@ class ClipboardReadTests(unittest.TestCase):
     def test_missing_reader(self):
         with self.assertRaises(FileNotFoundError):
             read_text(["/nonexistent/clipboard-reader"], 320)
+
+
+class ClipboardControlPolicyTests(unittest.TestCase):
+    def test_runtime_inputs_use_bounded_control(self):
+        # Native editable TextInput/TextField reads clipboard payloads even without
+        # pasting. Keep every runtime input on the explicitly bounded paste path.
+        root = Path(__file__).resolve().parents[1]
+        native = re.compile(r"\b(?:(?:[A-Za-z_]\w*)\.)?(TextField|TextInput|TextArea|TextEdit)\s*\{")
+        for path in root.glob("*.qml"):
+            source = re.sub(r"/\*.*?\*/|//[^\n]*", "", path.read_text(), flags=re.S)
+            matches = native.findall(source)
+            with self.subTest(file=path.name):
+                self.assertEqual(matches, ["TextArea"] if path.name == "BoundedTextField.qml" else [])
