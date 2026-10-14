@@ -6,12 +6,13 @@ Column {
   id: root
   property string title: ""
   property var points: []
+  property bool sessionTrend: false
   property bool tooltipsEnabled: true
   property color foreground: Color.foreground
   property string fontFamily: Style.font.family
   visible: points.length > 0
   spacing: Style.space(4)
-  Accessible.name: title + " duration trend, " + points.length + " completed intervals"
+  Accessible.name: title + " duration trend, " + points.length + (sessionTrend ? " sessions" : " completed intervals")
 
   function length(value) {
     var minutes = Math.floor(value / 60000)
@@ -87,7 +88,9 @@ Column {
       for (var k = 0; k < positions.length; k++) {
         var excluded = samples[k].excludedFromLearning
         ctx.beginPath()
-        ctx.arc(positions[k].x, positions[k].y, Style.space(2), 0, Math.PI * 2)
+        if (root.sessionTrend && samples[k].stopped)
+          ctx.rect(positions[k].x - Style.space(2), positions[k].y - Style.space(2), Style.space(4), Style.space(4))
+        else ctx.arc(positions[k].x, positions[k].y, Style.space(2), 0, Math.PI * 2)
         ctx.strokeStyle = Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, excluded ? 0.4 : 0.75)
         ctx.fillStyle = Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.75)
         if (!excluded) ctx.fill()
@@ -107,7 +110,9 @@ Column {
       visible: root.tooltipsEnabled && hover.containsMouse && root.points.length > 0
       readonly property var sample: root.points.length ? root.points[hover.pointIndex] : null
       text: sample ? root.title + " · " + Qt.formatDateTime(new Date(sample.endUtcMs), "ddd, MMM d, yyyy")
-        + " · " + root.length(sample.durationMs) + (sample.excludedFromLearning ? " · Excluded" : "") : ""
+        + " · " + root.length(sample.durationMs) + (root.sessionTrend ? " · " + (sample.stopped ? "Stopped" : "Completed")
+          + " · " + sample.completedRounds + "/" + sample.rounds + " rounds"
+          : "") + (sample.excludedFromLearning ? " · Excluded" : "") : ""
       fontFamily: root.fontFamily
     }
   }

@@ -1,7 +1,9 @@
 .pragma library
 
+// Every drawing must center its complete horizontal silhouette in its canvas
+// in every state. Fix geometry at its source; never add per-view offsets.
 var options = [
-  {id: "coffee", name: "Coffee cup", source: "CoffeeGraphic.qml", previewOffsetX: 4},
+  {id: "coffee", name: "Coffee cup", source: "CoffeeGraphic.qml"},
   {id: "starship", name: "Starship", source: "StarshipGraphic.qml"}
 ]
 

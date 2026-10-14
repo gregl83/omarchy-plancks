@@ -21,8 +21,8 @@ class ReleaseValidationTests(unittest.TestCase):
             'id': 'test.plugin', 'name': 'Test', 'version': '1.0.0',
             'author': 'Test', 'description': 'Release validation fixture',
         }))
-        for name in ('README.md', 'LICENSE', 'assets/preview-main.png', 'assets/preview-history.png', 'assets/preview-settings.png', 'preview.png', 'qmldir', 'plancks.py',
-                     'Widget.qml', 'EpochPanel.qml', 'EpochController.qml', 'HistoryView.qml', 'HistoryTrend.qml', 'AnimatedGraphic.qml', 'CoffeeGraphic.qml', 'StarshipGraphic.qml', 'InsightsSettings.qml', 'insights.py', 'GraphicPreview.qml', 'Graphics.js', 'BoundedTextField.qml', 'clipboard_read.py'):
+        for name in ('README.md', 'LICENSE', 'assets/preview-main.png', 'assets/preview-history.png', 'assets/preview-settings.png', 'assets/preview-session.png', 'assets/preview-session-config.png', 'assets/preview-session-history.png', 'preview.png', 'qmldir', 'plancks.py',
+                     'Widget.qml', 'EpochPanel.qml', 'EpochController.qml', 'HistoryView.qml', 'HistoryTrend.qml', 'AnimatedGraphic.qml', 'CoffeeGraphic.qml', 'StarshipGraphic.qml', 'InsightsSettings.qml', 'insights.py', 'GraphicPreview.qml', 'Graphics.js', 'sessions.py', 'SessionConfig.qml', 'SessionHistory.qml', 'BoundedTextField.qml', 'clipboard_read.py', 'notification_send.py'):
             self.root.joinpath(name).parent.mkdir(parents=True, exist_ok=True)
             self.root.joinpath(name).write_text('fixture\n')
         self.git('add', '.')

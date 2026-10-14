@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 import plancks
+import sessions
 from preview_environment import stage_desktop
 
 shell = Path(os.environ.get('OMARCHY_PATH', '/usr/share/omarchy')) / 'shell'
@@ -34,6 +35,13 @@ with tempfile.TemporaryDirectory(prefix='plancks-preview-') as directory:
         start = (now - timedelta(days=day)).replace(hour=9, minute=0)
         sequence += 1
         store.transition('start', f'start-{day}', sequence - 1, now=stamp(start))
+        if day == 1:
+            config = dict(sessions.DEFAULTS, preset='custom', rounds=1, finalBreak=False)
+            state, _ = store.session_action('session_started', 'preview-session', sequence, config=config, now=stamp(start))
+            current = state['session']
+            state, _ = store.session_action('session_completed', 'preview-finished', state['sequence'],
+                session_id=current['sessionId'], stage_id=current['stages'][0]['stageId'], now=stamp(start + timedelta(minutes=28)))
+            sequence = state['sequence']
         if day:
             sequence += 1
             store.transition('end', f'end-{day}', sequence - 1,
@@ -47,7 +55,7 @@ with tempfile.TemporaryDirectory(prefix='plancks-preview-') as directory:
         (root / name).symlink_to(shell / name)
     plugin = root / 'Plancks'
     plugin.mkdir()
-    for name in ('qmldir', 'Widget.qml', 'EpochPanel.qml', 'HistoryView.qml', 'HistoryTrend.qml', 'AnimatedGraphic.qml', 'CoffeeGraphic.qml', 'StarshipGraphic.qml', 'InsightsSettings.qml', 'insights.py', 'GraphicPreview.qml', 'Graphics.js', 'plancks.py', 'BoundedTextField.qml', 'clipboard_read.py', 'assets'):
+    for name in ('qmldir', 'Widget.qml', 'EpochPanel.qml', 'HistoryView.qml', 'HistoryTrend.qml', 'AnimatedGraphic.qml', 'CoffeeGraphic.qml', 'StarshipGraphic.qml', 'InsightsSettings.qml', 'insights.py', 'GraphicPreview.qml', 'Graphics.js', 'plancks.py', 'sessions.py', 'SessionConfig.qml', 'SessionHistory.qml', 'BoundedTextField.qml', 'clipboard_read.py', 'assets'):
         (plugin / name).symlink_to(REPO / name)
     controller = (REPO / 'EpochController.qml').read_text()
     command = next(line for line in controller.splitlines() if line.strip().startswith('command: ["python3"'))
@@ -160,7 +168,7 @@ ShellRoot {
     repeat: true
     running: true
     onTriggered: {
-      if (++capture.attempts > 80) { console.error("PREVIEW_FAIL timeout: " + Plancks.EpochController.error); Qt.quit(); return }
+      if (++capture.attempts > 80) { console.error("PREVIEW_FAIL timeout at " + capture.step + " ready=" + Plancks.EpochController.ready + " wallpaper=" + wallpaper.ready + ": " + Plancks.EpochController.error); Qt.quit(); return }
       if (!Plancks.EpochController.ready || !wallpaper.ready) return
       var panel = find(widget, "plancks_root")
       if (capture.step === 0) { widget.open(); capture.step = 1; return }
@@ -190,17 +198,30 @@ ShellRoot {
         return
       }
       if (capture.step === 7) { capture.step = -1; capture.save(SETTINGS_PATH, 8); return }
-      if (capture.step === 8) { console.log("PREVIEW_PASS"); Qt.quit() }
+      if (capture.step === 8) { panel.closeSettings(); panel.openSession(); capture.step = 9; return }
+      if (capture.step === 9) { capture.step = -1; capture.save(SESSION_CONFIG_PATH, 10); return }
+      if (capture.step === 10) { Plancks.EpochController.sessionAction("session_started", find(panel, "plancks_sessionConfig").draft); capture.step = 11; return }
+      if (capture.step === 11 && !Plancks.EpochController.busy && Plancks.EpochController.state.session) { capture.step = 12; return }
+      if (capture.step === 12) { capture.step = -1; capture.save(SESSION_PATH, 13); return }
+      if (capture.step === 13) { panel.openHistory(); panel.sessionHistoryMode = true; capture.step = 14; return }
+      if (capture.step === 14 && !Plancks.EpochController.sessionHistoryLoading) { capture.step = -1; capture.save(SESSION_HISTORY_PATH, 15); return }
+      if (capture.step === 15) { find(panel, "plancks_sessionHistory").detail = Plancks.EpochController.sessionHistory.rows[0]; capture.step = 16; return }
+      if (capture.step === 16) { capture.step = -1; capture.save(SESSION_DETAIL_PATH, 17); return }
+      if (capture.step === 17) { console.log("PREVIEW_PASS"); Qt.quit() }
     }
   }
 }
 '''
     qml = qml.replace('CLOCK', json.dumps(now.strftime('%A %H:%M')))
+    qml = qml.replace('SESSION_CONFIG_PATH', json.dumps(str(REPO / 'assets/preview-session-config.png')))
+    qml = qml.replace('SESSION_DETAIL_PATH', json.dumps(str(REPO / 'assets/preview-session-detail.png')))
+    qml = qml.replace('SESSION_HISTORY_PATH', json.dumps(str(REPO / 'assets/preview-session-history.png')))
+    qml = qml.replace('SESSION_PATH', json.dumps(str(REPO / 'assets/preview-session.png')))
     qml = qml.replace('MAIN_PATH', json.dumps(str(REPO / 'assets/preview-main.png')))
     qml = qml.replace('HISTORY_PATH', json.dumps(str(REPO / 'assets/preview-history.png')))
     qml = qml.replace('SETTINGS_PATH', json.dumps(str(REPO / 'assets/preview-settings.png')))
     (root / 'shell.qml').write_text(qml)
-    env = dict(os.environ, XDG_STATE_HOME=str(root / 'state'))
+    env = dict(os.environ, XDG_STATE_HOME=str(root / 'state'), PLANCKS_DISABLE_NOTIFICATIONS='1')
     result = subprocess.run(['quickshell', '-p', str(root), '--no-color'], env=env,
                             text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
     print(result.stdout)

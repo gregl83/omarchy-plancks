@@ -81,7 +81,7 @@ ShellRoot {
         }
         Rectangle { width: 48; height: 2; color: capture.accent }
         Text {
-          text: "Built for your bar.\nLocal. Personal. Quiet."
+          text: "Pomodoro + custom sessions.\nLocal. Personal. Quiet."
           color: capture.muted
           font.family: capture.fontFamily
           font.pixelSize: 17
@@ -189,15 +189,38 @@ ShellRoot {
           Rectangle { x: 0; y: 20; width: 3; height: parent.height - 40; color: capture.accent }
           Text {
             x: 24; y: 24
-            text: "PLANCKS  /  INSIGHTS"
+            text: "POMODORO + CUSTOM SESSIONS"
             font.family: capture.fontFamily
             font.pixelSize: 16
             font.letterSpacing: 1
             color: capture.accent
           }
+          // Static 50% sample of the session control's ten-segment progress bar.
+          Item {
+            id: sessionProgressSample
+            x: 24; y: sessionCardText.y + (sessionCardText.height - height * scale) / 2
+            width: 11; height: 76
+            scale: 1.25
+            transformOrigin: Item.TopLeft
+            readonly property int segmentGap: 2
+            readonly property int segmentHeight: Math.floor((height - segmentGap * 9 - 3) / 10)
+            readonly property int middleGap: height - segmentHeight * 10 - segmentGap * 8
+            Repeater {
+              model: 10
+              Rectangle {
+                required property int index
+                width: sessionProgressSample.width
+                height: sessionProgressSample.segmentHeight
+                y: index * (height + sessionProgressSample.segmentGap)
+                  + (index >= 5 ? sessionProgressSample.middleGap - sessionProgressSample.segmentGap : 0)
+                color: Qt.rgba(capture.ink.r, capture.ink.g, capture.ink.b, index >= 5 ? 0.3 : 0.12)
+              }
+            }
+          }
           Text {
-            x: 24; y: 67; width: parent.width - 48
-            text: "Extra time.\nSolid momentum."
+            id: sessionCardText
+            x: 62; y: 67; width: parent.width - 86
+            text: "Activity, rest,\nand repeat rounds."
             font.family: capture.fontFamily
             font.pixelSize: 24
             lineHeight: 1.25
@@ -208,7 +231,7 @@ ShellRoot {
       Rectangle { x: 76; y: 931; width: 1448; height: 1; color: Qt.rgba(capture.ink.r, capture.ink.g, capture.ink.b, 0.2) }
       Text {
         x: 76; y: 952
-        text: "PREDICTIONS  /  HISTORY  /  INSIGHTS"
+        text: "PREDICTIONS  /  SESSIONS  /  HISTORY  /  INSIGHTS"
         font.family: capture.fontFamily
         font.pixelSize: 15
         font.letterSpacing: 1.5

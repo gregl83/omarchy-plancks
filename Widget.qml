@@ -31,6 +31,10 @@ BarWidget {
       return [1800, 60]
     return raw
   }
+  function saveSessionConfig(config) {
+    settings = Object.assign({}, settings, {sessionConfig: config})
+    if (bar && bar.shell) bar.shell.updateEntryInline(moduleName, settings)
+  }
   function setInsightPreference(name, value) {
     if (["insightsEnabled", "finishNotificationsEnabled", "insightFrequency", "finishWarningSeconds"].indexOf(name) < 0) return
     var next = Object.assign({}, settings)
@@ -62,10 +66,11 @@ BarWidget {
     dimmed: root.epoch.phase !== "active" && EpochController.error === ""
     fixedWidth: root.vertical ? root.barSize : label.implicitWidth + Style.space(18)
     fixedHeight: root.vertical ? label.implicitHeight + Style.space(14) : root.barSize
-    tooltipText: root.tooltipsEnabled ? EpochController.error || root.epoch.status : ""
+    tooltipText: root.tooltipsEnabled ? EpochController.error || (root.epoch.session ? root.epoch.session.caption + ". " : "")
+      + root.epoch.status + "\nPrimary action: " + EpochController.primaryActionLabel : ""
     activeFocusOnTab: true
     Accessible.role: Accessible.Button
-    Accessible.name: "Plancks. " + root.epoch.status + ". " + root.epoch.timer
+    Accessible.name: "Plancks. " + (root.epoch.session ? root.epoch.session.caption + ". " + root.epoch.session.timer + ". " : "") + root.epoch.status + ". " + root.epoch.timer
     Keys.onReturnPressed: root.toggle()
     Keys.onSpacePressed: root.toggle()
     onPressed: function(b) { if (b === Qt.LeftButton) root.toggle() }
@@ -78,6 +83,15 @@ BarWidget {
       radius: Style.cornerRadius
     }
     Text {
+      visible: !!root.epoch.session && root.epoch.session.status === "paused"
+      text: "Ⅱ"
+      x: label.x - Style.space(7)
+      y: label.y
+      color: button.foreground
+      font.family: button.fontFamily
+      font.pixelSize: button.fontSize * 0.65
+    }
+    Text {
       id: label
       // Rich text handles hover itself; keep the button's input surface above it.
       z: -1
@@ -85,8 +99,9 @@ BarWidget {
       textFormat: Text.RichText
       text: {
         var warning = EpochController.error ? "! " : ""
-        var notation = "<i>t</i><sub>P</sub>"
-        var timer = root.epoch.timer || "--:--:--"
+        var session = root.epoch.session
+        var notation = "<i>t</i><sub>" + (session ? (session.kind === "focus" ? "A" : "R") : "P") + "</sub>"
+        var timer = session ? session.timer : root.epoch.timer || "--:--:--"
         if (root.vertical) return warning + notation + "<br>" + timer.replace(/:/g, "<br>")
         var gap = '<span style="font-size: ' + (button.fontSize / 2) + 'px">&#8202;</span>'
         return warning + notation + gap + timer
