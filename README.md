@@ -153,13 +153,13 @@ The search box matches across all completed history before pagination. Search ei
 
 ## Sessions
 
-Within an active epoch, select **Configure session…**. Pomodoro supplies 25-minute activity, 5-minute short rests, 15-minute long rests every four rounds, four rounds, and **Include final rest** enabled. Custom configurations support 1–180 whole minutes and 1–12 rounds/cadence. One round with no final rest is a standalone activity timer. The summary reflects the actual rest sequence; the final rest uses the same short/long cadence as other rests.
+Within an active epoch, select the **Configure session** timer icon immediately left of Settings in the panel header. Pomodoro supplies 25-minute activity, 5-minute short rests, 15-minute long rests every four rounds, four rounds, and **Include final rest** enabled. Custom configurations support 1–180 whole minutes and 1–12 rounds/cadence. One round with no final rest is a standalone activity timer. The summary reflects the actual rest sequence; the final rest uses the same short/long cadence as other rests.
 
 Custom sessions support an optional **Session name** (up to 80 characters). The name is saved with the last-used configuration and each run, appears in the panel and history, and is searchable. Existing unnamed configurations remain supported.
 
 Session history uses the same date, weekday, time, and duration search formats as epoch history, including `Tue`, `Tuesday`, `10/6/2026`, `09:30:00`, `8h30m`, and `08:30:00`. Session names, presets, inclusion state, outcomes, and activity/rest labels are also searchable. Durations match the session's elapsed time, totals, and planned or recorded stage durations. Both histories use **Clear**, live result counts, Enter to search immediately, and Escape to clear before leaving. Reopening preserves the query; switching history tabs clears the destination search. Trends remain independent of filtering.
 
-Configuration is unavailable during off-time. Opening or cancelling a draft creates no timer events. A successful start remembers its configuration; editing future defaults does not change the running session. An epoch forecast is informational and never prevents starting a longer session.
+Configuration is unavailable during off-time. Opening or cancelling a draft creates no timer events. A successful start remembers its configuration; editing future defaults does not change the running session. An epoch forecast is informational and never prevents starting a longer session. Configuration summaries use compact hours and minutes consistently (for example, `3h 23m` remaining or `15m` beyond the epoch estimate).
 
 Session timers count down with `−HH:MM:SS`, show `+00:00:00` at the target, and count up with `+HH:MM:SS` after the target. Each stage sends one silent desktop notification at its target. Select **Start rest**, **Start activity**, or **Finish session** yourself; no stage advances automatically. Early advancement is disabled. **Stop** ends the whole session and preserves partial progress. **Pause/Resume** freezes the signed timer and records paused time separately while the epoch continues.
 

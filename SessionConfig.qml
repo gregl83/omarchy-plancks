@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
 import "."
@@ -12,7 +13,11 @@ Column {
   property int revision: 0
   signal backRequested()
   signal revealRequested(var item)
-  spacing: Style.space(12)
+  spacing: Style.space(10)
+  function duration(minutes) {
+    return minutes >= 60 ? Math.floor(minutes / 60) + "h"
+      + (minutes % 60 ? " " + minutes % 60 + "m" : "") : minutes + "m"
+  }
   function defaults() { return {name: "", preset: "pomodoro", presetVersion: 1, focusMinutes: 25, shortBreakMinutes: 5,
     longBreakMinutes: 15, longBreakEnabled: true, longBreakEvery: 4, rounds: 4, finalBreak: true} }
   function load(config) { draft = Object.assign(defaults(), config || {}); revision++ }
@@ -36,10 +41,12 @@ Column {
     return {minutes: total, breaks: count, longBreaks: longs}
   }
   Keys.onEscapePressed: backRequested()
-  Text { text: "Preset"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+  PanelSectionHeader { text: "SESSION"; foreground: root.foreground; fontFamily: root.fontFamily }
   ButtonGroup {
     objectName: "plancks_sessionPreset"
     options: [{value: "pomodoro", label: "Pomodoro"}, {value: "custom", label: "Custom"}]
+    fontFamily: root.fontFamily
+    fontSize: Style.font.caption
     value: root.draft.preset
     foreground: root.foreground
     onChanged: function(value) { if (value === "pomodoro") root.load(null); else root.edit("preset", "custom") }
@@ -75,47 +82,66 @@ Column {
       Keys.onEscapePressed: root.backRequested()
     }
   }
-  Repeater {
-    model: [{key: "focusMinutes", label: "Activity (minutes)"}, {key: "shortBreakMinutes", label: "Rest (minutes)"},
-      {key: "longBreakMinutes", label: "Long rest (minutes)"}, {key: "longBreakEvery", label: "Long rest every N rounds"},
-      {key: "rounds", label: "Activity rounds"}]
-    delegate: Row {
-      id: fieldRow
-      required property var modelData
-      width: root.width
-      spacing: Style.space(8)
-      Text { width: parent.width - number.width - parent.spacing; anchors.verticalCenter: number.verticalCenter
-        text: fieldRow.modelData.label; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; wrapMode: Text.WordWrap }
-      TextField {
-        id: number
-        objectName: "plancks_session_" + fieldRow.modelData.key
-        width: Style.space(65)
-        Component.onCompleted: text = String(root.draft[fieldRow.modelData.key])
-        Connections {
-          target: root
-          function onRevisionChanged() { number.text = String(root.draft[fieldRow.modelData.key]) }
-          function onDraftChanged() { if (!number.activeFocus) number.text = String(root.draft[fieldRow.modelData.key]) }
-        }
-        foreground: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.bodySmall
-        Accessible.name: fieldRow.modelData.label
-        onTextEdited: root.edit(fieldRow.modelData.key, text.trim() === "" ? 0 : Number(text))
-        onActiveFocusChanged: if (activeFocus) root.revealRequested(fieldRow)
-        Keys.onEscapePressed: root.backRequested()
+  component NumberSetting: Column {
+    id: fieldRow
+    required property string settingKey
+    required property string label
+    Layout.fillWidth: true
+    Layout.preferredWidth: 1
+    spacing: Style.space(6)
+    Text {
+      text: fieldRow.label
+      color: root.foreground
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.bodySmall
+    }
+    TextField {
+      id: number
+      objectName: "plancks_session_" + fieldRow.settingKey
+      width: parent.width
+      Component.onCompleted: text = String(root.draft[fieldRow.settingKey])
+      Connections {
+        target: root
+        function onRevisionChanged() { number.text = String(root.draft[fieldRow.settingKey]) }
+        function onDraftChanged() { if (!number.activeFocus) number.text = String(root.draft[fieldRow.settingKey]) }
       }
+      foreground: root.foreground
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.bodySmall
+      Accessible.name: fieldRow.label
+      onTextEdited: root.edit(fieldRow.settingKey, text.trim() === "" ? 0 : Number(text))
+      onActiveFocusChanged: if (activeFocus) root.revealRequested(fieldRow)
+      Keys.onEscapePressed: root.backRequested()
     }
   }
+  PanelSeparator { foreground: root.foreground }
+  PanelSectionHeader { text: "TIMING"; foreground: root.foreground; fontFamily: root.fontFamily }
+  GridLayout {
+    width: parent.width
+    columns: 3
+    columnSpacing: Style.space(12)
+    NumberSetting { settingKey: "focusMinutes"; label: "Activity (min)" }
+    NumberSetting { settingKey: "shortBreakMinutes"; label: "Rest (min)" }
+    NumberSetting { settingKey: "rounds"; label: "Rounds" }
+  }
+  PanelSeparator { foreground: root.foreground }
+  PanelSectionHeader { text: "REST OPTIONS"; foreground: root.foreground; fontFamily: root.fontFamily }
   Repeater {
     model: [{key: "longBreakEnabled", label: "Long rests"}, {key: "finalBreak", label: "Include final rest"}]
-    delegate: Row {
+    delegate: Item {
       id: optionRow
       required property var modelData
       width: root.width
-      Text { width: parent.width - option.width; text: optionRow.modelData.label; color: root.foreground
+      height: Math.max(optionLabel.implicitHeight, option.implicitHeight)
+      Text { id: optionLabel; anchors.verticalCenter: parent.verticalCenter
+        width: parent.width - option.width - Style.space(12); text: optionRow.modelData.label; color: root.foreground
         font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
       ToggleSwitch {
         id: option
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        trackHeight: Style.space(16)
+        cursorPad: Style.space(4)
         objectName: "plancks_session_" + optionRow.modelData.key
         checked: root.draft[optionRow.modelData.key]
         foreground: root.foreground
@@ -133,7 +159,7 @@ Column {
           text: option.Accessible.description
           fontFamily: root.fontFamily
         }
-        onToggled: root.edit(optionRow.modelData.key, !checked)
+        onToggled: { forceActiveFocus(); root.edit(optionRow.modelData.key, !checked) }
         Keys.onSpacePressed: toggled()
         Keys.onReturnPressed: toggled()
         Keys.onEscapePressed: root.backRequested()
@@ -141,11 +167,20 @@ Column {
       }
     }
   }
+  GridLayout {
+    width: parent.width
+    columns: 2
+    columnSpacing: Style.space(12)
+    NumberSetting { settingKey: "longBreakMinutes"; label: "Long rest (min)" }
+    NumberSetting { settingKey: "longBreakEvery"; label: "Every N rounds" }
+  }
+  PanelSeparator { foreground: root.foreground }
+  PanelSectionHeader { text: "SUMMARY"; foreground: root.foreground; fontFamily: root.fontFamily }
   Text {
     width: parent.width
     objectName: "plancks_sessionSummary"
     text: root.validation || root.draft.rounds + " × " + root.draft.focusMinutes + "m activity · " + root.summary.breaks
-      + " rests · " + Math.floor(root.summary.minutes / 60) + "h " + root.summary.minutes % 60 + "m total"
+      + " rests · " + root.duration(root.summary.minutes) + " total"
       + (root.draft.longBreakEnabled && root.summary.longBreaks === 0 ? "\nNo long rest occurs in this sequence." : "")
     color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; wrapMode: Text.WordWrap
   }
@@ -158,8 +193,8 @@ Column {
       var remaining = Number(parts[0]) * 3600 + Number(parts[1]) * 60 + Number(parts[2])
       var minutes = Math.ceil((timer.indexOf("−") === 0 ? remaining : -remaining) / 60)
       var overlap = root.summary.minutes - minutes
-      return "Epoch estimate: " + Math.max(0, minutes) + "m remaining."
-        + (overlap > 0 ? "\nThis session extends " + overlap + "m beyond the current epoch estimate." : "")
+      return "Epoch estimate: " + root.duration(Math.max(0, minutes)) + " remaining."
+        + (overlap > 0 ? "\nThis session extends " + root.duration(overlap) + " beyond the current epoch estimate." : "")
     }
     color: root.foreground; opacity: 0.7; font.family: root.fontFamily; font.pixelSize: Style.font.caption; wrapMode: Text.WordWrap
   }
