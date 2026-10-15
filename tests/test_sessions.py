@@ -321,6 +321,44 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(len(recent), 10)
         self.assertEqual([p['endUtcMs'] for p in recent], sorted(p['endUtcMs'] for p in recent))
 
+    def test_daily_activity_respects_inclusion_pauses_and_search(self):
+        self.start()
+        target = self.state['session']['sessionId']
+        self.command('session_paused', 20000)
+        self.command('session_resumed', 30000)
+        self.command('session_advanced', 80000)
+        self.command('session_stopped', 90000)
+        with patch('plancks.clock', return_value=clock(90000)):
+            activity = self.store.session_history()['activity']
+            day = plancks.datetime.fromtimestamp(clock(90000)['utcMs'] / 1000).date().isoformat()
+            self.assertEqual(activity['today'], day)
+            self.assertEqual(activity['days'], {day: dict(durationMs=70000, sessions=1)})
+            self.assertEqual(self.store.session_history(4, 'nonexistent')['activity'], activity)
+            self.state, _ = self.store.session_action(
+                'session_inclusion_changed', 'exclude-grid', self.state['sequence'],
+                session_id=target, excluded=True)
+            self.assertEqual(self.store.session_history()['activity']['days'], {})
+            self.state, _ = self.store.session_action(
+                'session_inclusion_changed', 'include-grid', self.state['sequence'],
+                session_id=target, excluded=False)
+            self.assertEqual(self.store.session_history()['activity'], activity)
+        with patch('plancks.clock', return_value=clock(190 * 86400000)):
+            self.assertEqual(self.store.session_history()['activity']['days'], {})
+        with patch('plancks.clock', return_value=clock(-86400000)):
+            self.assertEqual(self.store.session_history()['activity']['days'], {})
+
+    def test_daily_activity_aggregates_finished_sessions_only(self):
+        self.start()
+        self.command('session_stopped', 10000)
+        self.command('session_started', 20000, config=self.config)
+        self.command('session_stopped', 40000)
+        self.command('session_started', 50000, config=self.config)
+        self.command('session_stopped', 49000)  # Invalid backwards clock.
+        self.command('session_started', 60000, config=self.config)
+        with patch('plancks.clock', return_value=clock(120000)):
+            activity = self.store.session_history()['activity']
+        self.assertEqual(list(activity['days'].values()), [dict(durationMs=30000, sessions=2)])
+
     def test_history_pagination_search_and_epoch_exclusion_independence(self):
         for i in range(7):
             self.start()

@@ -477,6 +477,13 @@ ShellRoot {
       var back = findChild(panel, "plancks_historyBackButton")
       tryVerify(function() { return !Plancks.EpochController.historyLoading })
       compare(Plancks.EpochController.history.total, 3, "Three completed intervals before paging")
+      tryVerify(function() { return !Plancks.EpochController.sessionHistoryLoading
+        && Plancks.EpochController.sessionHistory.generation === Plancks.EpochController.state.generation
+        && Plancks.EpochController.sessionHistory.sequence === Plancks.EpochController.state.sequence })
+      verify(!panel.sessionHistoryMode, "Session history is prefetched before selecting Sessions")
+      var prefetchedRequest = Plancks.EpochController.sessionHistoryId
+      Plancks.EpochController.prefetchSessionHistory()
+      compare(Plancks.EpochController.sessionHistoryId, prefetchedRequest, "Current prefetched history avoids duplicate requests")
       var epochsTab = findChild(panel, "plancks_epochsTab")
       var sessionsTab = findChild(panel, "plancks_sessionsTab")
       var tabX = sessionsTab.x
@@ -813,8 +820,14 @@ ShellRoot {
       compare(widget.epoch.sequence, pausedSequence + 1, "Cascade closes both in one event")
       compare(widget.epoch.workSampleCount, 0, "Skip intent survives confirmation")
       console.log("SESSION_UI_CASCADE_OK")
+      // Reproduce a cold cache with saved sessions, then open Epochs first.
+      panel.sessionHistoryMode = false
+      Plancks.EpochController.sessionHistory = {rows: [], page: 0, pages: 1, total: 0}
       panel.openHistory()
+      tryVerify(function() { return !Plancks.EpochController.sessionHistoryLoading
+        && Plancks.EpochController.sessionHistory.rows.length === 1 })
       panel.sessionHistoryMode = true
+      compare(Plancks.EpochController.sessionHistory.rows.length, 1, "First tab switch already has session rows")
       tryVerify(function() { return !Plancks.EpochController.sessionHistoryLoading && Plancks.EpochController.sessionHistory.rows.length === 1 })
       var sessionHistory = findChild(panel, "plancks_sessionHistory")
       var sessionSearch = findVisual(sessionHistory, "plancks_sessionSearch")
@@ -845,6 +858,22 @@ ShellRoot {
       verify(focusTrend.visible && focusTrend.sessionTrend)
       compare(focusTrend.points.length, 1)
       verify(focusTrend.points[0].stopped)
+      var activityGrid = findVisual(sessionHistory, "plancks_sessionActivity")
+      verify(activityGrid.visible)
+      compare(activityGrid.width, focusTrend.width)
+      verify(activityGrid.x > focusTrend.x)
+      verify(activityGrid.weeks > 1 && activityGrid.weeks <= 26)
+      compare(activityGrid.cells.length, activityGrid.weeks * 7)
+      verify(Math.abs(activityGrid.gridWidth - activityGrid.width) < 0.01)
+      compare(focusTrend.plotHeight, activityGrid.gridHeight)
+      verify(activityGrid.cells.some(function(cell) { return cell.durationMs > 0 }))
+      activityGrid.activity = {today: "2026-03-01", days: {"2026-02-28": {durationMs: 60000, sessions: 1}}}
+      compare(activityGrid.cells[activityGrid.cells.length - 1].date.getDay(), 0)
+      compare(activityGrid.cells.filter(function(cell) { return cell.durationMs > 0 }).length, 1)
+      compare(activityGrid.totalMs, 60000)
+      compare(findChild(activityGrid, "plancks_dailyActivityTotal").text, "1m")
+      compare(activityGrid.length(10920000), "3h 2m")
+      activityGrid.activity = Qt.binding(function() { return sessionHistory.history.activity || ({}) })
 
       compare(Plancks.EpochController.sessionHistory.rows[0].status, "stopped")
       compare(Plancks.EpochController.sessionHistory.rows[0].config.name, "read")
@@ -864,6 +893,7 @@ ShellRoot {
       sessionToggle.forceActiveFocus(); keyClick(Qt.Key_Space)
       tryVerify(function() { return !Plancks.EpochController.busy && !Plancks.EpochController.sessionHistoryLoading && Plancks.EpochController.sessionHistory.rows[0].excludedFromStatistics === true })
       verify(Plancks.EpochController.sessionHistory.trend[0].excludedFromLearning)
+      tryVerify(function() { return !activityGrid.cells.some(function(cell) { return cell.durationMs > 0 }) })
       sessionToggle = findVisual(sessionHistory, "plancks_sessionToggle_0")
       verify(!sessionToggle.checked)
       sessionToggle.forceActiveFocus(); keyClick(Qt.Key_Space)

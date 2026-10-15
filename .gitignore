@@ -7,3 +7,7 @@ __pycache__/
 
 # IDE
 .idea
+
+# Demo build intermediates
+assets/demo/frames/
+assets/demo/render.log
