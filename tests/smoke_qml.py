@@ -857,6 +857,9 @@ ShellRoot {
       activityGrid.activity = {today: "2026-03-01", days: {"2026-02-28": {durationMs: 60000, sessions: 1}}}
       compare(activityGrid.cells[activityGrid.cells.length - 1].date.getDay(), 0)
       compare(activityGrid.cells.filter(function(cell) { return cell.durationMs > 0 }).length, 1)
+      compare(activityGrid.totalMs, 60000)
+      compare(findChild(activityGrid, "plancks_dailyActivityTotal").text, "1m")
+      compare(activityGrid.length(10920000), "3h 2m")
       activityGrid.activity = Qt.binding(function() { return sessionHistory.history.activity || ({}) })
 
       compare(Plancks.EpochController.sessionHistory.rows[0].status, "stopped")

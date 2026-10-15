@@ -114,7 +114,7 @@ ShellRoot {
         x: 1044; y: 240; width: 480
         spacing: 24
         Rectangle {
-          width: parent.width; height: 172
+          width: parent.width; height: 220
           color: Color.popups.background
           border.color: Qt.rgba(capture.ink.r, capture.ink.g, capture.ink.b, 0.2)
           radius: 8

@@ -17,6 +17,7 @@ Column {
   readonly property int weeks: columns.length
   readonly property real gridWidth: columns.length ? columns[columns.length - 1] + cellSize : 0
   readonly property var cells: buildCells()
+  readonly property real totalMs: cells.reduce(function(total, cell) { return total + (cell.future ? 0 : cell.durationMs) }, 0)
   spacing: Style.space(4)
   Accessible.name: "Daily activity, last " + weeks + " weeks"
   Accessible.description: "Included session activity by local finish date. Stronger shading means more activity."
@@ -58,6 +59,13 @@ Column {
     return Qt.rgba(foreground.r, foreground.g, foreground.b, [0.05, 0.2, 0.35, 0.5][level])
   }
   function level(ms) { return ms <= 0 ? 0 : ms < 1800000 ? 1 : ms < 5400000 ? 2 : 3 }
+  function length(value) {
+    var minutes = Math.floor(value / 60000)
+    if (minutes === 0) return value > 0 ? "<1m" : "0m"
+    var hours = Math.floor(minutes / 60)
+    var rest = minutes % 60
+    return hours ? hours + "h" + (rest ? " " + rest + "m" : "") : rest + "m"
+  }
   function help(cell) {
     var minutes = Math.floor(cell.durationMs / 60000)
     var duration = minutes >= 60 ? Math.floor(minutes / 60) + "h " + minutes % 60 + "m"
@@ -66,12 +74,30 @@ Column {
       + cell.sessions + (cell.sessions === 1 ? " session" : " sessions")
       + "\nIncluded sessions, grouped by finish date."
   }
-  PanelSectionHeader {
+  Item {
     width: parent.width
-    text: "DAILY ACTIVITY"
-    foreground: root.foreground
-    fontFamily: root.fontFamily
-    elide: Text.ElideRight
+    height: Math.max(label.implicitHeight, total.implicitHeight)
+    PanelSectionHeader {
+      id: label
+      width: Math.max(0, parent.width - total.width - Style.space(8))
+      text: "DAILY ACTIVITY"
+      foreground: root.foreground
+      fontFamily: root.fontFamily
+      elide: Text.ElideRight
+    }
+    Text {
+      id: total
+      objectName: "plancks_dailyActivityTotal"
+      anchors.right: parent.right
+      anchors.baseline: label.baseline
+      text: root.length(root.totalMs)
+      textFormat: Text.PlainText
+      color: root.foreground
+      opacity: 0.6
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      Accessible.name: "Total activity in displayed weeks: " + text
+    }
     MouseArea {
       id: titleHover
       anchors.fill: parent
@@ -80,7 +106,7 @@ Column {
     }
     PanelToolTip {
       visible: root.tooltipsEnabled && titleHover.containsMouse
-      text: "Last " + root.weeks + " weeks · one square per day, four weeks per group (oldest group may be partial). Activity is grouped by session finish date."
+      text: root.length(root.totalMs) + " total included activity across the displayed weeks.\nLast " + root.weeks + " weeks · one square per day, four weeks per group (oldest group may be partial). Activity is grouped by session finish date."
       fontFamily: root.fontFamily
     }
   }
