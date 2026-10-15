@@ -1,6 +1,6 @@
 [![Build](https://github.com/gregl83/omarchy-plancks/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gregl83/omarchy-plancks/actions/workflows/ci.yml)
-[![Omarchy Plugins](https://img.shields.io/badge/Omarchy-Plugins-7aa2f7)](https://plugins.omarchy.org/plugin.html?id=gregl83.plancks)
 [![Release](https://img.shields.io/github/v/release/gregl83/omarchy-plancks)](https://github.com/gregl83/omarchy-plancks/releases/latest)
+[![Omarchy Plugins](https://img.shields.io/badge/omarchy-plugins-7aa2f7)](https://plugins.omarchy.org/plugin.html?id=gregl83.plancks)
 [![Apache 2.0 licensed](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/gregl83/omarchy-plancks/blob/main/LICENSE)
 
 # Plancks
