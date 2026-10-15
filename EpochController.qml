@@ -144,6 +144,14 @@ QtObject {
   property string sessionQuery: ""
   function registerPanel(panel) { panels = panels.concat([panel]) }
   function unregisterPanel(panel) { if (lastPanel === panel) lastPanel = null; panels = panels.filter(function(p) { return p !== panel }); if (endIntent && endIntent.panel === panel) endIntent = null }
+  // Warm the hidden Sessions view before its first tab selection. Keep saved
+  // searches and in-flight user requests intact; normal navigation refreshes them.
+  function prefetchSessionHistory() {
+    if (!ready || sessionHistoryLoading || sessionQuery !== "") return
+    if (sessionHistory.generation === state.generation && sessionHistory.sequence === state.sequence
+        && sessionHistory.page === 0 && !sessionHistory.query && !sessionHistoryError) return
+    requestSessionHistory(0)
+  }
   function requestSessionHistory(page, query, detailId) {
     if (query !== undefined) sessionQuery = query
     sessionHistoryLoading = true

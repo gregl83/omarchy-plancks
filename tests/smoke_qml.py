@@ -477,6 +477,13 @@ ShellRoot {
       var back = findChild(panel, "plancks_historyBackButton")
       tryVerify(function() { return !Plancks.EpochController.historyLoading })
       compare(Plancks.EpochController.history.total, 3, "Three completed intervals before paging")
+      tryVerify(function() { return !Plancks.EpochController.sessionHistoryLoading
+        && Plancks.EpochController.sessionHistory.generation === Plancks.EpochController.state.generation
+        && Plancks.EpochController.sessionHistory.sequence === Plancks.EpochController.state.sequence })
+      verify(!panel.sessionHistoryMode, "Session history is prefetched before selecting Sessions")
+      var prefetchedRequest = Plancks.EpochController.sessionHistoryId
+      Plancks.EpochController.prefetchSessionHistory()
+      compare(Plancks.EpochController.sessionHistoryId, prefetchedRequest, "Current prefetched history avoids duplicate requests")
       var epochsTab = findChild(panel, "plancks_epochsTab")
       var sessionsTab = findChild(panel, "plancks_sessionsTab")
       var tabX = sessionsTab.x
@@ -813,8 +820,14 @@ ShellRoot {
       compare(widget.epoch.sequence, pausedSequence + 1, "Cascade closes both in one event")
       compare(widget.epoch.workSampleCount, 0, "Skip intent survives confirmation")
       console.log("SESSION_UI_CASCADE_OK")
+      // Reproduce a cold cache with saved sessions, then open Epochs first.
+      panel.sessionHistoryMode = false
+      Plancks.EpochController.sessionHistory = {rows: [], page: 0, pages: 1, total: 0}
       panel.openHistory()
+      tryVerify(function() { return !Plancks.EpochController.sessionHistoryLoading
+        && Plancks.EpochController.sessionHistory.rows.length === 1 })
       panel.sessionHistoryMode = true
+      compare(Plancks.EpochController.sessionHistory.rows.length, 1, "First tab switch already has session rows")
       tryVerify(function() { return !Plancks.EpochController.sessionHistoryLoading && Plancks.EpochController.sessionHistory.rows.length === 1 })
       var sessionHistory = findChild(panel, "plancks_sessionHistory")
       var sessionSearch = findVisual(sessionHistory, "plancks_sessionSearch")

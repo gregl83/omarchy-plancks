@@ -68,6 +68,7 @@ Panel {
     showingSettings = false
     showingHistory = true
     EpochController.requestHistory(0)
+    if (!sessionHistoryMode) EpochController.prefetchSessionHistory()
     Qt.callLater(function() { scroll.contentY = 0; keys.forceActiveFocus() })
   }
   function closeHistory(toMain) {

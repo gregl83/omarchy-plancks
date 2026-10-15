@@ -36,7 +36,7 @@ Column {
   readonly property var history: EpochController.sessionHistory
   signal backRequested()
   signal revealRequested(var item)
-  spacing: Style.space(12)
+  spacing: Style.space(14)
   function length(ms) { var s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 3600).toString().padStart(2, "0") + ":" + Math.floor(s / 60 % 60).toString().padStart(2, "0") + ":" + (s % 60).toString().padStart(2, "0") }
   function compactLength(ms) {
     var minutes = Math.floor(Math.abs(ms) / 60000)
@@ -97,46 +97,48 @@ Column {
   }
   Column {
     width: parent.width
-    visible: !root.detail
-    spacing: Style.space(8)
-    Row {
+    visible: !root.detail && (root.history.trend || []).length > 0
+    spacing: Style.spacing.panelGap
+    Column {
       width: parent.width
-      spacing: Style.space(20)
-      HistoryTrend {
-        id: focusTrend
-        objectName: "plancks_sessionFocusTrend"
-        width: (parent.width - parent.spacing) / 2
-        title: "Activity time"
-        sessionTrend: true
-        plotHeight: activityGrid.gridHeight
-        points: root.history.trend || []
-        foreground: root.foreground
-        fontFamily: root.fontFamily
-        tooltipsEnabled: root.tooltipsEnabled
+      spacing: Style.spacing.panelGap
+      Row {
+        width: parent.width
+        spacing: Style.space(20)
+        HistoryTrend {
+          id: focusTrend
+          objectName: "plancks_sessionFocusTrend"
+          width: (parent.width - parent.spacing) / 2
+          title: "Activity time"
+          sessionTrend: true
+          plotHeight: activityGrid.gridHeight
+          points: root.history.trend || []
+          foreground: root.foreground
+          fontFamily: root.fontFamily
+          tooltipsEnabled: root.tooltipsEnabled
+        }
+        SessionActivity {
+          id: activityGrid
+          objectName: "plancks_sessionActivity"
+          width: (parent.width - parent.spacing) / 2
+          visible: focusTrend.visible
+          activity: root.history.activity || ({})
+          foreground: root.foreground
+          fontFamily: root.fontFamily
+          tooltipsEnabled: root.tooltipsEnabled
+        }
       }
-      SessionActivity {
-        id: activityGrid
-        objectName: "plancks_sessionActivity"
-        width: (parent.width - parent.spacing) / 2
-        visible: focusTrend.visible
-        activity: root.history.activity || ({})
-        foreground: root.foreground
-        fontFamily: root.fontFamily
-        tooltipsEnabled: root.tooltipsEnabled
+      Text {
+        width: parent.width
+        visible: focusTrend.points.length > 0 && !!root.history.query
+        text: "Activity charts · unaffected by search"
+        color: root.foreground
+        opacity: 0.6
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        wrapMode: Text.WordWrap
       }
     }
-    Text {
-      width: parent.width
-      visible: focusTrend.points.length > 0 && !!root.history.query
-      text: "Activity charts · unaffected by search"
-      color: root.foreground
-      opacity: 0.6
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      wrapMode: Text.WordWrap
-    }
-    Text { width: parent.width; visible: !root.detail; text: "Epoch totals · " + (root.history.completedRounds || 0) + " rounds · " + root.length(root.history.completedFocusMs || 0) + " activity"
-      color: root.foreground; opacity: 0.6; font.pixelSize: Style.font.caption; font.family: root.fontFamily; wrapMode: Text.WordWrap }
     PanelSeparator { foreground: root.foreground }
   }
   Row {
