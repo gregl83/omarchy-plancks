@@ -31,6 +31,7 @@ ShellRoot {
     {seconds: 2, action: "pause", chapter: "02 / SESSIONS", title: "Take a\nbreather.", copy: "Pause your session\nwhen life interrupts."},
     {seconds: 2, action: "resume", chapter: "02 / SESSIONS", title: "Find your\nmomentum.", copy: "Resume right where\nyou left off."},
     {seconds: 4, action: "history", chapter: "03 / HISTORY", title: "Learn your\npatterns.", copy: "Explore past epochs\nand off-time trends."},
+    {seconds: 4, action: "sessionHistory", chapter: "03 / HISTORY", title: "See your\nrhythm build.", copy: "Session trends and daily activity.\nYour recent weeks at a glance."},
     {seconds: 3, action: "settings", chapter: "04 / MAKE IT YOURS", title: "Choose your\ncompanion.", copy: "Coffee cup or Starship.\nA little motion with meaning."},
     {seconds: 2, action: "starship", chapter: "04 / MAKE IT YOURS", title: "Ready for\nwhat’s next.", copy: "Your rhythm. Your choice."},
     {seconds: 3, action: "finish", chapter: "PLANCKS / OMARCHY", title: "Your day.\nYour rhythm.", copy: "A second clock, tuned to\nyour daily rhythm."}
@@ -139,7 +140,7 @@ ShellRoot {
   function cue(action) {
     var controls = {configure: "plancks_configureSession", start: "plancks_startSession",
       pause: "plancks_pauseSession", resume: "plancks_pauseSession",
-      history: "plancks_historyButton", starship: "plancks_graphic_starship"}
+      history: "plancks_historyButton", sessionHistory: "plancks_sessionsTab", starship: "plancks_graphic_starship"}
     if (!controls[action]) { pointerOpacity = 0; return }
     var item = find(controls[action])
     var point = item.mapToItem(stage, item.width / 2, item.height / 2)
@@ -150,6 +151,7 @@ ShellRoot {
     else if (action === "start") activate("plancks_startSession")
     else if (action === "pause" || action === "resume") activate("plancks_pauseSession")
     else if (action === "history") activate("plancks_historyButton")
+    else if (action === "sessionHistory") activate("plancks_sessionsTab")
     else if (action === "settings") { panel.closeHistory(true); panel.openSettings() }
     else if (action === "starship") activate("plancks_graphic_starship")
     else if (action === "finish") panel.closeSettings()
@@ -161,6 +163,9 @@ ShellRoot {
     if (action === "start" || action === "resume") return state.session && state.session.status !== "paused" && !panel.showingSession
     if (action === "pause") return state.session && state.session.status === "paused"
     if (action === "history") return panel.showingHistory && Plancks.EpochController.history.rows.length > 0
+    if (action === "sessionHistory") return panel.showingHistory && panel.sessionHistoryMode
+      && !Plancks.EpochController.sessionHistoryLoading && Plancks.EpochController.sessionHistory.rows.length > 0
+      && find("plancks_sessionActivity").cells.some(function(cell) { return cell.durationMs > 0 })
     if (action === "settings") return panel.showingSettings
     if (action === "starship") return widget.animatedGraphic === "starship"
     if (action === "finish") return !panel.showingSettings && widget.animatedGraphic === "starship"

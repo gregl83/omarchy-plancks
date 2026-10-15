@@ -99,21 +99,36 @@ Column {
     width: parent.width
     visible: !root.detail
     spacing: Style.space(8)
-    HistoryTrend {
-      id: focusTrend
-      objectName: "plancks_sessionFocusTrend"
+    Row {
       width: parent.width
-      title: "Activity time"
-      sessionTrend: true
-      points: root.history.trend || []
-      foreground: root.foreground
-      fontFamily: root.fontFamily
-      tooltipsEnabled: root.tooltipsEnabled
+      spacing: Style.space(20)
+      HistoryTrend {
+        id: focusTrend
+        objectName: "plancks_sessionFocusTrend"
+        width: (parent.width - parent.spacing) / 2
+        title: "Activity time"
+        sessionTrend: true
+        plotHeight: activityGrid.gridHeight
+        points: root.history.trend || []
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+        tooltipsEnabled: root.tooltipsEnabled
+      }
+      SessionActivity {
+        id: activityGrid
+        objectName: "plancks_sessionActivity"
+        width: (parent.width - parent.spacing) / 2
+        visible: focusTrend.visible
+        activity: root.history.activity || ({})
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+        tooltipsEnabled: root.tooltipsEnabled
+      }
     }
     Text {
       width: parent.width
       visible: focusTrend.points.length > 0 && !!root.history.query
-      text: "Latest sessions · unaffected by search"
+      text: "Activity charts · unaffected by search"
       color: root.foreground
       opacity: 0.6
       font.family: root.fontFamily

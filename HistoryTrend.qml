@@ -6,6 +6,7 @@ Column {
   id: root
   property string title: ""
   property var points: []
+  property real plotHeight: Style.space(68)
   property bool sessionTrend: false
   property bool tooltipsEnabled: true
   property color foreground: Color.foreground
@@ -47,7 +48,7 @@ Column {
   Canvas {
     id: plot
     width: parent.width
-    height: Style.space(40)
+    height: root.plotHeight
     property var samples: root.points
     readonly property real inset: Style.space(4)
     onSamplesChanged: requestPaint()

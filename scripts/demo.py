@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 import plancks
+import sessions
 from preview_environment import stage_desktop
 
 
@@ -33,6 +34,31 @@ def stage_fixture(root):
 
     store = plancks.Store(root / 'state' / 'omarchy' / 'gregl83.plancks')
     sequence = 0
+    # Varied, deterministic activity makes the calendar and recent-session trend
+    # reviewable without reading or modifying the user's history.
+    for day in range(84, 7, -1):
+        start = (now - timedelta(days=day)).replace(hour=9, minute=0)
+        if start.weekday() >= 5 or day % 11 == 0:
+            continue
+        state, _ = store.transition('start', f'sample-start-{day}', sequence, now=stamp(start))
+        duration = (18, 42, 75, 130, 55)[day % 5]
+        config = dict(sessions.DEFAULTS, preset='custom', name='Reading' if day % 2 else 'Focus',
+                      focusMinutes=duration, rounds=1, finalBreak=False)
+        state, _ = store.session_action('session_started', f'sample-session-{day}', state['sequence'],
+                                       config=config, now=stamp(start))
+        current = state['session']
+        stopped = day % 9 == 0
+        state, _ = store.session_action('session_stopped' if stopped else 'session_completed',
+            f'sample-finish-{day}', state['sequence'], session_id=current['sessionId'],
+            stage_id=current['stages'][0]['stageId'],
+            now=stamp(start + timedelta(minutes=duration // 2 if stopped else duration)))
+        if day % 13 == 0:
+            state, _ = store.session_action('session_inclusion_changed', f'sample-exclude-{day}',
+                state['sequence'], session_id=current['sessionId'], excluded=True,
+                now=stamp(start + timedelta(hours=3)))
+        state, _ = store.transition('end', f'sample-end-{day}', state['sequence'],
+                                   now=stamp(start + timedelta(hours=8)))
+        sequence = state['sequence']
     for day in range(7, -1, -1):
         start = (now - timedelta(days=day)).replace(hour=9, minute=0)
         sequence += 1

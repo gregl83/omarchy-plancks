@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import ctypes
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import cache
 import copy
 import fcntl
@@ -533,7 +533,18 @@ class Store:
                       stopped=r['status'] == 'stopped', excludedFromLearning=r.get('excludedFromStatistics', False),
                       completedRounds=r['completedRounds'],
                       rounds=r['config']['rounds']) for r in reversed([r for r in rows if not r['invalid']][:10])]
-        return dict(detail=next((r for r in rows if r["sessionId"] == detail_id), None), trend=trend, rows=filtered[page * 5:(page + 1) * 5], page=page, pages=pages, total=len(filtered),
+        today = datetime.fromtimestamp(clock()['utcMs'] / 1000).date()
+        cutoff = today - timedelta(days=181)
+        activity_days = {}
+        for row in included:
+            day = datetime.fromtimestamp(row['end']['utcMs'] / 1000).date()
+            if cutoff <= day <= today and row['focusMs'] > 0:
+                key = day.isoformat()
+                bucket = activity_days.setdefault(key, dict(durationMs=0, sessions=0))
+                bucket['durationMs'] += row['focusMs']
+                bucket['sessions'] += 1
+        activity = dict(today=today.isoformat(), days=activity_days)
+        return dict(detail=next((r for r in rows if r["sessionId"] == detail_id), None), trend=trend, activity=activity, rows=filtered[page * 5:(page + 1) * 5], page=page, pages=pages, total=len(filtered),
                     query=query.strip(), generation=state['generation'], sequence=state['sequence'],
                     bestRounds=max(rounds_by_epoch.values(), default=0),
                     completedRounds=sum(r['completedRounds'] for r in current),
