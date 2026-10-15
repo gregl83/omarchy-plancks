@@ -52,6 +52,14 @@ omarchy restart shell
 
 Your history survives the restart. For local checkouts or uncommitted changes, see [development installation](docs/development-installation.md).
 
+## Remove
+
+```bash
+omarchy plugin remove gregl83.plancks
+```
+
+Your saved history stays available for a future reinstall. See [removal details](docs/user-guide.md#remove) to delete data or clean up optional keyboard shortcuts.
+
 ## Documentation
 
 - [User guide](docs/user-guide.md) — timer behavior, sessions, settings, shortcuts, and recovery.
