@@ -522,17 +522,15 @@ ShellRoot {
         button.focus = false
         mouseMove(button, -20, -20)
         wait(150)
-        var idleFill = String(button.color)
-        var idleBorder = JSON.stringify(button.borderSpec)
         mouseMove(button, button.width / 2, button.height / 2)
         wait(250)
         verify(button.hot, "Pointer activates tab hover")
         var fill = String(button.color)
         var border = JSON.stringify(button.borderSpec)
-        if (button.selected) {
-          compare(fill, idleFill, "Selected tab fill does not change on hover")
-          compare(border, idleBorder, "Selected tab border does not change on hover")
-        }
+        compare(fill, String(Style.hoverFillFor(button.foreground, button.accent)),
+                "Selected and unselected tabs use the shared button hover fill")
+        compare(border, JSON.stringify(Border.controlSpec("hover-cursor", button.foreground, button.accent)),
+                "Tabs use the shared button hover border")
         for (var i = 0; i < 12; i++) {
           mouseMove(button, button.width / 2 + i % 3, button.height / 2)
           wait(40)
@@ -970,7 +968,7 @@ ShellRoot {
       verify(sessionsTab.selected, "Details remain within the Sessions tab")
       sessionsTab.forceActiveFocus()
       wait(150)
-      compare(String(sessionsTab.color), String(Style.selectedFillFor(sessionsTab.foreground, sessionsTab.accent)), "Selected tab retains its fill with keyboard focus in details")
+      compare(String(sessionsTab.color), String(Style.focusFillFor(sessionsTab.foreground, sessionsTab.accent)), "Selected tab uses the shared button keyboard-focus fill in details")
       verify(findChild(panel, "plancks_sessionDetailSummary").visible)
       compare(findChild(panel, "plancks_sessionDetailTotals").entries[1][0], "Partial activity")
       var totalsGrid = findChild(panel, "plancks_sessionDetailTotals")
