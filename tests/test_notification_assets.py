@@ -7,7 +7,7 @@ import unittest
 class NotificationAssetsTests(unittest.TestCase):
     def test_all_states_are_packaged(self):
         root = Path(__file__).resolve().parents[1] / 'assets/notifications'
-        for graphic in ('coffee', 'starship'):
+        for graphic in ('sun-moon', 'coffee', 'starship'):
             for phase in ('active', 'off-time'):
                 paths = [f'{phase}/fill-{level:03}.png' for level in range(0, 101, 5)]
                 paths += [f'{state}/{phase}.png' for state in ('learning', 'overtime')]

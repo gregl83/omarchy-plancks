@@ -18,7 +18,7 @@ An **epoch** is your daily window of opportunity; **off-time** is the space betw
 - **See what’s ahead.** A countdown estimates the end of your epoch or the start of your next one.
 - **Make time for focus.** Run Pomodoro rounds or your own activity and rest sessions.
 - **Find your rhythm.** Browse searchable history and trends, and leave unusual days out of predictions.
-- **Pick your companion.** Watch a Coffee cup or Starship fill during off-time and empty during your epoch.
+- **Pick your companion.** Watch the sun and moon descend through your daily cycle, or a Coffee cup or Starship fill during off-time and empty during your epoch.
 - **Get a gentle nudge.** Optional insights and finish notifications help you keep track of your day.
 - **Keep it yours.** Local storage, no account, and no network requests from the plugin.
 
@@ -39,7 +39,7 @@ Click **Start epoch** when your day begins and **End epoch** when you’re done.
 
 During an epoch, open **Configure session** beside Settings for Pomodoro rounds or a custom activity timer. Pause when you need to, and move to the next stage when you’re ready. Your timers and history survive sleep and restarts.
 
-Choose Coffee cup or Starship in **Settings**, and turn on insights or finish notifications if you’d like a nudge. Notifications start off.
+Choose Sun and moon, Coffee cup, or Starship in **Settings**, and turn on insights or finish notifications if you’d like a nudge. Notifications start off.
 
 See the [illustrated user guide](docs/user-guide.md) for screenshots, history, and ways to fine-tune your rhythm.
 
@@ -62,6 +62,7 @@ Your saved history stays available for a future reinstall. See [removal details]
 
 ## Documentation
 
+- [Animations](docs/animations.md) — each companion’s states, illustrated with representative stills.
 - [User guide](docs/user-guide.md) — timer behavior, sessions, settings, shortcuts, and recovery.
 - [Migration](docs/migration.md) — bring your history and timers to a new machine.
 - [Development installation](docs/development-installation.md) — try local checkouts and uncommitted changes.

@@ -9,7 +9,7 @@ import tempfile
 
 REPO = Path(__file__).resolve().parents[1]
 frames = []
-for graphic in ("coffee", "starship"):
+for graphic in ("sun-moon", "coffee", "starship"):
     for phase in ("active", "off-time"):
         for level in range(0, 101, 5):
             frames.append(dict(graphic=graphic, phase=phase, fill=level / 100,
@@ -22,7 +22,7 @@ for graphic in ("coffee", "starship"):
 
 with tempfile.TemporaryDirectory(prefix="plancks-notification-assets-") as directory:
     root = Path(directory)
-    for name in ("AnimatedGraphic.qml", "CoffeeGraphic.qml", "StarshipGraphic.qml", "Graphics.js"):
+    for name in ("AnimatedGraphic.qml", "CoffeeGraphic.qml", "StarshipGraphic.qml", "SunMoonGraphic.qml", "Graphics.js"):
         shutil.copy2(REPO / name, root / name)
     for frame in frames:
         path = REPO / "assets/notifications" / frame["path"]

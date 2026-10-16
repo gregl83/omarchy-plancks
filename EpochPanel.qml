@@ -1056,7 +1056,7 @@ Panel {
               Grid {
                 id: graphicGrid
                 width: parent.width
-                columns: 2
+                columns: 3
                 spacing: Style.space(12)
                 Repeater {
                   id: graphicChoices
@@ -1065,7 +1065,7 @@ Panel {
                     id: graphicChoice
                     required property var modelData
                     required property int index
-                    width: (graphicGrid.width - graphicGrid.spacing) / 2
+                    width: (graphicGrid.width - (graphicGrid.columns - 1) * graphicGrid.spacing) / graphicGrid.columns
                     implicitHeight: graphicTile.implicitHeight + Style.space(16)
                     objectName: "plancks_graphic_" + modelData.id
                     selected: (root.hostWidget ? root.hostWidget.animatedGraphic : "coffee") === modelData.id
