@@ -7,7 +7,6 @@ bash "$OMARCHY_PATH/bin/omarchy-plugin-validate" /package
 # also cover pure helpers without the desktop's GObject bindings.
 python3 -c 'from gi.repository import Gio, GLib'
 python3 -m unittest discover -s tests -p test_notification_send.py -v
-python3 tests/smoke_roadster.py
 export XDG_RUNTIME_DIR
 XDG_RUNTIME_DIR=$(mktemp -d)
 chmod 700 "$XDG_RUNTIME_DIR"
@@ -20,6 +19,8 @@ cleanup() {
   rm -rf "$XDG_RUNTIME_DIR"
 }
 trap cleanup EXIT
+# Quickshell needs an owner-only runtime directory even with offscreen Qt.
+python3 tests/smoke_roadster.py
 cat > "$XDG_RUNTIME_DIR/sway.conf" <<'CONFIG'
 xwayland disable
 output HEADLESS-1 mode 1280x1024

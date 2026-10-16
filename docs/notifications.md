@@ -15,7 +15,7 @@ Every variation uses the same delivery format:
 | Timeout | Requests 8 seconds; the desktop controls final presentation. |
 | Actions | No notification action buttons; session transitions happen in the panel. |
 
-Custom session names are displayed literally: markup characters are escaped before delivery.
+Notification bodies are escaped before delivery. Custom session names stay in the panel and history and are omitted from desktop alerts, because the desktop notification service may expose message bodies in its persistence-process arguments.
 
 ## Variations and examples
 
@@ -35,7 +35,7 @@ Custom session names are displayed literally: markup characters are escaped befo
 | Long-rest target | Session long rest reaches its target | `Long rest time reached · Start activity when ready` |
 | Final stage target | Last session stage reaches its target | `Rest time reached · Finish session when ready` |
 
-Session messages follow `[name · ]{Activity|Rest|Long rest} time reached · {next action} when ready`. The name prefix is omitted for unnamed sessions. The final stage always uses `Finish session`, regardless of stage type. For example: `Study · Activity time reached · Start rest when ready`.
+Session messages follow `{Activity|Rest|Long rest} time reached · {next action} when ready`. The final stage always uses `Finish session`, regardless of stage type. Session names are omitted from all variants.
 
 Durations in insight messages use readable units such as `30 minutes` or `1 hour 30 minutes`, rather than the panel’s signed clock format. The examples are representative; wording rotates within each category.
 
@@ -102,7 +102,7 @@ The snapshot is captured from the current state when the alert is queued. It is 
 
 ## Delivery and recovery
 
-Scheduling runs in the existing Python helper. Ordinary ticks check an in-memory deadline; historical aggregates rebuild only when history changes. Delivery progress is saved atomically at scheduling or notification events, preventing duplicate delivery across restarts and helper instances. A short-lived Python helper receives each alert through stdin and delivers it over D-Bus using Omarchy’s Python GObject dependency. Custom session names and notification contents never enter process arguments; there is no additional resident process or network dependency. Insight errors appear in Settings without stopping the clock.
+Scheduling runs in the existing Python helper. Ordinary ticks check an in-memory deadline; historical aggregates rebuild only when history changes. Delivery progress is saved atomically at scheduling or notification events, preventing duplicate delivery across restarts and helper instances. A short-lived Python helper receives each alert through stdin and delivers it over D-Bus using Omarchy’s Python GObject dependency. The Plancks sender keeps notification contents out of its own process arguments; desktop handling is separate, so bodies contain only catalog text and aggregate timing/counts, never custom session names. There is no additional resident process or network dependency. Insight errors appear in Settings without stopping the clock.
 
 Session target milestones are durably claimed in the session journal before delivery. A crash between claiming and desktop delivery can lose an alert, but cannot repeat it or change the running stage. Epoch alert claims similarly prevent duplicates across restarts.
 

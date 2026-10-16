@@ -796,7 +796,9 @@ def serve(store):
                 values = display.update(now)
                 current = values.get('session')
                 if current:
-                    emit({'ok': True, 'sessionNotice': {'generation': display.state['generation'], 'message': (current['name'] + ' · ' if current.get('name') else '') + current['caption'].split(' · ')[0] +
+                    # Desktop notification persistence may expose bodies in argv.
+                    # Keep user-authored session names inside the panel/history.
+                    emit({'ok': True, 'sessionNotice': {'generation': display.state['generation'], 'message': current['caption'].split(' · ')[0] +
                           ' time reached · ' + current['nextLabel'] + ' when ready'}})
                 full = True
             except ValueError:

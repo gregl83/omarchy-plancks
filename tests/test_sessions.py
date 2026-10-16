@@ -407,7 +407,7 @@ class SessionBridgeTests(unittest.TestCase):
             now = plancks.clock()
             earlier = dict(now, utcMs=now['utcMs'] - 61000, bootMs=now['bootMs'] - 61000)
             state, _ = store.transition('start', 'epoch', 0, now=earlier)
-            config = dict(sessions.DEFAULTS, preset='custom', rounds=1, focusMinutes=1, finalBreak=False)
+            config = dict(sessions.DEFAULTS, preset='custom', name='Private project name', rounds=1, focusMinutes=1, finalBreak=False)
             store.session_action('session_started', 'session', state['sequence'], config=config, now=earlier)
             def collect():
                 process = subprocess.Popen([sys.executable, str(Path(plancks.__file__)), 'serve', '--state-dir', directory],
@@ -431,6 +431,10 @@ class SessionBridgeTests(unittest.TestCase):
                     process.stdout.close(); process.stderr.close()
             first = collect()
             self.assertEqual(sum('sessionNotice' in m for m in first), 1)
+            notice = next(m['sessionNotice']['message'] for m in first if 'sessionNotice' in m)
+            self.assertEqual(notice, 'Activity time reached · Finish session when ready')
+            self.assertNotIn('Private project name', notice)
+            self.assertEqual(store.recover()['session']['config']['name'], 'Private project name')
             self.assertTrue(any(m.get('view', {}).get('session', {}).get('timer', '').startswith('+') for m in first))
             before = [(p.name, p.stat().st_mtime_ns) for p in store.events.glob('events-*.jsonl')]
             second = collect()
