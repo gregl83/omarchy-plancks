@@ -43,14 +43,19 @@ Item {
       ctx.lineJoin = "round"
       var cycle = root.motion * Math.PI * 2
       var pulse = root.overtime ? 0.65 + 0.25 * Math.cos(cycle) : 1
-      var y = 43 - root.elevation * 23
+      var y = 47 - root.elevation * 31
       // The fixed horizon defines symmetric bounds in every frame.
-      ctx.globalAlpha = 0.45
+      ctx.globalAlpha = 0.28
+      ctx.lineWidth = 1.2
       ctx.beginPath()
-      ctx.moveTo(7, 43); ctx.lineTo(51, 43)
+      ctx.moveTo(9, 49); ctx.quadraticCurveTo(29, 47, 49, 49)
       ctx.stroke()
+      ctx.lineWidth = 1.5
       ctx.save()
-      ctx.beginPath(); ctx.rect(0, 0, 58, 42); ctx.clip()
+      ctx.beginPath()
+      ctx.moveTo(7, 0); ctx.lineTo(51, 0); ctx.lineTo(51, 48)
+      ctx.quadraticCurveTo(29, 46, 7, 48)
+      ctx.closePath(); ctx.clip()
       if (root.daylight > 0) {
         ctx.save()
         ctx.translate(29, y)
@@ -77,12 +82,18 @@ Item {
         ctx.closePath(); ctx.stroke()
         ctx.globalAlpha *= 0.18; ctx.fill()
         ctx.restore()
-        for (var s = 0; s < 2; s++) {
-          var x = s === 0 ? 13 : 45
-          ctx.globalAlpha = (1 - root.daylight) * root.elevation * (0.4 + 0.2 * Math.cos(cycle + s * Math.PI))
+        var stars = [{x: 13, y: 16, radius: 1.5},
+                     {x: 39, y: 5, radius: 1},
+                     {x: 46, y: 26, radius: 1.8}]
+        for (var s = 0; s < stars.length; s++) {
+          var star = stars[s]
+          var x = star.x
+          var sy = star.y
+          var r = star.radius
+          ctx.globalAlpha = (1 - root.daylight) * root.elevation * (0.4 + 0.2 * Math.cos(cycle + s * 2.1))
           ctx.beginPath()
-          ctx.moveTo(x - 2, 14); ctx.lineTo(x + 2, 14)
-          ctx.moveTo(x, 12); ctx.lineTo(x, 16)
+          ctx.moveTo(x - r, sy); ctx.lineTo(x + r, sy)
+          ctx.moveTo(x, sy - r); ctx.lineTo(x, sy + r)
           ctx.stroke()
         }
       }

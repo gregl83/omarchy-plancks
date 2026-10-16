@@ -12,7 +12,7 @@ These stills use the packaged notification assets. Countdown rows read left to r
 
 ## Sun and moon
 
-The sun represents an active epoch; the crescent moon represents off-time. Each descends toward the horizon as its predicted interval runs out. This follows your epochs, independently of actual daylight.
+The sun represents an active epoch; the crescent moon represents off-time. Each descends behind a soft, nearly flat curved horizon as its predicted interval runs out. This follows your epochs, independently of actual daylight.
 
 | State | Stills | Behavior |
 | --- | --- | --- |
@@ -20,7 +20,7 @@ The sun represents an active epoch; the crescent moon represents off-time. Each 
 | Epoch · learning | <img src="../assets/notifications/sun-moon/learning/active.png" width="58" height="54" alt="Sun and moon: Epoch · learning"> | Sun at a fixed height with rotating rays; no predicted progress yet. |
 | Epoch · countdown | <img src="../assets/notifications/sun-moon/active/fill-075.png" width="58" height="54" alt="Sun and moon: Epoch · countdown, 25% elapsed"> <img src="../assets/notifications/sun-moon/active/fill-050.png" width="58" height="54" alt="Sun and moon: Epoch · countdown, 50% elapsed"> <img src="../assets/notifications/sun-moon/active/fill-025.png" width="58" height="54" alt="Sun and moon: Epoch · countdown, 75% elapsed"> | Sun descends toward the horizon, with rotating rays. |
 | Epoch · past expected end | <img src="../assets/notifications/sun-moon/overtime/active.png" width="58" height="54" alt="Sun and moon: Epoch · past expected end"> | Sun remains partly below the horizon; its rays gently pulse. |
-| Off-time · learning | <img src="../assets/notifications/sun-moon/learning/off-time.png" width="58" height="54" alt="Sun and moon: Off-time · learning"> | Moon at a fixed height with twinkling stars; no predicted progress yet. |
+| Off-time · learning | <img src="../assets/notifications/sun-moon/learning/off-time.png" width="58" height="54" alt="Sun and moon: Off-time · learning"> | Moon at a fixed height with three staggered, twinkling stars; no predicted progress yet. |
 | Off-time · countdown | <img src="../assets/notifications/sun-moon/off-time/fill-025.png" width="58" height="54" alt="Sun and moon: Off-time · countdown, 25% elapsed"> <img src="../assets/notifications/sun-moon/off-time/fill-050.png" width="58" height="54" alt="Sun and moon: Off-time · countdown, 50% elapsed"> <img src="../assets/notifications/sun-moon/off-time/fill-075.png" width="58" height="54" alt="Sun and moon: Off-time · countdown, 75% elapsed"> | Moon descends toward the horizon as the stars fade. |
 | Off-time · past expected start | <img src="../assets/notifications/sun-moon/overtime/off-time.png" width="58" height="54" alt="Sun and moon: Off-time · past expected start"> | Moon remains at the horizon with a gentle pulse. |
 
