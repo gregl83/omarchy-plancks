@@ -1265,12 +1265,6 @@ Panel {
               width: historyMode.tabWidth
               text: "Epochs"
               selected: !root.sessionHistoryMode
-              borderSpec: Border.controlSpec(activeFocus ? "focus"
-                : selected ? (Border.controlHasWidth("selected") ? "selected" : "normal")
-                : hot ? "hover-cursor" : "normal", foreground, accent)
-              color: selected ? Style.selectedFillFor(foreground, accent)
-                : activeFocus ? Style.focusFillFor(foreground, accent)
-                : hot ? Style.hoverFillFor(foreground, accent) : background
               bordered: true
               focusable: true
               foreground: root.foreground
@@ -1288,12 +1282,6 @@ Panel {
               width: historyMode.tabWidth
               text: "Sessions"
               selected: root.sessionHistoryMode
-              borderSpec: Border.controlSpec(activeFocus ? "focus"
-                : selected ? (Border.controlHasWidth("selected") ? "selected" : "normal")
-                : hot ? "hover-cursor" : "normal", foreground, accent)
-              color: selected ? Style.selectedFillFor(foreground, accent)
-                : activeFocus ? Style.focusFillFor(foreground, accent)
-                : hot ? Style.hoverFillFor(foreground, accent) : background
               bordered: true
               focusable: true
               foreground: root.foreground
