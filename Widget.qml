@@ -20,6 +20,7 @@ BarWidget {
     settings = Object.assign({}, settings, {animatedGraphic: selected})
     if (bar && bar.shell) bar.shell.updateEntryInline(moduleName, settings)
   }
+  readonly property bool motivationalQuotesEnabled: setting("motivationalQuotesEnabled", true) === true
   readonly property bool insightsEnabled: setting("insightsEnabled", false) === true
   readonly property bool finishNotificationsEnabled: setting("finishNotificationsEnabled", false) === true
   readonly property string insightFrequency: ["light", "standard", "frequent"].indexOf(setting("insightFrequency", "standard")) >= 0
@@ -36,7 +37,7 @@ BarWidget {
     if (bar && bar.shell) bar.shell.updateEntryInline(moduleName, settings)
   }
   function setInsightPreference(name, value) {
-    if (["insightsEnabled", "finishNotificationsEnabled", "insightFrequency", "finishWarningSeconds"].indexOf(name) < 0) return
+    if (["insightsEnabled", "motivationalQuotesEnabled", "finishNotificationsEnabled", "insightFrequency", "finishWarningSeconds"].indexOf(name) < 0) return
     var next = Object.assign({}, settings)
     next[name] = value
     settings = next

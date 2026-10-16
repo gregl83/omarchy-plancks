@@ -128,6 +128,7 @@ QtObject {
     if (helper.running)
       helper.write(JSON.stringify({action: "configure", initialSeconds: Number(settings.initialSeconds || 0),
         insightsEnabled: settings.insightsEnabled === true,
+        motivationalQuotesEnabled: settings.motivationalQuotesEnabled !== false,
         finishNotificationsEnabled: settings.finishNotificationsEnabled === true,
         insightFrequency: settings.insightFrequency || "standard",
         finishWarningSeconds: settings.finishWarningSeconds || [1800, 60]}) + "\n")

@@ -10,6 +10,7 @@ import math
 import os
 from pathlib import Path
 import random
+from statistics import median
 import tempfile
 
 MINUTE = 60_000
@@ -21,73 +22,132 @@ COOLDOWN = 2 * MINUTE
 
 # Meaning IDs are independent of wording IDs. Changing the sentence must not
 # make the same observation eligible again.
-ENCOURAGEMENT = {
-    "momentum": ("Good momentum. Keep building.", "Still moving forward. Keep that going.",
-                 "You've got momentum. Stay with it.", "A little momentum goes a long way."),
-    "next_step": ("One useful next step. That's enough to keep moving.", "Choose one thing. Give it a good run.",
-                  "Small steps count. So does this one.", "One clear next step can change the shape of the day."),
-    "possibility": ("There's room for something good here.", "Your next good idea still has room to happen.",
-                    "A useful window. Plenty of possibility.", "There's still something worth starting."),
-    "direction": ("Keep what matters in sight.", "A clear direction. One step at a time.",
-                  "You get to choose what comes next.", "Pick the next useful thing. Keep it simple."),
-    "building": ("Keep building. Small things add up.", "Steady steps make substantial things.",
-                 "A little more forward. That's how things grow.", "Good things can take shape one step at a time."),
-    "confidence": ("You've got this. Keep going.", "A good moment to trust your next step.",
-                   "Keep going. There's something here.", "You have room to make this count."),
-    "credit": ("Give yourself credit for showing up.", "You made room for this. That counts.",
-               "Another window of opportunity. Good to have you here.", "Showing up is a solid beginning."),
-    "simple": ("Simple is useful. Start there.", "One thing at a time. Still an excellent system.",
-               "Keep the next step small and clear.", "A manageable next step is a good next step."),
-    "curiosity": ("A good moment to follow a promising idea.", "There's room to try something worthwhile.",
-                  "One useful experiment could open things up.", "Stay curious. Something good may follow."),
-    "steady": ("Steady is a strength.", "Keep your rhythm. Let the small things accumulate.",
-               "Consistency has a quiet kind of power.", "Steady forward. A dependable approach."),
-    "elapsed": ("{hours} hours into your epoch. You've got momentum.",
-                "{hours} hours in. Keep your next step in sight.",
-                "{hours} hours on the clock. Still room to make it count.",
-                "{hours} hours of opportunity. Keep building."),
-    "overrun_time": ("An extra {extra}. Still going strong.", "{extra} beyond the prediction. Solid momentum.",
-                     "An extra {extra}. Apparently, you had more in you.",
-                     "{extra} into extra time. You're keeping it going."),
-}
-OVERRUN = ("Expected finish exceeded. You're killing it.", "Past the prediction. Still going strong.",
-           "Extra time. Solid momentum.", "You had more in you. Clearly.",
-           "Beyond your expected finish. Still building.", "The prediction ended. Your momentum didn't.")
-WARNINGS = ("{remaining} to your expected finish. Finish strong.",
-            "About {remaining} remaining. Make it count.",
-            "{remaining} to your projected finish. One more useful step.",
-            "{remaining} left in your expected window. Bring it home strong.")
-ONE_MINUTE = ("One minute to your expected finish. Make it count.",
-              "One minute remaining. One final spark.",
-              "Your expected finish is a minute away. Finish strong.",
-              "One minute to the prediction. Keep that momentum.")
-STATS = {
-    "start_consistency": ("Your last five starts span {span}, down from {previous}. Your rhythm is tightening.",
-                          "Start-time spread: {span}, previously {previous}. Getting more consistent.",
-                          "Your recent starts are closer together: {span} versus {previous}. Steady rhythm."),
-    "duration_consistency": ("Your last five epoch lengths span just {span}. A steady rhythm.",
-                             "Five epoch lengths within {span} of one another. Consistency looks good.",
-                             "Recent epoch lengths are within {span}. Your rhythm is taking shape."),
-    "milestone": ("{count} included epochs completed. That's consistency.",
-                  "{count} completed, included epochs in the log. A substantial rhythm.",
-                  "{count} included epochs recorded. Keep building."),
-    "month_hours": ("Over {hours} hours of included opportunity recorded this month. A substantial window.",
-                    "This month's included epochs add up to more than {hours} hours. Room for a lot of possibility.",
-                    "More than {hours} hours of opportunity in this month's log. Steady accumulation."),
-    "duration_record": ("You've passed your longest included epoch this month. New ground.",
-                        "Your longest included epoch this month, surpassed. You're still going strong.",
-                        "A new duration mark for this month. Apparently, you had more in you."),
-    "earlier_start": ("Today's start was earlier than your previous ten included starts. A head start.",
-                      "Earlier than your previous ten included starts. Good beginning.",
-                      "Earlier than your previous ten starts. A little extra room today."),
-    "forecast_accuracy": ("{matches} of your last five eligible finishes were within 30 minutes of the forecast. Getting dialed in.",
-                          "Forecast check: {matches} of five eligible finishes within 30 minutes. A rhythm is forming.",
-                          "{matches} of five eligible finishes landed within 30 minutes of their prediction. Steady signal."),
-    "morning_pattern": ("Your last five starts this week were before 09:00. A steady beginning.",
-                        "Five recent starts this week, all before 09:00. Consistency looks good.",
-                        "Before 09:00 on each of your last five starts this week. Rhythm established."),
-}
-
+# Verified short excerpts; keep sources with the catalog and in docs/notifications.md.
+QUOTES = {'jobs': ('Your time is limited, so don’t waste it living someone else’s life.',
+          'Steve Jobs',
+          'https://news.stanford.edu/stories/2005/06/steve-jobs-2005-graduates-stay-hungry-stay-foolish'),
+ 'feynman': ('What I cannot create, I do not understand.',
+             'Richard Feynman',
+             'https://magazine.caltech.edu/post/biology-through-the-eyes-of-a-physicist'),
+ 'johnson': ("There's always something else that hasn't been found yet, so help them find it.",
+             'Katherine Johnson',
+             'https://time.com/4779086/katherine-goble-johnson-nasa-hidden-figures/'),
+ 'kay': ('The best way to predict the future is to invent it.',
+         'Alan Kay',
+         'https://computerhistory.org/wp-content/uploads/2019/08/core-2012.pdf'),
+ 'hopper': ('I think I always looked for the easiest and best, most accurate way of getting something done.',
+            'Grace Hopper',
+            'https://archive.computerhistory.org/resources/text/Oral_History/Hopper_Grace/102702026.05.01.pdf'),
+ 'turing': ('We can only see a short distance ahead, but we can see plenty there that needs to be done.',
+            'Alan Turing',
+            'https://turingtrust.co.uk/about-us/alan-turing/'),
+ 'einstein': ('The important thing is not to stop questioning.',
+              'Albert Einstein',
+              'https://www.pbs.org/wgbh/nova/einstein/wisd-nf.html'),
+ 'musk': ('I think Apollo 11 was one of the most inspiring things in all of human history.',
+          'Elon Musk',
+          'https://time.com/5628572/elon-musk-moon-landing/'),
+ 'thiel': ('But every time we create something new, we go from 0 to 1.',
+           'Peter Thiel with Blake Masters',
+           'https://penguinrandomhousehighereducation.com/book/?isbn=9780804139304'),
+ 'kennedy': ('We choose to go to the moon in this decade and do the other things, not because they are easy, '
+             'but because they are hard.',
+             'John F. Kennedy',
+             'https://www.jfklibrary.org/learn/about-jfk/historic-speeches/address-at-rice-university-on-the-nations-space-effort'),
+ 'ride': ('Science is fun. Science is curiosity. We all have natural curiosity.',
+          'Sally Ride',
+          'https://assets.science.nasa.gov/content/dam/science/cds/researchers/nac/apac/2017/Harman_GS_Stars_APAC_July_2017_Tagged.pdf'),
+ 'arnold': ('And the way to be innovative or the way to find what you love to do is to try different things.',
+            'Frances Arnold',
+            'https://thereader.mitpress.mit.edu/in-conversation-with-nobel-laureate-frances-arnold/')}
+ENCOURAGEMENT = {'question': ('What question would make this problem more interesting?',
+              'Which assumption would be worth testing?',
+              'What would you try if you were allowed to be wrong?',
+              'Where does your current explanation stop making sense?'),
+ 'experiment': ('Try the smallest experiment that could change your mind.',
+                'Make a rough version. Let it teach you what the plan cannot.',
+                'What could you test before you commit to building it?',
+                'A surprising result may be the most useful part of the experiment.'),
+ 'craft': ('What would make this easier for the next person to understand?',
+           'Find one unnecessary complication. See what happens without it.',
+           'Give the awkward detail a little attention; it may be telling you something.',
+           'Try explaining the idea without its usual vocabulary.'),
+ 'perspective': ('Step back far enough to see what the problem is really asking.',
+                 'Which part of this would still matter a year from now?',
+                 'What might someone from another field notice here?',
+                 'Is there a simpler question underneath the one you are solving?'),
+ 'learning': ('Write down what surprised you before it becomes familiar.',
+              'Follow the part you do not quite understand yet.',
+              'What did the last attempt teach you that the first plan missed?',
+              'Leave a note for your future self about what you learned.'),
+ 'purpose': ('Who would benefit if this worked?',
+             'What is worth making easier for someone else?',
+             'Bring the person who will use this back into the picture.',
+             'Which part of this feels worth your curiosity?'),
+ 'possibility': ('An unfinished idea can still be worth exploring.',
+                 'What would a small, working version look like?',
+                 'Give an overlooked possibility a fair test.',
+                 'There may be more than one good way through this.'),
+ 'reflection': ('What deserves to be kept from today?',
+                'A pause can make room for a different explanation.',
+                'What would you like to understand better by the end of this?',
+                'Notice what changed your mind. That is useful information.'),
+ 'elapsed': ('{hours} hours into this epoch. What has become clearer?',
+             '{hours} hours have passed. Is your attention where you want it?',
+             '{hours} hours in. What is worth carrying into the rest of the day?',
+             '{hours} hours into your day. A moment to choose what comes next.'),
+ 'overrun_time': ('{extra} past the prediction. What would make a good stopping point?',
+                  'An extra {extra}. Keep the time intentional.',
+                  '{extra} beyond the estimate. Is this still the direction you want?',
+                  '{extra} into extra time. Leave yourself a clear place to return to.')}
+OVERRUN = ('You have passed the expected finish. What would make a satisfying close?',
+ 'The predicted window has ended. Choose what deserves your remaining attention.',
+ 'Past the estimate. A useful moment to decide whether to continue or wrap up.',
+ 'Your day ran beyond its prediction. What is worth keeping from it?')
+WARNINGS = ('{remaining} to your expected finish. Choose what you want to leave complete.',
+ 'About {remaining} remaining. What is the most useful thing to close out?',
+ '{remaining} to the predicted end. Give your next start a clear place to begin.',
+ '{remaining} left in the expected window. Make room to capture what you learned.')
+ONE_MINUTE = ('One minute to your expected finish. Leave a note for where to pick up.',
+ 'One minute remaining. What would help you return to this?',
+ 'Your expected finish is a minute away. Save the thought you want to keep.',
+ 'One minute to the prediction. Choose a good stopping point.')
+STATS = {'start_consistency': ('Your last five starts span {span}, down from {previous}.',
+                       'Start-time spread narrowed from {previous} to {span}.',
+                       'Your recent starts are closer together: {span} versus {previous}.'),
+ 'duration_consistency': ('Your last five epoch lengths span {span}.',
+                          'The longest and shortest of your last five epochs differ by {span}.',
+                          'Five recent epoch lengths fall within a {span} range.'),
+ 'milestone': ('{count} included epochs completed.',
+               'Your log now contains {count} completed, included epochs.',
+               '{count} included epochs recorded. A moment to look back at what has changed.'),
+ 'month_hours': ('Over {hours} hours of included opportunity recorded this month.',
+                 'This month’s included epochs total more than {hours} hours.',
+                 'More than {hours} hours in this month’s included epoch log.'),
+ 'duration_record': ('This epoch is now longer than any other included epoch this month.',
+                     'You have passed your longest included epoch this month.',
+                     'A new longest included epoch for this month. A useful point to check in.'),
+ 'earlier_start': ('Today’s start was earlier than your previous ten included starts.',
+                   'An earlier start today than any of your previous ten included epochs.',
+                   'Today began ahead of your previous ten included start times.'),
+ 'forecast_accuracy': ('{matches} of your last five eligible finishes were within 30 minutes of the '
+                       'forecast.',
+                       'Forecast check: {matches} of five eligible finishes within 30 minutes.',
+                       'For {matches} of your last five eligible epochs, the finish estimate was within half '
+                       'an hour.'),
+ 'morning_pattern': ('Your last five starts this week were before 09:00.',
+                     'Five recent starts this week, all before 09:00.',
+                     'Before 09:00 on each of your last five starts this week.'),
+ 'epoch_median': ('Your last five included epochs had a median length of {duration}.',
+                  'Typical epoch length across your last five included entries: {duration}.'),
+ 'off_time_median': ('Your last five included off-time intervals had a median length of {duration}.',
+                     'Typical off-time across your last five included intervals: {duration}.'),
+ 'week_summary': ('{count} included epochs started this week, totaling {duration} of recorded opportunity.',
+                  'This week’s completed, included epochs: {count}, with {duration} recorded.'),
+ 'forecast_improvement': ('Median finish-estimate error fell from {previous} to {error} across your last two '
+                          'groups of five eligible epochs.',
+                          'Your latest five eligible finish estimates had a median error of {error}, versus '
+                          '{previous} for the previous five.')}
 
 def normalize_settings(values):
     values = values if isinstance(values, dict) else {}
@@ -100,6 +160,7 @@ def normalize_settings(values):
         raw = [1800, 60]
     return {"enabled": values.get("insightsEnabled") is True,
             "finish": values.get("finishNotificationsEnabled") is True,
+            "quotes": values.get("motivationalQuotesEnabled", True) is True,
             "frequency": frequency, "warnings": sorted({round(v) for v in raw}, reverse=True)}
 
 
@@ -171,6 +232,16 @@ class Statistics:
             span = max(s["durationMs"] for s in last) - min(s["durationMs"] for s in last)
             if span <= HOUR:
                 self.fixed.append(("duration_consistency", fact_key("durations", last), {"span": length(span)}))
+        if len(epochs) >= 5:
+            last = epochs[-5:]
+            self.fixed.append(("epoch_median", fact_key("epoch_median", last),
+                               {"duration": length(median(s["durationMs"] for s in last))}))
+        off_times = [s for s in state["history"] if s["kind"] == "off"
+                     and s["durationMs"] >= 0 and not s.get("excludedFromLearning", False)]
+        if len(off_times) >= 5:
+            last = off_times[-5:]
+            self.fixed.append(("off_time_median", fact_key("off_time_median", last),
+                               {"duration": length(median(s["durationMs"] for s in last))}))
         if len(epochs) in (10, 25, 50, 100, 250, 500, 1000):
             self.fixed.append(("milestone", f"milestone:{len(epochs)}", {"count": len(epochs)}))
         this_month = [s for s, d in starts if (d.year, d.month) == month]
@@ -191,7 +262,21 @@ class Statistics:
             matches = sum(abs(s["durationMs"] - s["expectedDurationMs"]) <= 30 * MINUTE for s in forecasts)
             if matches >= 4:
                 self.fixed.append(("forecast_accuracy", fact_key("forecasts", forecasts), {"matches": matches}))
+        eligible = [s for s in epochs if type(s.get("expectedDurationMs")) in (int, float)
+                    and math.isfinite(s["expectedDurationMs"]) and s["expectedDurationMs"] >= 1000]
+        if len(eligible) >= 10:
+            last = eligible[-10:]
+            errors = [abs(s["durationMs"] - s["expectedDurationMs"]) for s in last]
+            before, after = median(errors[:5]), median(errors[5:])
+            if before >= MINUTE and after <= before * 0.75:
+                self.fixed.append(("forecast_improvement", fact_key("forecast_improvement", last),
+                                   {"previous": length(before), "error": length(after)}))
         week = current.isocalendar()[:2]
+        completed_week = [s for s, d in starts if d.isocalendar()[:2] == week]
+        if len(completed_week) >= 3:
+            self.fixed.append(("week_summary", fact_key("week_summary", completed_week),
+                               {"count": len(completed_week),
+                                "duration": length(sum(s["durationMs"] for s in completed_week))}))
         week_starts = [(s, d) for s, d in starts if d.isocalendar()[:2] == week]
         if state["phase"] == "active":
             week_starts.append(({"eventId": state["epochId"]}, current))
@@ -354,11 +439,20 @@ class Insights:
         prediction = self.state.get("predictionMs")
         if prediction is None or age - prediction < HOUR:
             meanings.remove("overrun_time")
-        meanings = [k for k in meanings if k not in book["recentKinds"][-4:]] or ["momentum"]
-        # Most opportunities favor a factual observation when one is eligible.
+        meanings = [k for k in meanings if k not in book["recentKinds"][-4:]] or ["question"]
+        # Quotes are distinct messages, not alternate wording of a prompt.
+        # Never recycle a quote while it remains in the recent-message window.
+        quotes = [key for key in QUOTES
+                  if self.config["quotes"] and "quote:" + key not in book["recentKinds"][-4:]
+                  and "quote:" + key + ":0" not in book["recentMessages"]]
         if candidates and self.rng.random() < 0.65:
             kind, fact, fields = self.rng.choice(candidates)
             pool = STATS[kind]
+        elif quotes and self.rng.random() < 0.65:
+            key = self.rng.choice(quotes)
+            quote, author, _ = QUOTES[key]
+            kind = "quote:" + key
+            return self.phrase(kind, kind, {}, (f'“{quote}” — {author}',), preview)
         else:
             kind = self.rng.choice(meanings)
             fact = "encouragement:" + kind

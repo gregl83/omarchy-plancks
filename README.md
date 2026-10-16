@@ -62,6 +62,7 @@ Your saved history stays available for a future reinstall. See [removal details]
 
 ## Documentation
 
+- [Notifications](docs/notifications.md) — alert variations, message formats, scheduling, and snapshot assets.
 - [Animations](docs/animations.md) — each companion’s states, illustrated with representative stills.
 - [User guide](docs/user-guide.md) — timer behavior, sessions, settings, shortcuts, and recovery.
 - [Migration](docs/migration.md) — bring your history and timers to a new machine.

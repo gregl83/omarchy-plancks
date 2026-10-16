@@ -83,19 +83,25 @@ Item {
       var angle = root.rollAngle * Math.PI / 180
       var thrust = root.liftThrust
       var catchPower = 1 + 0.7 * root.catchBoost
-      var exhaustPower = Math.max(root.lift, root.groundWash)
-      var exhaustExtent = (0.15 + 0.85 * thrust) * root.lift
+      // Engine output does not fade with altitude. Only the roll throttles
+      // the lift plume; near the surface the ground intercepts the full jet.
+      var exhaustPower = root.enginesOn ? 1 : 0
+      var exhaustExtent = (0.15 + 0.85 * thrust) * exhaustPower
       var jetLength = exhaustPower * (3 + thrust * (19 + 5 * root.catchBoost + Math.sin(cycle * 6) * 1.2))
       if (root.groundWash > 0)
         jetLength = (47 - (35 - root.lift * 20 + bob)) / 0.75 - 10
       var jetSpread = (1 + 5 * thrust) * Math.max(0.2, exhaustPower) * (1 + 0.2 * root.catchBoost)
       if (root.groundWash > 0) jetSpread = Math.min(6, 1 + jetLength * 0.24)
       var clouds = []
-      if (root.enginesOn && thrust > 0.02 && root.lift > 0.02 && root.groundWash === 0) {
+      // Blend free exhaust into the impact cloud instead of removing all
+      // vapor until the last trace of ground wash has disappeared.
+      var vaporExtent = Math.min(exhaustExtent, jetLength / 24)
+      var freeVapor = 1 - root.groundWash
+      if (root.enginesOn && thrust > 0.02 && freeVapor > 0) {
         for (var cloudSide = -1; cloudSide <= 1; cloudSide += 2) {
-          clouds.push({x: cloudSide * 12, y: 10 + 8 * exhaustExtent, rx: 6 * exhaustExtent, ry: 5 * exhaustExtent, alpha: 0.4 * thrust * catchPower})
-          clouds.push({x: cloudSide * 12, y: 10 + 14 * exhaustExtent, rx: 11 * exhaustExtent, ry: 7 * exhaustExtent, alpha: 0.5 * thrust * catchPower})
-          clouds.push({x: cloudSide * 12, y: 10 + 18 * exhaustExtent, rx: 15 * exhaustExtent, ry: 6 * exhaustExtent, alpha: 0.55 * thrust * catchPower})
+          clouds.push({x: cloudSide * 12, y: 10 + 8 * vaporExtent, rx: 6 * exhaustExtent, ry: 5 * vaporExtent, alpha: 0.4 * thrust * catchPower * freeVapor})
+          clouds.push({x: cloudSide * 12, y: 10 + 14 * vaporExtent, rx: 11 * exhaustExtent, ry: 7 * vaporExtent, alpha: 0.5 * thrust * catchPower * freeVapor})
+          clouds.push({x: cloudSide * 12, y: 10 + 18 * vaporExtent, rx: 15 * exhaustExtent, ry: 6 * vaporExtent, alpha: 0.55 * thrust * catchPower * freeVapor})
         }
       }
       if (root.groundWash > 0) {
