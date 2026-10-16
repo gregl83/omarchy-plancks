@@ -8,7 +8,7 @@ The widget renders Planck-time notation as italic **t** with an upright subscrip
 
 The bar and panel timer use normal text for an active epoch and Omarchy's standard dimmed styling for off-time. The tooltip, accessible label, and panel name the phase explicitly.
 
-Choose **Sun and moon**, **Coffee cup**, **Starship**, or **Roadster** in Settings. The selected graphic sits to the left of the main panel’s timer. Sun and moon descend toward a horizon; Coffee cup, Starship, and Roadster empty during an epoch and refill during off-time. Roadster hovers on cold-gas streams and occasionally rolls during an epoch, then parks for off-time. See the [animation reference](animations.md) for stills of every state and descriptions of their motion.
+Choose **Sun and moon**, **Coffee cup**, **Starship**, or **Roadster** in Settings. The selected graphic sits to the left of the main panel’s timer. Sun and moon descend toward a horizon; Coffee cup, Starship, and Roadster empty during an epoch and refill during off-time. Roadster hovers on cold-gas streams and rolls once across 45%–55% of a predicted epoch, then parks for off-time. See the [animation reference](animations.md) for stills of every state and descriptions of their motion.
 
 While learning, each graphic animates without showing predicted progress. Past the expected time, it holds its endpoint appearance while the positive timer shows how far past the prediction you are. Animations run while the timer panel or Settings previews are open.
 
@@ -34,7 +34,7 @@ Starting or ending an epoch changes its active/off-time appearance; passing an e
 Configure optional insights and finish alerts in Settings. See [Notifications](notifications.md) for all variations, message examples, scheduling, session target alerts, and image formats.
 
 <p align="center">
-  <img src="../assets/preview-settings.png" width="320" alt="Plancks settings with graphic selection and insights">
+  <img src="../assets/preview-settings.png" width="320" alt="Plancks settings with graphic selection and notification controls">
   <br>
   <em>Make it feel like yours with Sun and moon, Coffee cup, Starship, or Roadster and optional insights.</em>
 </p>
@@ -126,7 +126,7 @@ Configuration is unavailable during off-time. Opening or cancelling a draft crea
 
 Session timers count down with `−HH:MM:SS`, show `+00:00:00` at the target, and count up with `+HH:MM:SS` after the target. Each stage has a [target notification](notifications.md#variations-and-examples). Select **Start rest**, **Start activity**, or **Finish session** yourself; no stage advances automatically. Early advancement is disabled. **Stop** ends the whole session and preserves partial progress. **Pause/Resume** freezes the signed timer and records paused time separately while the epoch continues.
 
-The bar switches to **t_A** for activity or **t_R** for rest, with a pause marker where applicable. The panel keeps the epoch timer and graphic above the session timer; Coffee/Starship retain their epoch meaning. Closing the panel, sleeping, rebooting, or working away from the computer does not stop an unpaused session. After recovery, the same stage includes any overrun, with [notification recovery](notifications.md#settings-and-scheduling) handled separately. Already-paused sessions remain paused.
+The bar switches to **t_A** for activity or **t_R** for rest, with a pause marker where applicable. The panel keeps the epoch timer and graphic above the session timer; all four graphics retain their epoch meaning. Closing the panel, sleeping, rebooting, or working away from the computer does not stop an unpaused session. After recovery, the same stage includes any overrun, with [notification recovery](notifications.md#settings-and-scheduling) handled separately. Already-paused sessions remain paused.
 
 <p align="center">
   <img src="../assets/preview-session.png" width="380" alt="Epoch and session timers together">
@@ -134,7 +134,7 @@ The bar switches to **t_A** for activity or **t_R** for rest, with a pause marke
   <em>Keep your activity or rest timer alongside the bigger picture of your day.</em>
 </p>
 
-Session tooltips follow the epoch pattern: full timestamps on hover, explanations beside detail values, and concise action consequences on controls. The progress bar tooltip shows current-stage percentage and segment meaning. The shared **Tooltips** switch controls these hints; accessible action descriptions remain available when hints are disabled.
+Session tooltips follow the epoch pattern: full timestamps on hover, explanations beside detail values, and concise action consequences on controls. The session progress bar has ten subtly beveled blocks, each representing 10%, with a larger gap at 50%. Its tooltip shows current-stage percentage and segment meaning. The shared **Tooltips** switch controls these hints; accessible action descriptions remain available when hints are disabled.
 
 Session details show four stages per page in chronological order. **Previous · Page X of Y · Next** changes only the stage list and returns focus to its heading; settings and totals stay above it. Pagination is hidden for four or fewer stages, and opening a session starts at its first stage page.
 

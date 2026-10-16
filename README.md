@@ -8,7 +8,7 @@
 **A second clock, tuned to your daily rhythm.**
 
 <p align="center">
-  <a href="assets/demo/plancks.mp4"><img src="assets/demo/plancks.gif" alt="Plancks demo: epoch predictions, starting and pausing a Pomodoro session, history trends, and Starship selection" width="960"></a>
+  <a href="assets/demo/plancks.mp4"><img src="assets/demo/plancks.gif" alt="Plancks demo: epoch predictions, starting and pausing a Pomodoro session, history trends, and animation selection" width="960"></a>
 </p>
 
 Get a feel for the time ahead. Plancks sits beside your clock in the Omarchy bar, learns your daily rhythm, and estimates when your day will wind down and the next will begin.
@@ -39,7 +39,7 @@ Click **Start epoch** when your day begins and **End epoch** when you’re done.
 
 During an epoch, open **Configure session** beside Settings for Pomodoro rounds or a custom activity timer. Pause when you need to, and move to the next stage when you’re ready. Your timers and history survive sleep and restarts.
 
-Choose Sun and moon, Coffee cup, Starship, or Roadster in **Settings**, and turn on insights or finish notifications if you’d like a nudge. Notifications start off.
+Choose Sun and moon, Coffee cup, Starship, or Roadster in **Settings**, and turn on insights or finish notifications if you’d like a nudge. Optional epoch notifications start off.
 
 See the [illustrated user guide](docs/user-guide.md) for screenshots, history, and ways to fine-tune your rhythm.
 
