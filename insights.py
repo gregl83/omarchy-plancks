@@ -35,10 +35,12 @@ QUOTES = {'jobs': ('Your time is limited, so don’t waste it living someone els
  'kay': ('The best way to predict the future is to invent it.',
          'Alan Kay',
          'https://computerhistory.org/wp-content/uploads/2019/08/core-2012.pdf'),
- 'hopper': ('I think I always looked for the easiest and best, most accurate way of getting something done.',
+ 'hopper': ('I think I always looked for the easiest and best, most accurate way of getting '
+            'something done.',
             'Grace Hopper',
             'https://archive.computerhistory.org/resources/text/Oral_History/Hopper_Grace/102702026.05.01.pdf'),
- 'turing': ('We can only see a short distance ahead, but we can see plenty there that needs to be done.',
+ 'turing': ('We can only see a short distance ahead, but we can see plenty there that needs to be '
+            'done.',
             'Alan Turing',
             'https://turingtrust.co.uk/about-us/alan-turing/'),
  'einstein': ('The important thing is not to stop questioning.',
@@ -50,16 +52,42 @@ QUOTES = {'jobs': ('Your time is limited, so don’t waste it living someone els
  'thiel': ('But every time we create something new, we go from 0 to 1.',
            'Peter Thiel with Blake Masters',
            'https://penguinrandomhousehighereducation.com/book/?isbn=9780804139304'),
- 'kennedy': ('We choose to go to the moon in this decade and do the other things, not because they are easy, '
-             'but because they are hard.',
-             'John F. Kennedy',
+ 'kennedy': ('We choose to go to the moon … not because they are easy, but because they are hard.',
+             'JFK',
              'https://www.jfklibrary.org/learn/about-jfk/historic-speeches/address-at-rice-university-on-the-nations-space-effort'),
  'ride': ('Science is fun. Science is curiosity. We all have natural curiosity.',
           'Sally Ride',
           'https://assets.science.nasa.gov/content/dam/science/cds/researchers/nac/apac/2017/Harman_GS_Stars_APAC_July_2017_Tagged.pdf'),
- 'arnold': ('And the way to be innovative or the way to find what you love to do is to try different things.',
+ 'arnold': ('And the way to be innovative or the way to find what you love to do is to try '
+            'different things.',
             'Frances Arnold',
-            'https://thereader.mitpress.mit.edu/in-conversation-with-nobel-laureate-frances-arnold/')}
+            'https://thereader.mitpress.mit.edu/in-conversation-with-nobel-laureate-frances-arnold/'),
+ 'musk_courage': ("But if something's important enough then you do it even though the risk of "
+                  'failure is high.',
+                  'Elon Musk',
+                  'https://archive.computerhistory.org/resources/access/text/2014/03/102746849-05-01-acc.pdf'),
+ 'goddard': ('the dream of yesterday is the hope of today and the reality of tomorrow.',
+             'Robert H. Goddard',
+             'https://svs.gsfc.nasa.gov/10400'),
+ 'hawking': ('however difficult life may seem, there is always something you can do, and succeed '
+             'at.',
+             'Stephen Hawking',
+             'https://www.cam.ac.uk/stories/stephen-hawking'),
+ 'roosevelt': ('Far better is it to dare mighty things, to win glorious triumphs, even though '
+               'checkered by failure …',
+               'Theodore Roosevelt',
+               'https://science.nasa.gov/photojournal/mars-decoder-ring/'),
+ 'edison': ('Results! Why, man, I have gotten lots of results! I know several thousand things that '
+            "won't work!",
+            'Thomas Edison',
+            'https://edison.rutgers.edu/about/news/news-the-edisonian/the-edisonian-vol-9-issue-1-winter-2012'),
+ 'kariko': ('always focus on what you can do, what you can change, what your next step will be.',
+            'Katalin Karikó',
+            'https://www.kwse.or.kr/kor/notice/news/files/pdf/Newsletter_89.pdf'),
+ 'goodenough': ('Think about the problem and to remember that we compete against problems, not '
+                'against people.',
+                'John B. Goodenough',
+                'https://www.nobelprize.org/prizes/chemistry/2019/goodenough/137569-goodenough-interview-transcript/')}
 ENCOURAGEMENT = {'question': ('What question would make this problem more interesting?',
               'Which assumption would be worth testing?',
               'What would you try if you were allowed to be wrong?',

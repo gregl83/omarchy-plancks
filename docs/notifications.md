@@ -75,6 +75,8 @@ These observations share the existing history cache and fact deduplication. Week
 
 Selections focus on curiosity, invention, exploration, and learning; political advocacy, personal attacks, and culture-war commentary are excluded. Quotes are short, attributed excerpts, stored locally with their source URL. They are not paraphrased into the author's voice or combined with generated praise. Original prompts are unquoted and unattributed. Historical notes describe the measured pattern without claiming that elapsed time proves productivity or achievement. Finish warnings remain clear about time; extra-time notes invite a deliberate choice rather than automatically praising a longer day.
 
+The catalog contains 19 excerpts focused on curiosity, invention, persistence, and tackling difficult problems. JFK is the compact notification attribution for John F. Kennedy. Interior omissions are marked with an ellipsis; sentence fragments retain the source wording. Edison's entry is his response about storage-battery experiments, as recalled by Walter S. Mallory; it is not the frequently retold light-bulb quotation.
+
 | Author | Excerpt used | Verification source |
 | --- | --- | --- |
 | Steve Jobs | Your time is limited, so don’t waste it living someone else’s life. | [Source](https://news.stanford.edu/stories/2005/06/steve-jobs-2005-graduates-stay-hungry-stay-foolish) |
@@ -86,11 +88,20 @@ Selections focus on curiosity, invention, exploration, and learning; political a
 | Albert Einstein | The important thing is not to stop questioning. | [Source](https://www.pbs.org/wgbh/nova/einstein/wisd-nf.html) |
 | Elon Musk | I think Apollo 11 was one of the most inspiring things in all of human history. | [Source](https://time.com/5628572/elon-musk-moon-landing/) |
 | Peter Thiel with Blake Masters | But every time we create something new, we go from 0 to 1. | [Source](https://penguinrandomhousehighereducation.com/book/?isbn=9780804139304) |
-| John F. Kennedy | We choose to go to the moon in this decade and do the other things, not because they are easy, but because they are hard. | [Source](https://www.jfklibrary.org/learn/about-jfk/historic-speeches/address-at-rice-university-on-the-nations-space-effort) |
+| JFK | We choose to go to the moon … not because they are easy, but because they are hard. | [Source](https://www.jfklibrary.org/learn/about-jfk/historic-speeches/address-at-rice-university-on-the-nations-space-effort) |
 | Sally Ride | Science is fun. Science is curiosity. We all have natural curiosity. | [Source](https://assets.science.nasa.gov/content/dam/science/cds/researchers/nac/apac/2017/Harman_GS_Stars_APAC_July_2017_Tagged.pdf) |
 | Frances Arnold | And the way to be innovative or the way to find what you love to do is to try different things. | [Source](https://thereader.mitpress.mit.edu/in-conversation-with-nobel-laureate-frances-arnold/) |
+| Elon Musk | But if something's important enough then you do it even though the risk of failure is high. | [Source](https://archive.computerhistory.org/resources/access/text/2014/03/102746849-05-01-acc.pdf) |
+| Robert H. Goddard | the dream of yesterday is the hope of today and the reality of tomorrow. | [Source](https://svs.gsfc.nasa.gov/10400) |
+| Stephen Hawking | however difficult life may seem, there is always something you can do, and succeed at. | [Source](https://www.cam.ac.uk/stories/stephen-hawking) |
+| Theodore Roosevelt | Far better is it to dare mighty things, to win glorious triumphs, even though checkered by failure … | [Source](https://science.nasa.gov/photojournal/mars-decoder-ring/) |
+| Thomas Edison | Results! Why, man, I have gotten lots of results! I know several thousand things that won't work! | [Source](https://edison.rutgers.edu/about/news/news-the-edisonian/the-edisonian-vol-9-issue-1-winter-2012) |
+| Katalin Karikó | always focus on what you can do, what you can change, what your next step will be. | [Source](https://www.kwse.or.kr/kor/notice/news/files/pdf/Newsletter_89.pdf) |
+| John B. Goodenough | Think about the problem and to remember that we compete against problems, not against people. | [Source](https://www.nobelprize.org/prizes/chemistry/2019/goodenough/137569-goodenough-interview-transcript/) |
 
-Sources include a commencement transcript, an oral history, institutional archives, and a sourced quotation collection. Preserve the source and exact excerpt when extending the catalog; omit uncertain attributions. No network access is needed when showing a quote.
+Sources include speech and interview transcripts, institutional archives, and attributed recollections. Preserve the source and exact excerpt when extending the catalog; omit uncertain attributions. No network access is needed when showing a quote.
+
+Run `python3 tests/smoke_notification_quotes.py` after catalog edits. It measures each complete body, including quotation marks and attribution, with Qt's word wrapping and three-line ellipsis limit in Liberation Sans at 14px. The check covers the standard 300px text area in Omarchy's 380px card, a tighter 280px area, and proportional scales from 1× to 2×. It also runs in QML CI. Custom themes that independently change font size or card spacing can require another fit check.
 
 ## Animation snapshots
 

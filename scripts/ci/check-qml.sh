@@ -21,6 +21,7 @@ cleanup() {
 trap cleanup EXIT
 # Quickshell needs an owner-only runtime directory even with offscreen Qt.
 python3 tests/smoke_roadster.py
+python3 tests/smoke_notification_quotes.py
 cat > "$XDG_RUNTIME_DIR/sway.conf" <<'CONFIG'
 xwayland disable
 output HEADLESS-1 mode 1280x1024

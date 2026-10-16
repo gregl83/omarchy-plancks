@@ -5,7 +5,10 @@ python3 -m unittest discover -s tests -v
 omarchy plugin validate .
 python3 tests/smoke_qml.py
 python3 tests/smoke_roadster.py
+python3 tests/smoke_notification_quotes.py
 ```
+
+The notification quote fit check needs Quickshell and Liberation Sans (`ttf-liberation`); it runs offscreen.
 
 The QML smoke check needs an active Wayland session and the installed Omarchy shell. It uses temporary storage and does not change the live bar. Add `--preview` to briefly show the test widget and panel. It checks two widgets sharing epoch state through IPC, busy/not-ready guards, normal and skip transitions, overrun, vertical layout, and reset. With `--preview` (also used in CI), it exercises history navigation, inclusion switches, pagination, trends and their empty-state behavior, plus the reset warning, default Cancel focus, Cancel activation, Escape cancellation, and explicit deletion through keyboard input. The same suite also covers draft validation/cancellation, saved session settings, shared state, pause/resume, situational primary actions, repeat suppression, paused-overrun guards, closed-panel epoch confirmation/cancellation, atomic skip closure, session detail navigation, and recovered overrun/final completion. Storage tests cover suspend-inclusive clocks and restart recovery; physical suspend/reboot still warrant a live-session check.
 
