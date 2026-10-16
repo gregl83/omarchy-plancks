@@ -185,6 +185,10 @@ ShellRoot {
       // This staging window includes editorial text; its height is not a bar.
       popup.contentHeight = Qt.binding(function() { return scroll.contentHeight + popup.verticalContentInset })
       card.parent = desktop
+      // Rasterize at native size before shrinking the showcase panel. Direct
+      // scene-graph scaling can snap thin button borders out of existence.
+      card.layer.enabled = true
+      card.layer.smooth = true
       card.transformOrigin = Item.TopLeft
       card.scale = Qt.binding(function() { return Math.min(520 / card.width, 708 / card.height) })
       card.x = Qt.binding(function() { return (desktop.width - card.width * card.scale) / 2 })
