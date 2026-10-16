@@ -8,8 +8,13 @@ import subprocess
 import tempfile
 
 REPO = Path(__file__).resolve().parents[1]
+# Notification cards fit images into a square icon slot. Remove the animation
+# canvas margins, then fit each static silhouette without changing its aspect.
+magick = shutil.which("magick")
+if not magick:
+    raise SystemExit("Install ImageMagick to render tightly fitted notification assets.")
 frames = []
-for graphic in ("coffee", "starship"):
+for graphic in ("sun-moon", "coffee", "starship", "roadster"):
     for phase in ("active", "off-time"):
         for level in range(0, 101, 5):
             frames.append(dict(graphic=graphic, phase=phase, fill=level / 100,
@@ -22,7 +27,7 @@ for graphic in ("coffee", "starship"):
 
 with tempfile.TemporaryDirectory(prefix="plancks-notification-assets-") as directory:
     root = Path(directory)
-    for name in ("AnimatedGraphic.qml", "CoffeeGraphic.qml", "StarshipGraphic.qml", "Graphics.js"):
+    for name in ("AnimatedGraphic.qml", "CoffeeGraphic.qml", "StarshipGraphic.qml", "SunMoonGraphic.qml", "RoadsterGraphic.qml", "Graphics.js"):
         shutil.copy2(REPO / name, root / name)
     for frame in frames:
         path = REPO / "assets/notifications" / frame["path"]
@@ -42,7 +47,7 @@ Window {
     id: drawing
     anchors.fill: parent
     graphic: root.frame.graphic
-    foreground: "#808080"
+    foreground: "white"
     phase: root.frame.phase === "active" ? "active" : "off"
     fill: root.frame.fill
     learning: root.frame.learning
@@ -78,4 +83,9 @@ Window {
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=60)
     if result.returncode or "NOTIFICATION_ASSETS_PASS" not in result.stdout:
         raise SystemExit(result.stdout)
+for frame in frames:
+    subprocess.run([magick, frame["path"], "-trim", "+repage",
+                    "-resize", "108x108", "-gravity", "center",
+                    "-background", "none", "-extent", "116x116",
+                    "PNG32:" + frame["path"]], check=True)
 print(f"Rendered {len(frames)} notification images in assets/notifications")

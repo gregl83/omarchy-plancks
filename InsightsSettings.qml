@@ -48,7 +48,7 @@ Column {
   }
 
   PanelSectionHeader {
-    text: "INSIGHTS"
+    text: "NOTIFICATIONS"
     foreground: root.foreground
     fontFamily: root.fontFamily
   }
@@ -91,7 +91,7 @@ Column {
   }
   Text {
     width: parent.width
-    text: "Positive notes, historical patterns, and an extra-time celebration. Active epochs only."
+    text: "Science and technology quotes, thoughtful prompts, and historical patterns. Active epochs only."
     wrapMode: Text.WordWrap
     color: root.foreground
     opacity: 0.6
@@ -141,7 +141,7 @@ Column {
       bordered: true
       height: cadence.height
       KeyNavigation.backtab: cadence.enabled ? cadence : occasional
-      KeyNavigation.tab: finish
+      KeyNavigation.tab: quotes
       onClicked: EpochController.requestInsightPreview()
       onActiveFocusChanged: if (activeFocus) root.revealRequested(preview)
       Keys.onEscapePressed: root.backRequested()
@@ -150,6 +150,53 @@ Column {
   Text {
     width: parent.width
     text: "First note around 90 minutes. Then " + (cadence.value === "light" ? "every 3–4 hours." : cadence.value === "frequent" ? "every 1–2 hours." : "every 2–3 hours.")
+    wrapMode: Text.WordWrap
+    color: root.foreground
+    opacity: 0.6
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.caption
+  }
+  Item {
+    width: parent.width
+    height: Math.max(quotesLabel.implicitHeight, quotes.implicitHeight)
+    Text {
+      id: quotesLabel
+      width: parent.width - quotes.width - Style.space(12)
+      anchors.verticalCenter: parent.verticalCenter
+      text: "Motivational quotes"
+      color: root.foreground
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.bodySmall
+    }
+    ToggleSwitch {
+      id: quotes
+      objectName: "plancks_motivationalQuotesToggle"
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      trackHeight: Style.space(16)
+      cursorPad: Style.space(4)
+      checked: !root.hostWidget || root.hostWidget.motivationalQuotesEnabled
+      foreground: root.foreground
+      activeFocusOnTab: true
+      hasCursor: activeFocus
+      Accessible.role: Accessible.CheckBox
+      Accessible.name: "Motivational quotes"
+      Accessible.description: "Include attributed quotes in insights and previews. Historical insights and original prompts remain available when off."
+      Accessible.checkable: true
+      Accessible.checked: checked
+      KeyNavigation.backtab: preview
+      KeyNavigation.tab: finish
+      onToggled: { forceActiveFocus(); root.setPreference("motivationalQuotesEnabled", !checked) }
+      onActiveFocusChanged: if (activeFocus) root.revealRequested(quotes)
+      Keys.onSpacePressed: toggled()
+      Keys.onReturnPressed: toggled()
+      Keys.onEnterPressed: toggled()
+      Keys.onEscapePressed: root.backRequested()
+    }
+  }
+  Text {
+    width: parent.width
+    text: "Include attributed quotes in insights and previews. Stats and original prompts remain available when off."
     wrapMode: Text.WordWrap
     color: root.foreground
     opacity: 0.6
@@ -183,7 +230,7 @@ Column {
       Accessible.name: "Finish notifications"
       Accessible.checkable: true
       Accessible.checked: checked
-      KeyNavigation.backtab: preview
+      KeyNavigation.backtab: quotes
       KeyNavigation.tab: thresholds.enabled ? thresholds : root.nextControl
       onToggled: { forceActiveFocus(); root.setPreference("finishNotificationsEnabled", !checked) }
       onActiveFocusChanged: if (activeFocus) root.revealRequested(finish)

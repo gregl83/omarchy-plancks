@@ -388,7 +388,7 @@ Panel {
               foreground: Qt.darker(root.foreground, 1.4)
               fontFamily: title.font.family
               fontSize: Style.font.caption
-              horizontalPadding: Style.space(4)
+              horizontalPadding: Style.space(8)
               verticalPadding: Style.space(2)
               bordered: false
               focusable: true
@@ -626,14 +626,34 @@ Panel {
                   }
                   Repeater {
                     model: 10
-                    delegate: Rectangle {
+                    delegate: Canvas {
                       required property int index
                       width: sessionProgress.width
                       height: sessionProgress.segmentHeight
                       y: index * (height + sessionProgress.segmentGap)
                         + (index >= 5 ? sessionProgress.middleGap - sessionProgress.segmentGap : 0)
-                      color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b,
+                      readonly property color blockColor: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b,
                         10 - index <= sessionProgress.filledSegments ? 0.3 : 0.12)
+                      onBlockColorChanged: requestPaint()
+                      onWidthChanged: requestPaint()
+                      onHeightChanged: requestPaint()
+                      onAvailableChanged: if (available) requestPaint()
+                      onPaint: {
+                        var ctx = getContext("2d")
+                        ctx.reset()
+                        ctx.clearRect(0, 0, width, height)
+                        var taper = Math.min(Style.space(0.4), width / 4, height / 2)
+                        ctx.fillStyle = blockColor.toString()
+                        ctx.beginPath()
+                        ctx.moveTo(taper, 0)
+                        ctx.lineTo(width - taper, 0)
+                        ctx.lineTo(width, height / 2)
+                        ctx.lineTo(width - taper, height)
+                        ctx.lineTo(taper, height)
+                        ctx.lineTo(0, height / 2)
+                        ctx.closePath()
+                        ctx.fill()
+                      }
                     }
                   }
                 }
@@ -924,7 +944,7 @@ Panel {
                     tooltipText: root.tooltipsEnabled ? helpText : ""
                     fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
                     fontSize: Style.font.caption
-                    horizontalPadding: Style.space(4)
+                    horizontalPadding: Style.space(8)
                     verticalPadding: Style.space(2)
                     foreground: Qt.darker(root.foreground, 1.4)
                     focusable: true
@@ -1065,7 +1085,7 @@ Panel {
                     id: graphicChoice
                     required property var modelData
                     required property int index
-                    width: (graphicGrid.width - graphicGrid.spacing) / 2
+                    width: (graphicGrid.width - (graphicGrid.columns - 1) * graphicGrid.spacing) / graphicGrid.columns
                     implicitHeight: graphicTile.implicitHeight + Style.space(16)
                     objectName: "plancks_graphic_" + modelData.id
                     selected: (root.hostWidget ? root.hostWidget.animatedGraphic : "coffee") === modelData.id

@@ -183,6 +183,67 @@ class InsightTests(unittest.TestCase):
         store.reset('reset', state['generation'], state['sequence'])
         self.assertFalse(self.engine.path.exists())
 
+    def test_quotes_are_attributed_and_recent_quotes_are_not_recycled(self):
+        self.start(insightsEnabled=True)
+        seen = set()
+        for _ in range(80):
+            notice = self.engine.preview(self.state, HOUR)
+            if notice['kind'].startswith('quote:'):
+                key = notice['kind'].split(':', 1)[1]
+                quote, author, source = i.QUOTES[key]
+                self.assertEqual(notice['message'], f'“{quote}” — {author}')
+                self.assertTrue(source.startswith('https://'))
+                self.assertNotIn(notice['messageId'], self.engine.preview_book['recentMessages'][:-1])
+                seen.add(key)
+        self.assertGreaterEqual(len(seen), 5)
+        # Exhausting quotes must leave original prompts available without
+        # reusing quotes still inside the persisted recent-message window.
+        self.engine.book['recentMessages'] = ['quote:' + key + ':0' for key in i.QUOTES]
+        for _ in range(30):
+            self.assertFalse(self.engine.choose(HOUR)['kind'].startswith('quote:'))
+
+    def test_quote_preference_controls_scheduled_selection_and_preview(self):
+        self.start(insightsEnabled=True, motivationalQuotesEnabled=False)
+        for _ in range(80):
+            self.assertFalse(self.engine.choose(HOUR)['kind'].startswith('quote:'))
+            self.assertFalse(self.engine.preview(self.state, HOUR)['kind'].startswith('quote:'))
+        self.assertTrue(i.normalize_settings({})['quotes'])
+        self.assertFalse(i.normalize_settings({'motivationalQuotesEnabled': 'false'})['quotes'])
+        self.engine.configure({'insightsEnabled': True, 'motivationalQuotesEnabled': True})
+        self.assertTrue(any(self.engine.preview(self.state, HOUR)['kind'].startswith('quote:') for _ in range(40)))
+
+    def test_additional_stats_use_included_history_and_saved_forecasts(self):
+        history = []
+        # Recent entries land in the current ISO week; earlier five have
+        # substantially less accurate predictions than the latest five.
+        for n in range(10):
+            history.append({'eventId': str(n), 'kind': 'epoch',
+                            'start': {'utcMs': self.utc - (10 - n) * 24 * HOUR},
+                            'durationMs': 10 * HOUR,
+                            'expectedDurationMs': 10 * HOUR + (60 if n < 5 else 10) * MINUTE})
+        for n in range(5):
+            history.append({'eventId': 'off' + str(n), 'kind': 'off',
+                            'start': {'utcMs': self.utc - (5 - n) * 24 * HOUR},
+                            'durationMs': (n + 6) * HOUR})
+        history += [dict(history[0], eventId='excluded', durationMs=100 * HOUR, excludedFromLearning=True),
+                    dict(history[-1], eventId='bad-off', durationMs=-1),
+                    dict(history[-1], eventId='excluded-off', durationMs=100 * HOUR, excludedFromLearning=True)]
+        self.state['history'] = history
+        stats = i.Statistics()
+        stats.update(self.state)
+        facts = {kind: fields for kind, _, fields in stats.fixed}
+        self.assertEqual(facts['epoch_median']['duration'], '10 hours')
+        self.assertEqual(facts['off_time_median']['duration'], '8 hours')
+        self.assertEqual(facts['forecast_improvement'], {'previous': '1 hour', 'error': '10 minutes'})
+        self.assertEqual(facts['week_summary'], {'count': 4, 'duration': '40 hours'})
+        # No invented observations from insufficient samples or unchanged error.
+        self.state['history'] = history[:4]
+        self.state['sequence'] += 1
+        stats.update(self.state)
+        kinds = [kind for kind, _, _ in stats.fixed]
+        for kind in ('epoch_median', 'off_time_median', 'forecast_improvement', 'week_summary'):
+            self.assertNotIn(kind, kinds)
+
     def test_meaning_and_wording_variations_avoid_recent_repeats(self):
         self.start(insightsEnabled=True)
         recent = []

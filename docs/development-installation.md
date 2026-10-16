@@ -22,7 +22,7 @@ From the repository directory, validate and copy the runtime files to try edits 
 ```bash
 omarchy plugin validate .
 mkdir -p ~/.config/omarchy/plugins/gregl83.plancks
-cp manifest.json qmldir Widget.qml EpochPanel.qml EpochController.qml HistoryView.qml HistoryTrend.qml AnimatedGraphic.qml CoffeeGraphic.qml StarshipGraphic.qml GraphicPreview.qml InsightsSettings.qml Graphics.js plancks.py insights.py sessions.py SessionConfig.qml SessionHistory.qml SessionActivity.qml BoundedTextField.qml clipboard_read.py notification_send.py \
+cp manifest.json qmldir Widget.qml EpochPanel.qml EpochController.qml HistoryView.qml HistoryTrend.qml AnimatedGraphic.qml CoffeeGraphic.qml StarshipGraphic.qml SunMoonGraphic.qml RoadsterGraphic.qml GraphicPreview.qml InsightsSettings.qml Graphics.js plancks.py insights.py sessions.py SessionConfig.qml SessionHistory.qml SessionActivity.qml BoundedTextField.qml clipboard_read.py notification_send.py \
   ~/.config/omarchy/plugins/gregl83.plancks/
 cp -r assets ~/.config/omarchy/plugins/gregl83.plancks/
 omarchy-shell shell rescanPlugins

@@ -32,8 +32,9 @@ ShellRoot {
     {seconds: 2, action: "resume", chapter: "02 / SESSIONS", title: "Find your\nmomentum.", copy: "Resume right where\nyou left off."},
     {seconds: 4, action: "history", chapter: "03 / HISTORY", title: "Learn your\npatterns.", copy: "Explore past epochs\nand off-time trends."},
     {seconds: 4, action: "sessionHistory", chapter: "03 / HISTORY", title: "See your\nrhythm build.", copy: "Session trends and daily activity.\nYour recent weeks at a glance."},
-    {seconds: 3, action: "settings", chapter: "04 / MAKE IT YOURS", title: "Choose your\ncompanion.", copy: "Coffee cup or Starship.\nA little motion with meaning."},
+    {seconds: 3, action: "settings", chapter: "04 / MAKE IT YOURS", title: "Choose your\ncompanion.", copy: "Sun and moon, Coffee cup,\nStarship, or Roadster."},
     {seconds: 2, action: "starship", chapter: "04 / MAKE IT YOURS", title: "Ready for\nwhat’s next.", copy: "Your rhythm. Your choice."},
+    {seconds: 2, action: "roadster", chapter: "04 / MAKE IT YOURS", title: "A little motion.\nYour choice.", copy: "Four companions,\none daily rhythm."},
     {seconds: 3, action: "finish", chapter: "PLANCKS / OMARCHY", title: "Your day.\nYour rhythm.", copy: "A second clock, tuned to\nyour daily rhythm."}
   ]
   readonly property real duration: scenes.reduce(function(sum, scene) { return sum + scene.seconds }, 0)
@@ -140,7 +141,7 @@ ShellRoot {
   function cue(action) {
     var controls = {configure: "plancks_configureSession", start: "plancks_startSession",
       pause: "plancks_pauseSession", resume: "plancks_pauseSession",
-      history: "plancks_historyButton", sessionHistory: "plancks_sessionsTab", starship: "plancks_graphic_starship"}
+      history: "plancks_historyButton", sessionHistory: "plancks_sessionsTab", starship: "plancks_graphic_starship", roadster: "plancks_graphic_roadster"}
     if (!controls[action]) { pointerOpacity = 0; return }
     var item = find(controls[action])
     var point = item.mapToItem(stage, item.width / 2, item.height / 2)
@@ -153,7 +154,7 @@ ShellRoot {
     else if (action === "history") activate("plancks_historyButton")
     else if (action === "sessionHistory") activate("plancks_sessionsTab")
     else if (action === "settings") { panel.closeHistory(true); panel.openSettings() }
-    else if (action === "starship") activate("plancks_graphic_starship")
+    else if (action === "starship" || action === "roadster") activate("plancks_graphic_" + action)
     else if (action === "finish") panel.closeSettings()
   }
   function ready(action) {
@@ -167,8 +168,8 @@ ShellRoot {
       && !Plancks.EpochController.sessionHistoryLoading && Plancks.EpochController.sessionHistory.rows.length > 0
       && find("plancks_sessionActivity").cells.some(function(cell) { return cell.durationMs > 0 })
     if (action === "settings") return panel.showingSettings
-    if (action === "starship") return widget.animatedGraphic === "starship"
-    if (action === "finish") return !panel.showingSettings && widget.animatedGraphic === "starship"
+    if (action === "starship" || action === "roadster") return widget.animatedGraphic === action
+    if (action === "finish") return !panel.showingSettings && widget.animatedGraphic === "roadster"
     return state.phase === "active" && state.predictedEndUtcMs !== null && state.timer !== "--:--:--"
   }
   function tick() {
@@ -184,6 +185,10 @@ ShellRoot {
       // This staging window includes editorial text; its height is not a bar.
       popup.contentHeight = Qt.binding(function() { return scroll.contentHeight + popup.verticalContentInset })
       card.parent = desktop
+      // Rasterize at native size before shrinking the showcase panel. Direct
+      // scene-graph scaling can snap thin button borders out of existence.
+      card.layer.enabled = true
+      card.layer.smooth = true
       card.transformOrigin = Item.TopLeft
       card.scale = Qt.binding(function() { return Math.min(520 / card.width, 708 / card.height) })
       card.x = Qt.binding(function() { return (desktop.width - card.width * card.scale) / 2 })
