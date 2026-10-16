@@ -5,7 +5,8 @@
 var options = [
   {id: "sun-moon", name: "Sun and moon", source: "SunMoonGraphic.qml"},
   {id: "coffee", name: "Coffee cup", source: "CoffeeGraphic.qml"},
-  {id: "starship", name: "Starship", source: "StarshipGraphic.qml"}
+  {id: "starship", name: "Starship", source: "StarshipGraphic.qml"},
+  {id: "roadster", name: "Roadster", source: "RoadsterGraphic.qml"}
 ]
 
 function option(id) {

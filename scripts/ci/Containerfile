@@ -3,7 +3,7 @@ FROM docker.io/library/archlinux:base
 # introduce Qt ABI mismatches and QML name collisions in the pinned shell.
 ARG ARCH_SNAPSHOT=2026/10/06
 RUN printf 'Server = https://archive.archlinux.org/repos/%s/$repo/os/$arch\n' "$ARCH_SNAPSHOT" > /etc/pacman.d/mirrorlist \
-    && pacman -Syyuu --noconfirm --needed python python-gobject quickshell sway jq git dbus ttf-dejavu \
+    && pacman -Syyuu --noconfirm --needed python python-gobject imagemagick quickshell sway jq git dbus ttf-dejavu \
     && pacman -Scc --noconfirm \
     && setcap -r /usr/bin/sway \
     && useradd --create-home tester

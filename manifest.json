@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "gregl83.plancks",
   "name": "Plancks",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "author": "gregl83",
   "license": "Apache-2.0",
-  "description": "A second clock, tuned to your daily rhythm. An Omarchy productivity widget with a Pomodoro timer, custom session timers for focus, study, exercise, and rest, and local time tracking. Track daily epochs and off-time with learned predictions, countdowns, notifications, searchable history, and trend charts. Animated Coffee cup and SpaceX-inspired Starship graphics bring your timer to life. No account or cloud service.",
+  "description": "A second clock, tuned to your daily rhythm. An Omarchy productivity widget with a Pomodoro timer, custom session timers for focus, study, exercise, and rest, and local time tracking. Track daily epochs and off-time with learned predictions, countdowns, notifications, searchable history, and trend charts. Animated Sun and moon, Coffee cup, SpaceX-inspired Starship, and Tesla-inspired Roadster graphics bring your timer to life. No account or cloud service.",
   "kinds": [
     "bar-widget"
   ],

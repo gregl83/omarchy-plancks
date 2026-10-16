@@ -388,7 +388,7 @@ Panel {
               foreground: Qt.darker(root.foreground, 1.4)
               fontFamily: title.font.family
               fontSize: Style.font.caption
-              horizontalPadding: Style.space(4)
+              horizontalPadding: Style.space(8)
               verticalPadding: Style.space(2)
               bordered: false
               focusable: true
@@ -924,7 +924,7 @@ Panel {
                     tooltipText: root.tooltipsEnabled ? helpText : ""
                     fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
                     fontSize: Style.font.caption
-                    horizontalPadding: Style.space(4)
+                    horizontalPadding: Style.space(8)
                     verticalPadding: Style.space(2)
                     foreground: Qt.darker(root.foreground, 1.4)
                     focusable: true
@@ -1056,7 +1056,7 @@ Panel {
               Grid {
                 id: graphicGrid
                 width: parent.width
-                columns: 3
+                columns: 2
                 spacing: Style.space(12)
                 Repeater {
                   id: graphicChoices

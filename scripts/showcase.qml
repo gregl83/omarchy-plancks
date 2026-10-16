@@ -3,6 +3,7 @@ import QtQuick.Window
 import Quickshell
 import qs.Commons
 import "Plancks" as Plancks
+import "Plancks/Graphics.js" as Graphics
 import "PreviewContext.js" as Desktop
 
 ShellRoot {
@@ -155,15 +156,14 @@ ShellRoot {
             color: capture.accent
           }
           Repeater {
-            model: [{id: "coffee", name: "Coffee cup"}, {id: "starship", name: "Starship"}]
+            model: Graphics.options
             Item {
               required property var modelData
               required property int index
-              x: 24 + index * 218; y: 64; width: 214; height: 138
+              x: 24 + (index % 2) * 218; y: 58 + Math.floor(index / 2) * 76; width: 214; height: 72
               Plancks.AnimatedGraphic {
-                width: 94; height: 88
+                width: 58; height: 54
                 anchors.horizontalCenter: parent.horizontalCenter
-                anchors.horizontalCenterOffset: modelData.id === "coffee" ? 6 : 0
                 graphic: modelData.id
                 foreground: capture.ink
                 fill: 0.55
@@ -171,11 +171,11 @@ ShellRoot {
                 animated: false
               }
               Text {
-                y: 104; width: parent.width
+                y: 54; width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 text: modelData.name
                 font.family: capture.fontFamily
-                font.pixelSize: 18
+                font.pixelSize: 14
                 color: capture.ink
               }
             }
