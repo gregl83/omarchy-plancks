@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "OverlayLogic.js" as OverlayLogic
 
 Column {
   id: root
@@ -53,9 +54,21 @@ Column {
       else text = String(root.config.overlaySeconds || 60)
     }
     KeyNavigation.backtab: mode
-    KeyNavigation.tab: opacityChoice
+    KeyNavigation.tab: sizeChoice
     onActiveFocusChanged: if (activeFocus) root.revealRequested(seconds)
     Keys.onEscapePressed: root.backRequested()
+  }
+  Text { textFormat: Text.PlainText; text: "Size"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+  ButtonGroup {
+    id: sizeChoice
+    objectName: "plancks_overlaySize"
+    options: [{value: "small", label: "Small"}, {value: "medium", label: "Medium"}, {value: "large", label: "Large"}, {value: "extraLarge", label: "Extra large"}]
+    value: OverlayLogic.size(root.config)
+    foreground: root.foreground; fontFamily: root.fontFamily; fontSize: Style.font.caption
+    onChanged: function(value) { root.save("overlaySize", value) }
+    KeyNavigation.backtab: seconds
+    KeyNavigation.tab: opacityChoice
+    onActiveFocusChanged: if (activeFocus) root.revealRequested(sizeChoice)
   }
   Text { textFormat: Text.PlainText; text: "Opacity"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
   ButtonGroup {
@@ -64,14 +77,22 @@ Column {
     value: String(root.config.overlayOpacity || 0.65)
     foreground: root.foreground; fontFamily: root.fontFamily; fontSize: Style.font.caption
     onChanged: function(value) { root.save("overlayOpacity", Number(value)) }
-    KeyNavigation.backtab: seconds
+    KeyNavigation.backtab: sizeChoice
     KeyNavigation.tab: backing
     onActiveFocusChanged: if (activeFocus) root.revealRequested(opacityChoice)
+  }
+  Text {
+    width: parent.width
+    textFormat: Text.PlainText
+    text: "Fades the glass and text together, keeping the digits slightly stronger for readability."
+    wrapMode: Text.WordWrap
+    color: root.foreground; opacity: 0.6
+    font.family: root.fontFamily; font.pixelSize: Style.font.caption
   }
   Text { textFormat: Text.PlainText; text: "Background"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
   ButtonGroup {
     id: backing
-    options: [{value: "none", label: "None"}, {value: "translucent", label: "Translucent"}]
+    options: [{value: "none", label: "None"}, {value: "translucent", label: "Smoked glass"}]
     value: root.config.overlayBackground === true ? "translucent" : "none"
     foreground: root.foreground; fontFamily: root.fontFamily; fontSize: Style.font.caption
     onChanged: function(value) { root.save("overlayBackground", value === "translucent") }

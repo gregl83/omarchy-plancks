@@ -13,6 +13,13 @@ function opacity(settings) {
   var value = settings.overlayOpacity
   return typeof value === "number" && isFinite(value) && value >= 0.2 && value <= 1 ? value : 0.65
 }
+function size(settings) {
+  var value = settings.overlaySize
+  return ["small", "medium", "large", "extraLarge"].indexOf(value) >= 0 ? value : "medium"
+}
+function scale(settings) {
+  return {small: 0.75, medium: 1, large: 1.25, extraLarge: 1.75}[size(settings)]
+}
 function view(state, settings) {
   var session = state.session
   var timer = String((session ? session.timer : state.timer) || "--:--:--")

@@ -44,7 +44,7 @@ BarWidget {
     if (bar && bar.shell) bar.shell.updateEntryInline(moduleName, settings)
   }
   function setOverlayPreference(name, value) {
-    if (["overlayMode", "overlaySeconds", "overlayOpacity", "overlayBackground"].indexOf(name) < 0) return
+    if (["overlayMode", "overlaySeconds", "overlayOpacity", "overlayBackground", "overlaySize"].indexOf(name) < 0) return
     settings = Object.assign({}, settings, {[name]: value})
     if (bar && bar.shell) bar.shell.updateEntryInline(moduleName, settings)
   }

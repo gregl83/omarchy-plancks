@@ -64,6 +64,23 @@ ShellRoot {
         overlay.timerState = state
         overlay.operational = true
         check(overlay.showing, "operational window shows")
+        var mediumWidth = overlay.implicitWidth
+        var mediumHeight = overlay.implicitHeight
+        var mediumMargin = overlay.margins.bottom
+        overlay.config = {overlayMode: "always", overlaySize: "small"}
+        check(Math.abs(overlay.implicitWidth - mediumWidth * 0.75) <= 1.5, "small scales width")
+        check(Math.abs(overlay.implicitHeight - mediumHeight * 0.75) <= 1.5, "small scales height")
+        check(overlay.margins.bottom < mediumMargin, "small adjusts bottom spacing")
+        overlay.config = {overlayMode: "always", overlaySize: "large"}
+        check(Math.abs(overlay.implicitWidth - mediumWidth * 1.25) <= 1.5, "large scales width")
+        check(Math.abs(overlay.implicitHeight - mediumHeight * 1.25) <= 1.5, "large scales height")
+        check(overlay.margins.bottom > mediumMargin, "large adjusts bottom spacing")
+        overlay.config = {overlayMode: "always", overlaySize: "extraLarge"}
+        check(Math.abs(overlay.implicitWidth - mediumWidth * 1.75) <= 1.5, "extra large scales width")
+        check(Math.abs(overlay.implicitHeight - mediumHeight * 1.75) <= 1.5, "extra large scales height")
+        check(overlay.margins.bottom > mediumMargin, "extra large keeps bottom clearance")
+        overlay.config = {overlayMode: "always", overlaySize: "invalid"}
+        check(overlay.implicitWidth === mediumWidth, "invalid size preserves medium default")
         check(overlay.mask.width === 0 && overlay.mask.height === 0 && overlay.mask.regions.length === 0, "empty input region")
         check(overlay.WlrLayershell.keyboardFocus === WlrKeyboardFocus.None, "no keyboard focus")
         check(overlay.exclusionMode === ExclusionMode.Ignore, "does not reserve screen space")
@@ -79,4 +96,4 @@ ShellRoot {
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=20)
     if result.returncode or 'OVERLAY_PASS' not in result.stdout or 'OVERLAY_FAIL' in result.stdout:
         raise SystemExit(result.stdout)
-    print('Overlay passed: countdown boundary, overrun, learning, session priority, pause, settings bounds, input region and focus.')
+    print('Overlay passed: countdown boundary, overrun, learning, session priority, pause, settings bounds, size presets, input region and focus.')

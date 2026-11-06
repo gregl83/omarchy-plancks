@@ -45,12 +45,12 @@ Settings opens on **Appearance**. Use the **Appearance**, **Overlay**, and **Not
 | Tab | Controls |
 | --- | --- |
 | Appearance | Tooltips and animated graphic selection. |
-| Overlay | Clock mode, countdown lead time, opacity, and background. |
+| Overlay | Clock mode, countdown lead time, size, opacity, and background. |
 | Notifications | Occasional insights, frequency, preview, motivational quotes, and finish warnings. |
 
 ## Overlay clock
 
-![Overlay clock at 59 seconds with translucent backing](../assets/preview-overlay.png)
+![Overlay clock at 59 seconds with smoked-glass backing](../assets/preview-overlay.png)
 
 Settings → **Overlay** provides a small, click-through clock at the bottom center of the focused monitor. It cannot take keyboard focus or select text, and pointer input passes to the application beneath it. It reserves no desktop space and leaves a margin for a bottom bar. Only one overlay is shown across monitors.
 
@@ -60,7 +60,9 @@ Settings → **Overlay** provides a small, click-through clock at the bottom cen
 | Always | Shows the bar's current timer, including learning and paused sessions. |
 | Final countdown | Appears in the final **60 seconds** before the interval target, then remains through overrun until the interval changes. |
 
-Set the countdown lead time from **1–600 seconds**. Choose **40%, 65% (default), or 85%** text opacity and **None (default)** or **Translucent** background. Steady monospaced digits fade in without flashing or pulsing.
+Choose **Small (75%)**, **Medium (100%, default)**, **Large (125%)**, or **Extra large (175%)**. Medium preserves the original size; each preset scales the digits, glass, and bottom spacing together while keeping the clock centered above the bar. Sizing respects the shell’s UI scale. The overlay follows monitor focus; it is not pinned to the main monitor.
+
+Set the countdown lead time from **1–600 seconds**. Choose **40%, 65% (default), or 85%** opacity and **None (default)** or **Smoked glass** background. Smoked glass uses shallow chamfered corners, a translucent neutral center, restrained reflections, and fine edge highlights. The glass appearance is drawn locally; it does not blur or refract the desktop behind it. Opacity coordinates the backing, highlights, and text. Text stays 15 percentage points stronger (up to 100%) for readability: the 40%, 65%, and 85% presets use 55%, 80%, and 100% text opacity respectively. Without a background, the same control still adjusts text opacity. The digits, notation, and pause marker use the shell theme font (`Style.font.family`), matching the taskbar. Text uses antialiased edges and a subtle dark shadow, slightly stronger without a background for contrast; it has no hard outline. The reflection stays still; the clock fades in without flashing or pulsing. Existing translucent-background preferences select Smoked glass automatically.
 
 The overlay follows the same notation and priority as the bar: `t_A` for activity and `t_R` for rest/long rest when a session exists; otherwise `t_E` for an epoch or `t_O` for off-time. A paused session freezes the timer and shows a pause marker. Final countdown requires a valid target; elapsed time during epoch learning does not trigger it. Loading or timer errors hide the overlay. This display does not send notifications or advance stages automatically.
 
