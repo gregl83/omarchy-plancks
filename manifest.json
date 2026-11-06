@@ -5,7 +5,7 @@
   "version": "1.8.0",
   "author": "gregl83",
   "license": "Apache-2.0",
-  "description": "A second clock, tuned to your daily rhythm. An Omarchy productivity widget with a Pomodoro timer, custom session timers for focus, study, exercise, and rest, and local time tracking. Track daily epochs and off-time with learned predictions, countdowns, an optional click-through glass overlay clock, notifications, searchable history, and trend charts. Animated Sun and moon, Coffee cup, SpaceX-inspired Starship, and Tesla-inspired Roadster graphics bring your timer to life. No account or cloud service.",
+  "description": "A second clock for Omarchy, tuned to your daily rhythm. This productivity and time-tracking widget learns when your day ends and the next begins, showing a countdown of the time ahead. Add a NASA-inspired countdown overlay, notifications, searchable history and trends, and animated Sun and moon, Coffee cup, Starship, or Roadster companions. Includes a Pomodoro timer and custom focus, study, exercise, and rest sessions. Local storage; no account or cloud service.",
   "kinds": [
     "bar-widget"
   ],
