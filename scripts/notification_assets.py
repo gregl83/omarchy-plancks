@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Render notification snapshots from the production QML graphics, offscreen."""
+import argparse
 import json
 import os
 from pathlib import Path
@@ -13,10 +14,16 @@ REPO = Path(__file__).resolve().parents[1]
 magick = shutil.which("magick")
 if not magick:
     raise SystemExit("Install ImageMagick to render tightly fitted notification assets.")
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--graphic", choices=("sun-moon", "coffee", "starship", "roadster"))
+args = parser.parse_args()
 frames = []
-for graphic in ("sun-moon", "coffee", "starship", "roadster"):
+for graphic in ([args.graphic] if args.graphic else ("sun-moon", "coffee", "starship", "roadster")):
     for phase in ("active", "off-time"):
-        for level in range(0, 101, 5):
+        levels = set(range(0, 101, 5))
+        if graphic == "roadster" and phase == "active":
+            levels.update(range(45, 56))
+        for level in sorted(levels):
             frames.append(dict(graphic=graphic, phase=phase, fill=level / 100,
                                learning=False, overtime=False, path=f"{graphic}/{phase}/fill-{level:03}.png"))
         for special in ("learning", "overtime"):
@@ -37,7 +44,7 @@ with tempfile.TemporaryDirectory(prefix="plancks-notification-assets-") as direc
 import QtQuick.Window
 Window {
   id: root
-  width: 116; height: 108
+  width: 464; height: 432
   visible: true
   color: "transparent"
   property var frames: FRAMES
@@ -72,7 +79,7 @@ Window {
           root.index++
           capture.restart()
         }
-      }, Qt.size(116, 108))
+      }, Qt.size(464, 432))
     }
   }
 }'''.replace("FRAMES", json.dumps(frames))
@@ -83,8 +90,26 @@ Window {
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=60)
     if result.returncode or "NOTIFICATION_ASSETS_PASS" not in result.stdout:
         raise SystemExit(result.stdout)
+# Keep the Roadster's position and scale stable throughout flight. Independent
+# trims would enlarge the inverted car when its bottom plume is suppressed.
+flight = [frame for frame in frames if frame["graphic"] == "roadster"
+          and frame["phase"] == "active" and not frame["learning"] and not frame["overtime"]]
+flight_crop = None
+if flight:
+    bounds = []
+    for frame in flight:
+        geometry = subprocess.check_output(
+            [magick, frame["path"], "-trim", "-format", "%w %h %X %Y", "info:"], text=True)
+        w, h, x, y = map(int, geometry.split())
+        bounds.append((x, y, x + w, y + h))
+    left = min(b[0] for b in bounds)
+    top = min(b[1] for b in bounds)
+    right = max(b[2] for b in bounds)
+    bottom = max(b[3] for b in bounds)
+    flight_crop = f"{right-left}x{bottom-top}+{left}+{top}"
 for frame in frames:
-    subprocess.run([magick, frame["path"], "-trim", "+repage",
+    crop = ["-crop", flight_crop] if frame in flight else ["-trim"]
+    subprocess.run([magick, frame["path"], *crop, "+repage",
                     "-resize", "108x108", "-gravity", "center",
                     "-background", "none", "-extent", "116x116",
                     "PNG32:" + frame["path"]], check=True)

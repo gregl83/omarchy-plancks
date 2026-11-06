@@ -41,7 +41,10 @@ function notificationImage(graphic, state) {
   var path = "assets/notifications/" + option(graphic).id + "/"
   if (frame.learning) return path + "learning/" + phase + ".png"
   if (frame.overtime) return path + "overtime/" + phase + ".png"
-  var level = String(Math.round(frame.fill * 20) * 5)
+  // The ten-percent roll needs finer sampling to preserve its live angle.
+  var rolling = option(graphic).id === "roadster" && phase === "active"
+    && frame.fill >= 0.45 && frame.fill <= 0.55
+  var level = String(rolling ? Math.round(frame.fill * 100) : Math.round(frame.fill * 20) * 5)
   return path + phase + "/fill-" + ("000" + level).slice(-3) + ".png"
 }
 

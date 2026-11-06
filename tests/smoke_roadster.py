@@ -10,9 +10,11 @@ repo = Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory(prefix='plancks-roadster-check-') as directory:
     root = Path(directory)
     shutil.copy2(repo / 'RoadsterGraphic.qml', root)
+    shutil.copy2(repo / 'Graphics.js', root)
     (root / 'shell.qml').write_text('''import QtQuick
 import QtQuick.Window
 import QtTest
+import "Graphics.js" as Graphics
 Window {
   id: window
   property bool ready: false
@@ -35,6 +37,22 @@ Window {
     function angle(expected) {
       verify(Math.abs(car.rollAngle - expected) < 0.0001,
              "Expected " + expected + " degrees, got " + car.rollAngle)
+    }
+    function test_snapshot_angles() {
+      function clock(seconds) {
+        return "00:" + ("0" + Math.floor(seconds / 60)).slice(-2) + ":" + ("0" + seconds % 60).slice(-2)
+      }
+      for (var percent = 45; percent <= 55; percent++) {
+        var state = {phase: "active", predictedEndUtcMs: 1000,
+                     timer: "−" + clock(percent * 10), elapsed: clock(1000 - percent * 10)}
+        compare(Graphics.notificationImage("roadster", state),
+                "assets/notifications/roadster/active/fill-0" + percent + ".png",
+                "Each flip percentage selects its own still")
+        var coarse = Math.round(percent / 5) * 5
+        compare(Graphics.notificationImage("starship", state),
+                "assets/notifications/starship/active/fill-0" + coarse + ".png",
+                "Other graphics retain five-percent sampling")
+      }
     }
     function test_halfway() {
       car.phase = "active"

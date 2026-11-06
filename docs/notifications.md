@@ -107,7 +107,7 @@ Run `python3 tests/smoke_notification_quotes.py` after catalog edits. It measure
 
 The icon follows the selected Sun and moon, Coffee cup, Starship, or Roadster graphic. It represents the epoch/off-time state, including for session target alerts; it does not represent the session stage timer. See [Animations](animations.md) for the illustrated state reference.
 
-Predicted fill is rounded to the nearest 5%. Learning and overtime use dedicated stills. Each PNG has a white foreground with the drawing’s intentional transparency and a transparent background. The exporter trims unused canvas margins, fits the complete silhouette proportionally within 108 × 108 pixels, and centers it on a 116 × 116 canvas. This leaves a small border while making use of Omarchy’s 40 × 40 notification icon slot. Tall or wide shapes retain their proportions.
+Predicted fill is rounded to the nearest 5%, except Roadster’s 45%–55% flip interval, which uses 1% steps (36° per step) to follow the live angle. Learning and overtime use dedicated stills. Each PNG has a white foreground with the drawing’s intentional transparency and a transparent background. The exporter renders at 4× resolution, trims unused canvas margins, fits the complete silhouette proportionally within 108 × 108 pixels, and centers it on a 116 × 116 canvas. Roadster’s predicted active frames share one crop across the entire flight, preserving the live scale and position instead of independently enlarging the car when its plume contracts during a flip. This leaves a small border while making use of Omarchy’s 40 × 40 notification icon slot. Tall or wide shapes retain their proportions.
 
 The snapshot is captured from the current state when the alert is queued. It is static, so moving exhaust and other motion appear at a representative frame. Snapshot fitting is separate from the fixed live animation canvas.
 
@@ -119,7 +119,7 @@ Session target milestones are durably claimed in the session journal before deli
 
 ## Maintaining the assets
 
-Install ImageMagick, then run `python3 scripts/notification_assets.py` from the repository root after graphic changes. The generator renders production QML, applies the white foreground, and automatically trims and fits every still. Assets live in `assets/notifications/{sun-moon,coffee,starship,roadster}/`, with `active`, `off-time`, `learning`, and `overtime` folders.
+Install ImageMagick, then run `python3 scripts/notification_assets.py` from the repository root after graphic changes. The generator renders production QML, applies the white foreground, and automatically trims and fits every still. To regenerate only Roadster, use `python3 scripts/notification_assets.py --graphic roadster`. Assets live in `assets/notifications/{sun-moon,coffee,starship,roadster}/`, with `active`, `off-time`, `learning`, and `overtime` folders.
 
 Run `python3 -m unittest discover -s tests -p test_notification_assets.py` to check packaged state coverage, square dimensions, and RGBA format. See [Development checks](development-checks.md) for the wider rendering and validation workflow.
 
