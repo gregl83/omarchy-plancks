@@ -211,16 +211,11 @@ The bar tooltip shows the current **Primary action**, or **Review epoch confirma
 
 IPC results: `submitted` means sent to storage (not yet saved); `controls-opened` means session controls opened; `confirmation-pending` means explicit confirmation is required; `repeat-ignored` means a rapid repeat was suppressed; `busy` and `not-ready` mean no action was taken. Storage failures appear in the widget and panel with **Retry**.
 
-To assign **Super+Alt+P**, first check conflicts with `omarchy menu keybindings --print`, then add these optional bindings to `~/.config/hypr/bindings.lua`:
-
-```lua
-o.bind("SUPER + ALT + P", "Plancks: Epoch / next stage", "omarchy-shell gregl83.plancks primaryAction")
-o.bind("SUPER + ALT + SHIFT + P", "Plancks: Skip epoch", "omarchy-shell gregl83.plancks toggleEpochSkip")
-```
+For copyable **Super+Alt+P** and **Super+Alt+Shift+P** bindings, conflict checks, and reload commands, see [Optional Super-key shortcuts](../README.md#optional-super-key-shortcuts). The installer does not add bindings automatically.
 
 Existing primary bindings must change from `toggleEpoch` to `primaryAction` to get situational behavior. Keep key repeat disabled (the default): holding either shortcut must not repeat transitions. Primary action also suppresses repeated calls until 600 ms pass without another invocation, preventing a burst from finishing a session and then ending its epoch.
 
-Choose an unused combination, or explicitly unbind an existing assignment before replacing it. Validate with `hyprctl reload` and `hyprctl configerrors`. The plugin installer does not install keybindings automatically. After updating the controller in an existing installation, run `omarchy restart shell` to register the new IPC action.
+After updating the controller in an existing installation, run `omarchy restart shell` to register the new IPC action.
 
 ## Reset all data
 
