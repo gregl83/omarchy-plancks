@@ -4,7 +4,16 @@ An **epoch** is your window of available opportunity; **off-time** is the interv
 
 Plancks learns from recent epochs and off-time intervals to predict when your current epoch will end and when the next one will start. The window includes normal breaks and interruptions; it measures available opportunity, not continuous productive effort.
 
-The widget renders Planck-time notation as italic **t** with an upright subscript capital **P**, equivalent to `t_P`. Durations are ordinary hours, minutes, and seconds.
+Timers use italic **t** with an upright capital subscript identifying what they measure. Durations are ordinary hours, minutes, and seconds.
+
+| Timer state | Notation | Meaning |
+| --- | --- | --- |
+| Epoch | `t_E` | Current epoch |
+| Off-time | `t_O` | Interval between epochs |
+| Session activity | `t_A` | Current activity stage |
+| Session rest or long rest | `t_R` | Current rest stage |
+
+The bar shows the session notation while a session is running or paused; otherwise it shows the epoch/off-time notation. The panel keeps the epoch/off-time timer visible alongside the session timer. Pausing adds a separate pause marker without changing the subscript. Learning and passing an expected time also leave the state’s subscript unchanged.
 
 The bar and panel timer use normal text for an active epoch and Omarchy's standard dimmed styling for off-time. The tooltip, accessible label, and panel name the phase explicitly.
 
@@ -14,10 +23,10 @@ While learning, each graphic animates without showing predicted progress. Past t
 
 | Appearance | Example | Meaning |
 | --- | --- | --- |
-| Normal | `t_P −02:00:00` | Two hours until the current epoch is expected to end |
-| Normal | `t_P +00:15:00` | The current epoch is still active, fifteen minutes after its expected end time |
-| Dimmed | `t_P −02:00:00` | Two hours until the next epoch is expected to start |
-| Dimmed | `t_P +00:15:00` | The next epoch has not started, and its expected start time was fifteen minutes ago |
+| Normal | `t_E −02:00:00` | Two hours until the current epoch is expected to end |
+| Normal | `t_E +00:15:00` | The current epoch is still active, fifteen minutes after its expected end time |
+| Dimmed | `t_O −02:00:00` | Two hours until the next epoch is expected to start |
+| Dimmed | `t_O +00:15:00` | The next epoch has not started, and its expected start time was fifteen minutes ago |
 
 The timer descriptions use **Until expected epoch end** / **Since expected epoch end** while an epoch is active, and **Until expected next epoch start** / **Since expected next epoch start** during off-time.
 
@@ -126,7 +135,7 @@ Configuration is unavailable during off-time. Opening or cancelling a draft crea
 
 Session timers count down with `−HH:MM:SS`, show `+00:00:00` at the target, and count up with `+HH:MM:SS` after the target. Each stage has a [target notification](notifications.md#variations-and-examples). Select **Start rest**, **Start activity**, or **Finish session** yourself; no stage advances automatically. Early advancement is disabled. **Stop** ends the whole session and preserves partial progress. **Pause/Resume** freezes the signed timer and records paused time separately while the epoch continues.
 
-The bar switches to **t_A** for activity or **t_R** for rest, with a pause marker where applicable. The panel keeps the epoch timer and graphic above the session timer; all four graphics retain their epoch meaning. Closing the panel, sleeping, rebooting, or working away from the computer does not stop an unpaused session. After recovery, the same stage includes any overrun, with [notification recovery](notifications.md#settings-and-scheduling) handled separately. Already-paused sessions remain paused.
+The bar switches to **t_A** for activity or **t_R** for rest or long rest, with a pause marker where applicable. The panel keeps the epoch timer and graphic above the session timer; all four graphics retain their epoch meaning. Closing the panel, sleeping, rebooting, or working away from the computer does not stop an unpaused session. After recovery, the same stage includes any overrun, with [notification recovery](notifications.md#settings-and-scheduling) handled separately. Already-paused sessions remain paused.
 
 <p align="center">
   <img src="../assets/preview-session.png" width="380" alt="Epoch and session timers together">

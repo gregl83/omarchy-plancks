@@ -480,11 +480,12 @@ Panel {
               }
               Text {
                 id: timerText
+                objectName: "plancks_epochTimer"
                 anchors.centerIn: timerFrame
                 readonly property string timer: root.epoch.timer || "--:--:--"
                 readonly property bool countingDown: /^[−-]/.test(timer)
                 textFormat: Text.RichText
-                text: "<span style=\"font-size: " + Style.space(20) + "px;\"><i>t</i><sub>P</sub></span> " + timer
+                text: "<span style=\"font-size: " + Style.space(20) + "px;\"><i>t</i><sub>" + (root.epoch.phase === "active" ? "E" : "O") + "</sub></span> " + timer
                 color: root.foreground
                 opacity: root.epoch.phase !== "active" && EpochController.error === "" ? 0.45 : 1
                 Behavior on opacity {

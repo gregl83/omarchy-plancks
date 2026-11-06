@@ -109,6 +109,7 @@ ShellRoot {
       if (!test.ipcDone || !Plancks.EpochController.ready || Plancks.EpochController.busy) return
       if (test.step === 0) {
         if (!test.check(widget.epoch.phase === "off", "initial phase")) return
+        if (!test.check(resetTest.findChild(widget, "plancks_barTimer").text.indexOf("<sub>O</sub>") >= 0, "off-time bar notation")) return
         Plancks.EpochController.busy = true
         if (!test.check(Plancks.EpochController.ipc.primaryAction() === "busy", "Primary IPC busy guard")) return
         if (!test.check(Plancks.EpochController.ipc.toggleEpoch() === "busy", "IPC busy guard")) return
@@ -123,6 +124,7 @@ ShellRoot {
         test.step = 1
       } else if (test.step === 1) {
         if (!test.check(widget.epoch.phase === "active" && second.epoch.phase === "active", "shared active epoch")) return
+        if (!test.check(resetTest.findChild(widget, "plancks_barTimer").text.indexOf("<sub>E</sub>") >= 0, "epoch bar notation")) return
         if (test.preview) widget.open()
         test.step = 2
       } else if (test.step === 2) {
