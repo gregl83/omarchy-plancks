@@ -93,7 +93,7 @@ Column {
   ButtonGroup {
     id: backing
     options: [{value: "none", label: "None"}, {value: "translucent", label: "Smoked glass"}]
-    value: root.config.overlayBackground === true ? "translucent" : "none"
+    value: OverlayLogic.background(root.config) ? "translucent" : "none"
     foreground: root.foreground; fontFamily: root.fontFamily; fontSize: Style.font.caption
     onChanged: function(value) { root.save("overlayBackground", value === "translucent") }
     KeyNavigation.backtab: opacityChoice

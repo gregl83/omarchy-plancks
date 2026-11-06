@@ -41,7 +41,7 @@ PanelWindow {
     Canvas {
       anchors.fill: parent
       opacity: OverlayLogic.opacity(root.config)
-      visible: root.config.overlayBackground === true
+      visible: OverlayLogic.background(root.config)
       onWidthChanged: requestPaint()
       onHeightChanged: requestPaint()
       onAvailableChanged: if (available) requestPaint()
@@ -135,7 +135,7 @@ PanelWindow {
         renderType: Text.QtRendering
         antialiasing: true
         style: Text.Raised
-        styleColor: root.config.overlayBackground === true ? "#50070e16" : "#90070e16"
+        styleColor: OverlayLogic.background(root.config) ? "#50070e16" : "#90070e16"
       }
       Text {
         textFormat: Text.PlainText
@@ -147,7 +147,7 @@ PanelWindow {
         antialiasing: true
         font.weight: Font.DemiBold
         style: Text.Raised
-        styleColor: root.config.overlayBackground === true ? "#50070e16" : "#90070e16"
+        styleColor: OverlayLogic.background(root.config) ? "#50070e16" : "#90070e16"
       }
     }
     // No pulsing or animation on timer ticks. Respect the shell motion setting.

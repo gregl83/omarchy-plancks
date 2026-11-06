@@ -57,6 +57,9 @@ ShellRoot {
         }
         check(Logic.lead({overlaySeconds: -1}) === 60, "invalid lead falls back")
         check(Logic.opacity({overlayOpacity: 7}) === 0.65, "invalid opacity falls back")
+        check(Logic.background({}), "unset background defaults to glass")
+        check(!Logic.background({overlayBackground: false}), "explicit None preserved")
+        check(Logic.background({overlayBackground: true}), "explicit glass preserved")
         state.session = null
         state.timer = "−00:01:30"
         check(Logic.view(state, {overlayMode: "countdown", overlaySeconds: 90}).show, "custom lead")

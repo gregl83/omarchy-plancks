@@ -9,6 +9,9 @@ function lead(settings) {
   return typeof value === "number" && isFinite(value) && value >= 1 && value <= 600
     ? Math.round(value) : 60
 }
+function background(settings) {
+  return settings.overlayBackground !== false
+}
 function opacity(settings) {
   var value = settings.overlayOpacity
   return typeof value === "number" && isFinite(value) && value >= 0.2 && value <= 1 ? value : 0.65
