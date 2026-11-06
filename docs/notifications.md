@@ -41,7 +41,7 @@ Durations in insight messages use readable units such as `30 minutes` or `1 hour
 
 ## Settings and scheduling
 
-The **Notifications** section in Settings groups **Occasional insights**, its frequency and Preview controls, **Motivational quotes**, and **Finish notifications**.
+The **Notifications** tab in Settings groups **Occasional insights**, its frequency and Preview controls, **Motivational quotes**, and **Finish notifications**.
 
 **Motivational quotes** is enabled by default and can be switched off independently. It controls attributed quotes in both scheduled occasional insights and Preview. Historical observations and original reflective prompts remain available, and finish/session alerts are unaffected. Changing this preference does not enable notifications.
 

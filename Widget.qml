@@ -43,6 +43,11 @@ BarWidget {
     settings = next
     if (bar && bar.shell) bar.shell.updateEntryInline(moduleName, settings)
   }
+  function setOverlayPreference(name, value) {
+    if (["overlayMode", "overlaySeconds", "overlayOpacity", "overlayBackground"].indexOf(name) < 0) return
+    settings = Object.assign({}, settings, {[name]: value})
+    if (bar && bar.shell) bar.shell.updateEntryInline(moduleName, settings)
+  }
   readonly property bool opened: panel.opened
   readonly property bool popoutSwitchClosing: panel.popoutSwitchClosing
   readonly property real openPanelIndicatorWidth: label.implicitWidth

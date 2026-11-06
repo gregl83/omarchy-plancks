@@ -6,6 +6,7 @@ omarchy plugin validate .
 python3 tests/smoke_qml.py
 python3 tests/smoke_roadster.py
 python3 tests/smoke_notification_quotes.py
+python3 tests/smoke_overlay.py
 ```
 
 The notification quote fit check needs Quickshell and Liberation Sans (`ttf-liberation`); it runs offscreen.

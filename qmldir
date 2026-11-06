@@ -14,3 +14,5 @@ BoundedTextField 1.0 BoundedTextField.qml
 SessionActivity 1.0 SessionActivity.qml
 SunMoonGraphic 1.0 SunMoonGraphic.qml
 RoadsterGraphic 1.0 RoadsterGraphic.qml
+TimerOverlay 1.0 TimerOverlay.qml
+OverlaySettings 1.0 OverlaySettings.qml

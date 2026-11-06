@@ -38,6 +38,32 @@ Starting or ending an epoch changes its active/off-time appearance; passing an e
   <em>Your day at a glance: time remaining, predictions, and recent history. Sample data shown.</em>
 </p>
 
+## Settings tabs
+
+Settings opens on **Appearance**. Use the **Appearance**, **Overlay**, and **Notifications** tabs to switch sections; the selection stays while Settings is open. Tabs use the same hover, focus, and press states as the history tabs. Left/Right moves between tabs; Enter/Space selects one, and Tab moves through controls. **Reset data** stays below the selected section.
+
+| Tab | Controls |
+| --- | --- |
+| Appearance | Tooltips and animated graphic selection. |
+| Overlay | Clock mode, countdown lead time, opacity, and background. |
+| Notifications | Occasional insights, frequency, preview, motivational quotes, and finish warnings. |
+
+## Overlay clock
+
+![Overlay clock at 59 seconds with translucent backing](../assets/preview-overlay.png)
+
+Settings → **Overlay** provides a small, click-through clock at the bottom center of the focused monitor. It cannot take keyboard focus or select text, and pointer input passes to the application beneath it. It reserves no desktop space and leaves a margin for a bottom bar. Only one overlay is shown across monitors.
+
+| Mode | Behavior |
+| --- | --- |
+| Off (default) | No overlay. |
+| Always | Shows the bar's current timer, including learning and paused sessions. |
+| Final countdown | Appears in the final **60 seconds** before the interval target, then remains through overrun until the interval changes. |
+
+Set the countdown lead time from **1–600 seconds**. Choose **40%, 65% (default), or 85%** text opacity and **None (default)** or **Translucent** background. Steady monospaced digits fade in without flashing or pulsing.
+
+The overlay follows the same notation and priority as the bar: `t_A` for activity and `t_R` for rest/long rest when a session exists; otherwise `t_E` for an epoch or `t_O` for off-time. A paused session freezes the timer and shows a pause marker. Final countdown requires a valid target; elapsed time during epoch learning does not trigger it. Loading or timer errors hide the overlay. This display does not send notifications or advance stages automatically.
+
 ## Notifications
 
 Configure optional insights and finish alerts in Settings. See [Notifications](notifications.md) for all variations, message examples, scheduling, session target alerts, and image formats.

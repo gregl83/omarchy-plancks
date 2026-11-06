@@ -19,6 +19,7 @@ An **epoch** is your daily window of opportunity; **off-time** is the space betw
 - **Make time for focus.** Run Pomodoro rounds or your own activity and rest sessions.
 - **Find your rhythm.** Browse searchable history and trends, and leave unusual days out of predictions.
 - **Pick your companion.** Watch the sun and moon descend through your daily cycle, or a Coffee cup, Starship, or Roadster fill during off-time and empty during your epoch.
+- **Keep the countdown in sight.** An optional click-through overlay shows your timer always or during the final 60 seconds.
 - **Get a gentle nudge.** Optional insights and finish notifications help you keep track of your day.
 - **Keep it yours.** Local storage, no account, and no network requests from the plugin.
 
