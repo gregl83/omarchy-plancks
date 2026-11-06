@@ -109,6 +109,7 @@ ShellRoot {
       if (!test.ipcDone || !Plancks.EpochController.ready || Plancks.EpochController.busy) return
       if (test.step === 0) {
         if (!test.check(widget.epoch.phase === "off", "initial phase")) return
+        if (!test.check(resetTest.findChild(widget, "plancks_barTimer").text.indexOf("<sub>O</sub>") >= 0, "off-time bar notation")) return
         Plancks.EpochController.busy = true
         if (!test.check(Plancks.EpochController.ipc.primaryAction() === "busy", "Primary IPC busy guard")) return
         if (!test.check(Plancks.EpochController.ipc.toggleEpoch() === "busy", "IPC busy guard")) return
@@ -123,6 +124,7 @@ ShellRoot {
         test.step = 1
       } else if (test.step === 1) {
         if (!test.check(widget.epoch.phase === "active" && second.epoch.phase === "active", "shared active epoch")) return
+        if (!test.check(resetTest.findChild(widget, "plancks_barTimer").text.indexOf("<sub>E</sub>") >= 0, "epoch bar notation")) return
         if (test.preview) widget.open()
         test.step = 2
       } else if (test.step === 2) {
@@ -390,6 +392,15 @@ ShellRoot {
       compare(widget.settings.animatedGraphic, "roadster")
       tryVerify(function() { return timerGraphic.item && timerGraphic.item.objectName === "plancks_roadsterDrawing" })
       keyClick(Qt.Key_Tab)
+      verify(reset.activeFocus, "Appearance content ends at Reset data")
+      var appearanceTab = findVisual(scroll.contentItem, "plancks_settingsTab_0")
+      var overlayTab = findVisual(scroll.contentItem, "plancks_settingsTab_1")
+      var notificationsTab = findVisual(scroll.contentItem, "plancks_settingsTab_2")
+      notificationsTab.clicked()
+      notificationsTab.forceActiveFocus()
+      keyClick(Qt.Key_Tab)
+      compare(settingsView.tab, 2, "Notifications tab selected")
+      verify(!graphicChoice.visible, "Appearance controls hidden in Notifications")
       var insightToggle = findChild(panel, "plancks_insightsToggle")
       var finishToggle = findChild(panel, "plancks_finishNotificationsToggle")
       var insightPreview = findChild(panel, "plancks_previewInsightButton")
@@ -460,9 +471,28 @@ ShellRoot {
       verify(!widget.insightsEnabled && !widget.finishNotificationsEnabled, "Both options can be disabled")
       finishToggle.forceActiveFocus()
       keyClick(Qt.Key_Tab)
-      verify(reset.activeFocus, "Tab moves from finish notifications to reset")
+      verify(reset.activeFocus, "Notifications content ends at Reset data")
+      overlayTab.clicked()
+      compare(settingsView.tab, 1, "Overlay tab selected")
+      verify(!insightToggle.visible, "Notifications controls hidden in Overlay")
+      var overlayMode = findChild(panel, "plancks_overlayMode")
+      overlayMode.forceActiveFocus()
+      overlayMode.changed("countdown")
+      compare(widget.settings.overlayMode, "countdown", "Overlay mode saved")
+      keyClick(Qt.Key_Tab)
+      var overlaySeconds = findChild(panel, "plancks_overlaySeconds")
+      verify(overlaySeconds.activeFocus, "Tab reaches countdown lead time")
+      overlaySeconds.text = "30"
+      overlaySeconds.editingFinished()
+      compare(widget.settings.overlaySeconds, 30, "Countdown seconds saved")
+      overlaySeconds.text = "0"
+      overlaySeconds.editingFinished()
+      compare(widget.settings.overlaySeconds, 30, "Invalid countdown seconds rejected")
+      widget.setOverlayPreference("overlayMode", "off")
+      notificationsTab.clicked()
+      reset.forceActiveFocus()
       keyClick(Qt.Key_Backtab)
-      verify(finishToggle.activeFocus, "Disabled warning field is skipped")
+      verify(finishToggle.activeFocus, "Reset returns to last visible notification control")
       keyClick(Qt.Key_Backtab)
       verify(quoteToggle.activeFocus, "Quote preference remains available for previews")
       keyClick(Qt.Key_Backtab)
@@ -470,7 +500,11 @@ ShellRoot {
       keyClick(Qt.Key_Backtab)
       verify(insightToggle.activeFocus, "Disabled cadence is skipped")
       keyClick(Qt.Key_Backtab)
-      verify(roadsterChoice.activeFocus, "Shift-Tab moves from insights to Roadster")
+      verify(notificationsTab.activeFocus, "Shift-Tab moves from insights to settings tabs")
+      appearanceTab.clicked()
+      reset.forceActiveFocus()
+      keyClick(Qt.Key_Backtab)
+      verify(roadsterChoice.activeFocus, "Reset returns to last appearance control")
       keyClick(Qt.Key_Backtab)
       verify(starshipChoice.activeFocus, "Shift-Tab reaches Starship")
       keyClick(Qt.Key_Backtab)

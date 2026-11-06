@@ -43,6 +43,11 @@ BarWidget {
     settings = next
     if (bar && bar.shell) bar.shell.updateEntryInline(moduleName, settings)
   }
+  function setOverlayPreference(name, value) {
+    if (["overlayMode", "overlaySeconds", "overlayOpacity", "overlayBackground", "overlaySize"].indexOf(name) < 0) return
+    settings = Object.assign({}, settings, {[name]: value})
+    if (bar && bar.shell) bar.shell.updateEntryInline(moduleName, settings)
+  }
   readonly property bool opened: panel.opened
   readonly property bool popoutSwitchClosing: panel.popoutSwitchClosing
   readonly property real openPanelIndicatorWidth: label.implicitWidth
@@ -94,6 +99,7 @@ BarWidget {
     }
     Text {
       id: label
+      objectName: "plancks_barTimer"
       // Rich text handles hover itself; keep the button's input surface above it.
       z: -1
       anchors.centerIn: parent
@@ -101,7 +107,7 @@ BarWidget {
       text: {
         var warning = EpochController.error ? "! " : ""
         var session = root.epoch.session
-        var notation = "<i>t</i><sub>" + (session ? (session.kind === "focus" ? "A" : "R") : "P") + "</sub>"
+        var notation = "<i>t</i><sub>" + (session ? (session.kind === "focus" ? "A" : "R") : (root.epoch.phase === "active" ? "E" : "O")) + "</sub>"
         var timer = session ? session.timer : root.epoch.timer || "--:--:--"
         if (root.vertical) return warning + notation + "<br>" + timer.replace(/:/g, "<br>")
         var gap = '<span style="font-size: ' + (button.fontSize / 2) + 'px">&#8202;</span>'

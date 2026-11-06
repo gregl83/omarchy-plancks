@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "."
 import "Graphics.js" as Graphics
@@ -54,6 +55,7 @@ Panel {
   function openSettings() {
     keys.forceActiveFocus()
     showingHistory = false
+    settingsView.tab = 0
     showingSettings = true
     Qt.callLater(function() { scroll.contentY = 0; keys.forceActiveFocus() })
   }
@@ -123,7 +125,7 @@ Panel {
     }
   }
   Component.onDestruction: { EpochController.unregisterPanel(root); if (detailSubscription) EpochController.setPanelOpen(false) }
-  readonly property color foreground: bar ? bar.foreground : Color.foreground
+  readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
 
   function stamp(value) {
     return value === null || value === undefined ? "Not enough history" : Qt.formatDateTime(new Date(value), "ddd, MMM d, yyyy · HH:mm:ss")
@@ -213,7 +215,7 @@ Panel {
         else if (root.showingSession) historyBackButton.forceActiveFocus()
         else if (root.showingHistory) historyView.focusBack()
         else if (root.confirmingReset) cancelButton.forceActiveFocus()
-        else if (root.showingSettings) tooltipSwitch.forceActiveFocus()
+        else if (root.showingSettings) settingsTabs.itemAt(settingsView.tab).forceActiveFocus()
         else if (actionButton.enabled) actionButton.forceActiveFocus()
         else if (retryButton.visible) retryButton.forceActiveFocus()
       }
@@ -480,11 +482,12 @@ Panel {
               }
               Text {
                 id: timerText
+                objectName: "plancks_epochTimer"
                 anchors.centerIn: timerFrame
                 readonly property string timer: root.epoch.timer || "--:--:--"
                 readonly property bool countingDown: /^[−-]/.test(timer)
                 textFormat: Text.RichText
-                text: "<span style=\"font-size: " + Style.space(20) + "px;\"><i>t</i><sub>P</sub></span> " + timer
+                text: "<span style=\"font-size: " + Style.space(20) + "px;\"><i>t</i><sub>" + (root.epoch.phase === "active" ? "E" : "O") + "</sub></span> " + timer
                 color: root.foreground
                 opacity: root.epoch.phase !== "active" && EpochController.error === "" ? 0.45 : 1
                 Behavior on opacity {
@@ -995,161 +998,214 @@ Panel {
             width: parent.width
             spacing: Style.space(14)
             visible: root.showingSettings && !root.confirmingReset
+            property int tab: 0
+            readonly property Item firstControl: tab === 0 ? tooltipSwitch : tab === 1 ? overlaySettings.firstControl : insightsSettings.firstControl
+            readonly property Item lastControl: tab === 0 ? graphicChoices.itemAt(graphicChoices.count - 1) : tab === 1 ? overlaySettings.lastControl : insightsSettings.lastControl
             property int previewElapsed: 0
             onVisibleChanged: if (!visible) previewElapsed = 0
             Timer {
               objectName: "plancks_graphicPreviewTimer"
               interval: 100
               repeat: true
-              running: root.opened && settingsView.visible
+              running: root.opened && settingsView.visible && settingsView.tab === 0
               onTriggered: settingsView.previewElapsed = (settingsView.previewElapsed + interval * 0.55) % 17200
             }
-            Item {
-              id: tooltipControl
+            Row {
               width: parent.width
-              height: Math.max(tooltipLabel.implicitHeight, tooltipSwitch.implicitHeight)
-              Text {
-                id: tooltipLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Tooltips"
-                color: root.foreground
-                font.family: title.font.family
-                font.pixelSize: Style.font.bodySmall
-              }
-              ToggleSwitch {
-                id: tooltipSwitch
-                objectName: "plancks_tooltipsSwitch"
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                trackHeight: Style.space(16)
-                cursorPad: Style.space(4)
-                checked: root.tooltipsEnabled
-                foreground: root.foreground
-                activeFocusOnTab: true
-                hasCursor: activeFocus
-                Accessible.role: Accessible.CheckBox
-                Accessible.name: "Show tooltips"
-                Accessible.checkable: true
-                Accessible.checked: checked
-                KeyNavigation.tab: graphicChoices.itemAt(0)
-                KeyNavigation.backtab: historyBackButton
-                onActiveFocusChanged: if (activeFocus) root.revealButton(tooltipControl)
-                onToggled: {
-                  forceActiveFocus()
-                  if (root.hostWidget) root.hostWidget.setTooltipsEnabled(!checked)
+              spacing: Style.spacing.md
+              Repeater {
+                id: settingsTabs
+                model: ["Appearance", "Overlay", "Notifications"]
+                delegate: Button {
+                  required property string modelData
+                  required property int index
+                  objectName: "plancks_settingsTab_" + index
+                  width: (settingsView.width - Style.spacing.md * 2) / 3
+                  text: modelData
+                  selected: settingsView.tab === index
+                  bordered: true
+                  focusable: true
+                  foreground: root.foreground
+                  fontFamily: title.font.family
+                  fontSize: Style.font.caption
+                  Accessible.role: Accessible.PageTab
+                  Accessible.name: modelData
+                  Accessible.selected: selected
+                  KeyNavigation.left: index > 0 ? settingsTabs.itemAt(index - 1) : null
+                  KeyNavigation.right: index < 2 ? settingsTabs.itemAt(index + 1) : null
+                  KeyNavigation.backtab: index > 0 ? settingsTabs.itemAt(index - 1) : historyBackButton
+                  KeyNavigation.tab: index < 2 ? settingsTabs.itemAt(index + 1) : settingsView.firstControl
+                  onClicked: { settingsView.tab = index; scroll.contentY = 0 }
+                  onActiveFocusChanged: if (activeFocus) root.revealButton(this)
+                  Keys.onEscapePressed: root.closeSettings()
                 }
-                Keys.onSpacePressed: toggled()
-                Keys.onReturnPressed: toggled()
-                Keys.onEnterPressed: toggled()
-                Keys.onEscapePressed: root.closeSettings()
               }
             }
-            Text {
-              width: parent.width
-              text: "Show hover hints in the bar and panels."
-              wrapMode: Text.WordWrap
-              color: root.foreground
-              opacity: 0.6
-              font.family: title.font.family
-              font.pixelSize: Style.font.caption
-            }
-            PanelSeparator { foreground: root.foreground }
             Column {
+              id: appearanceSettings
               width: parent.width
-              spacing: Style.space(8)
-              PanelSectionHeader {
-                text: "ANIMATED GRAPHIC"
-                foreground: root.foreground
-                fontFamily: title.font.family
+              spacing: Style.space(14)
+              visible: settingsView.tab === 0
+              Item {
+                id: tooltipControl
+                width: parent.width
+                height: Math.max(tooltipLabel.implicitHeight, tooltipSwitch.implicitHeight)
+                Text {
+                  id: tooltipLabel
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "Tooltips"
+                  color: root.foreground
+                  font.family: title.font.family
+                  font.pixelSize: Style.font.bodySmall
+                }
+                ToggleSwitch {
+                  id: tooltipSwitch
+                  objectName: "plancks_tooltipsSwitch"
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  trackHeight: Style.space(16)
+                  cursorPad: Style.space(4)
+                  checked: root.tooltipsEnabled
+                  foreground: root.foreground
+                  activeFocusOnTab: true
+                  hasCursor: activeFocus
+                  Accessible.role: Accessible.CheckBox
+                  Accessible.name: "Show tooltips"
+                  Accessible.checkable: true
+                  Accessible.checked: checked
+                  KeyNavigation.tab: graphicChoices.itemAt(0)
+                  KeyNavigation.backtab: settingsTabs.itemAt(2)
+                  onActiveFocusChanged: if (activeFocus) root.revealButton(tooltipControl)
+                  onToggled: {
+                    forceActiveFocus()
+                    if (root.hostWidget) root.hostWidget.setTooltipsEnabled(!checked)
+                  }
+                  Keys.onSpacePressed: toggled()
+                  Keys.onReturnPressed: toggled()
+                  Keys.onEnterPressed: toggled()
+                  Keys.onEscapePressed: root.closeSettings()
+                }
               }
               Text {
-                objectName: "plancks_graphicPreviewState"
                 width: parent.width
-                text: Graphics.previewFrame(settingsView.previewElapsed).state.label
-                horizontalAlignment: Text.AlignHCenter
+                text: "Show hover hints in the bar and panels."
+                wrapMode: Text.WordWrap
                 color: root.foreground
                 opacity: 0.6
                 font.family: title.font.family
                 font.pixelSize: Style.font.caption
               }
-              Grid {
-                id: graphicGrid
+              PanelSeparator { foreground: root.foreground }
+              Column {
                 width: parent.width
-                columns: 2
-                spacing: Style.space(12)
-                Repeater {
-                  id: graphicChoices
-                  model: Graphics.options
-                  delegate: Button {
-                    id: graphicChoice
-                    required property var modelData
-                    required property int index
-                    width: (graphicGrid.width - (graphicGrid.columns - 1) * graphicGrid.spacing) / graphicGrid.columns
-                    implicitHeight: graphicTile.implicitHeight + Style.space(16)
-                    objectName: "plancks_graphic_" + modelData.id
-                    selected: (root.hostWidget ? root.hostWidget.animatedGraphic : "coffee") === modelData.id
-                    // Selection stays visible while the shared button paints its focus border.
-                    color: selected ? Style.selectedFillFor(foreground, accent)
-                      : activeFocus ? Style.focusFillFor(foreground, accent)
-                      : hot ? Style.hoverFillFor(foreground, accent) : background
-                    // A selection is restored state, not a hover transition.
-                    Behavior on color { enabled: false }
-                    foreground: root.foreground
-                    bordered: true
-                    focusable: true
-                    Accessible.role: Accessible.RadioButton
-                    Accessible.name: modelData.name
-                    Accessible.checkable: true
-                    Accessible.checked: selected
-                    Accessible.description: "Preview cycles through ready, learning, countdown, and overrun in both phases."
-                    KeyNavigation.tab: index + 1 < graphicChoices.count ? graphicChoices.itemAt(index + 1) : insightsSettings.firstControl
-                    KeyNavigation.backtab: index > 0 ? graphicChoices.itemAt(index - 1) : tooltipSwitch
-                    onClicked: if (root.hostWidget) root.hostWidget.setAnimatedGraphic(modelData.id)
-                    onActiveFocusChanged: if (activeFocus) root.revealButton(graphicChoice)
-                    Keys.onEscapePressed: root.closeSettings()
-                    Column {
-                      id: graphicTile
-                      width: parent.width - Style.space(16)
-                      anchors.centerIn: parent
-                      spacing: Style.space(6)
-                      GraphicPreview {
-                        id: graphicPreview
-                        objectName: "plancks_graphicPreview_" + graphicChoice.modelData.id
-                        width: Style.space(58)
-                        height: Style.space(54)
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        // Center the drawing's visible bounds, including its handle.
-                        graphic: graphicChoice.modelData.id
-                        foreground: root.foreground
-                        running: root.opened && settingsView.visible
-                        elapsed: settingsView.previewElapsed
-                      }
-                      Text {
-                        width: parent.width
-                        text: graphicChoice.modelData.name
-                        color: root.foreground
-                        font.family: title.font.family
-                        font.pixelSize: Style.font.bodySmall
-                        font.bold: graphicChoice.selected
-                        horizontalAlignment: Text.AlignHCenter
-                        wrapMode: Text.WordWrap
+                spacing: Style.space(8)
+                PanelSectionHeader {
+                  text: "ANIMATED GRAPHIC"
+                  foreground: root.foreground
+                  fontFamily: title.font.family
+                }
+                Text {
+                  objectName: "plancks_graphicPreviewState"
+                  width: parent.width
+                  text: Graphics.previewFrame(settingsView.previewElapsed).state.label
+                  horizontalAlignment: Text.AlignHCenter
+                  color: root.foreground
+                  opacity: 0.6
+                  font.family: title.font.family
+                  font.pixelSize: Style.font.caption
+                }
+                Grid {
+                  id: graphicGrid
+                  width: parent.width
+                  columns: 2
+                  spacing: Style.space(12)
+                  Repeater {
+                    id: graphicChoices
+                    model: Graphics.options
+                    delegate: Button {
+                      id: graphicChoice
+                      required property var modelData
+                      required property int index
+                      width: (graphicGrid.width - (graphicGrid.columns - 1) * graphicGrid.spacing) / graphicGrid.columns
+                      implicitHeight: graphicTile.implicitHeight + Style.space(16)
+                      objectName: "plancks_graphic_" + modelData.id
+                      selected: (root.hostWidget ? root.hostWidget.animatedGraphic : "coffee") === modelData.id
+                      // Selection stays visible while the shared button paints its focus border.
+                      color: selected ? Style.selectedFillFor(foreground, accent)
+                        : activeFocus ? Style.focusFillFor(foreground, accent)
+                        : hot ? Style.hoverFillFor(foreground, accent) : background
+                      // A selection is restored state, not a hover transition.
+                      Behavior on color { enabled: false }
+                      foreground: root.foreground
+                      bordered: true
+                      focusable: true
+                      Accessible.role: Accessible.RadioButton
+                      Accessible.name: modelData.name
+                      Accessible.checkable: true
+                      Accessible.checked: selected
+                      Accessible.description: "Preview cycles through ready, learning, countdown, and overrun in both phases."
+                      KeyNavigation.tab: index + 1 < graphicChoices.count ? graphicChoices.itemAt(index + 1) : resetButton
+                      KeyNavigation.backtab: index > 0 ? graphicChoices.itemAt(index - 1) : tooltipSwitch
+                      onClicked: if (root.hostWidget) root.hostWidget.setAnimatedGraphic(modelData.id)
+                      onActiveFocusChanged: if (activeFocus) root.revealButton(graphicChoice)
+                      Keys.onEscapePressed: root.closeSettings()
+                      Column {
+                        id: graphicTile
+                        width: parent.width - Style.space(16)
+                        anchors.centerIn: parent
+                        spacing: Style.space(6)
+                        GraphicPreview {
+                          id: graphicPreview
+                          objectName: "plancks_graphicPreview_" + graphicChoice.modelData.id
+                          width: Style.space(58)
+                          height: Style.space(54)
+                          anchors.horizontalCenter: parent.horizontalCenter
+                          // Center the drawing's visible bounds, including its handle.
+                          graphic: graphicChoice.modelData.id
+                          foreground: root.foreground
+                          running: root.opened && settingsView.visible && settingsView.tab === 0
+                          elapsed: settingsView.previewElapsed
+                        }
+                        Text {
+                          width: parent.width
+                          text: graphicChoice.modelData.name
+                          color: root.foreground
+                          font.family: title.font.family
+                          font.pixelSize: Style.font.bodySmall
+                          font.bold: graphicChoice.selected
+                          horizontalAlignment: Text.AlignHCenter
+                          wrapMode: Text.WordWrap
+                        }
                       }
                     }
                   }
                 }
               }
+
             }
 
-            PanelSeparator { foreground: root.foreground }
             InsightsSettings {
               id: insightsSettings
+              visible: settingsView.tab === 2
               objectName: "plancks_insightsSettings"
               width: parent.width
               hostWidget: root.hostWidget
               foreground: root.foreground
               fontFamily: title.font.family
-              previousControl: graphicChoices.itemAt(graphicChoices.count - 1)
+              previousControl: settingsTabs.itemAt(2)
+              nextControl: resetButton
+              onBackRequested: root.closeSettings()
+              onRevealRequested: function(item) { root.revealButton(item) }
+            }
+            OverlaySettings {
+              id: overlaySettings
+              visible: settingsView.tab === 1
+              width: parent.width
+              hostWidget: root.hostWidget
+              foreground: root.foreground
+              fontFamily: title.font.family
+              previousControl: settingsTabs.itemAt(2)
               nextControl: resetButton
               onBackRequested: root.closeSettings()
               onRevealRequested: function(item) { root.revealButton(item) }
@@ -1184,7 +1240,7 @@ Panel {
                 fontSize: Style.font.caption
                 height: insightsSettings.previewButtonHeight
                 foreground: root.foreground
-                KeyNavigation.backtab: insightsSettings.lastControl
+                KeyNavigation.backtab: settingsView.lastControl
                 KeyNavigation.tab: historyBackButton
                 onActiveFocusChanged: if (activeFocus) root.revealButton(resetButton)
                 onClicked: {
@@ -1383,7 +1439,7 @@ Panel {
                 enabled: !EpochController.busy
                 focusable: true
                 bordered: true
-                foreground: root.bar ? root.bar.urgent : Color.urgent
+                foreground: root.bar ? root.bar.urgent : Commons.Color.urgent
                 Accessible.name: text
                 Accessible.description: helpText
                 KeyNavigation.tab: cancelButton

@@ -85,6 +85,11 @@ QtObject {
       } else if (state[key] !== values[key]) state[key] = values[key]
     }
   }
+  property TimerOverlay overlayClock: TimerOverlay {
+    timerState: root.state
+    config: root.settings
+    operational: root.ready && root.error === ""
+  }
   property bool ready: false
   property bool busy: false
   property string error: ""

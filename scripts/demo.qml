@@ -3,6 +3,7 @@ import QtQuick.Window
 import Quickshell
 import QtTest
 import qs.Commons
+import qs.Commons as Commons
 import "Plancks" as Plancks
 import "PreviewContext.js" as Desktop
 
@@ -42,9 +43,9 @@ ShellRoot {
     id: bar
     property bool vertical: false
     property int barSize: Style.bar.sizeHorizontal
-    property color foreground: Color.foreground
-    property color barForeground: Color.foreground
-    property color urgent: Color.urgent
+    property color foreground: Commons.Color.foreground
+    property color barForeground: Commons.Color.foreground
+    property color urgent: Commons.Color.urgent
     property string position: "top"
     property bool foregroundAnimationEnabled: false
     property bool hidden: false
@@ -69,30 +70,30 @@ ShellRoot {
       id: stage
       width: 1280; height: 960
       PreviewWallpaper { id: wallpaper; anchors.fill: parent; overview: true }
-      Rectangle { anchors.fill: parent; color: Color.background; opacity: 0.83 }
-      Rectangle { x: 64; y: 74; width: 36; height: 3; color: Color.accent }
-      Text { x: 116; y: 61; text: "PLANCKS"; color: Color.foreground; font.family: Style.font.family; font.pixelSize: 24; font.letterSpacing: 4 }
+      Rectangle { anchors.fill: parent; color: Commons.Color.background; opacity: 0.83 }
+      Rectangle { x: 64; y: 74; width: 36; height: 3; color: Commons.Color.accent }
+      Text { x: 116; y: 61; text: "PLANCKS"; color: Commons.Color.foreground; font.family: Style.font.family; font.pixelSize: 24; font.letterSpacing: 4 }
       Column {
         x: 64; y: 265; width: 490; spacing: 26
-        Text { text: demo.chapter; color: Color.accent; font.family: Style.font.family; font.pixelSize: 15; font.letterSpacing: 2 }
-        Text { text: demo.heading; color: Color.foreground; font.family: Style.font.family; font.pixelSize: 56; font.bold: true; lineHeight: 1.12 }
-        Text { text: demo.caption; color: Color.muted; font.family: Style.font.family; font.pixelSize: 22; lineHeight: 1.45 }
+        Text { text: demo.chapter; color: Commons.Color.accent; font.family: Style.font.family; font.pixelSize: 15; font.letterSpacing: 2 }
+        Text { text: demo.heading; color: Commons.Color.foreground; font.family: Style.font.family; font.pixelSize: 56; font.bold: true; lineHeight: 1.12 }
+        Text { text: demo.caption; color: Commons.Color.muted; font.family: Style.font.family; font.pixelSize: 22; lineHeight: 1.45 }
       }
       Rectangle {
         x: 620; y: 54; width: 600; height: 806; radius: 12
-        color: Color.background
-        border.color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.14)
+        color: Commons.Color.background
+        border.color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.14)
         PreviewWallpaper { anchors.fill: parent; anchors.margins: 2; opacity: 0.7 }
       }
       Item {
         id: desktop
         x: 640; y: 74; width: 560; height: 766
         Rectangle {
-          width: parent.width; height: bar.barSize; color: Color.bar.background
+          width: parent.width; height: bar.barSize; color: Commons.Color.bar.background
           Text {
             anchors.right: widget.left; anchors.rightMargin: Style.space(8)
             height: parent.height; verticalAlignment: Text.AlignVCenter
-            text: "Thursday 13:37"; color: Color.foreground
+            text: "Thursday 13:37"; color: Commons.Color.foreground
             font.family: Style.font.family; font.pixelSize: Style.font.body
           }
           Plancks.Widget {
@@ -101,7 +102,7 @@ ShellRoot {
             bar: bar; width: implicitWidth; height: bar.barSize
             Rectangle {
               anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter
-              width: widget.openPanelIndicatorWidth; height: 2; radius: 1; color: Color.accent
+              width: widget.openPanelIndicatorWidth; height: 2; radius: 1; color: Commons.Color.accent
             }
           }
         }
@@ -109,18 +110,18 @@ ShellRoot {
       Rectangle {
         x: demo.pointerX - 12; y: demo.pointerY - 12; z: 100
         width: 24; height: 24; radius: 12; color: "transparent"
-        border.color: Color.accent; border.width: 2; opacity: demo.pointerOpacity
+        border.color: Commons.Color.accent; border.width: 2; opacity: demo.pointerOpacity
         Behavior on x { NumberAnimation { duration: 260; easing.type: Easing.InOutCubic } }
         Behavior on y { NumberAnimation { duration: 260; easing.type: Easing.InOutCubic } }
         Behavior on opacity { NumberAnimation { duration: 180 } }
-        Rectangle { anchors.centerIn: parent; width: 5; height: 5; radius: 3; color: Color.accent }
+        Rectangle { anchors.centerIn: parent; width: 5; height: 5; radius: 3; color: Commons.Color.accent }
       }
-      Rectangle { x: 64; y: 890; width: 1152; height: 1; color: Color.muted; opacity: 0.25 }
-      Text { x: 64; y: 912; text: "REAL INTERFACE  /  SAMPLE HISTORY"; color: Color.muted; font.family: Style.font.family; font.pixelSize: 13; font.letterSpacing: 1.2 }
-      Text { x: 940; y: 912; width: 276; horizontalAlignment: Text.AlignRight; text: "gregl83.plancks"; color: Color.muted; font.family: Style.font.family; font.pixelSize: 14 }
-      Rectangle { x: 64; y: 890; height: 2; width: 1152 * demo.frame / (demo.duration * DEMO_FPS); color: Color.accent }
+      Rectangle { x: 64; y: 890; width: 1152; height: 1; color: Commons.Color.muted; opacity: 0.25 }
+      Text { x: 64; y: 912; text: "REAL INTERFACE  /  SAMPLE HISTORY"; color: Commons.Color.muted; font.family: Style.font.family; font.pixelSize: 13; font.letterSpacing: 1.2 }
+      Text { x: 940; y: 912; width: 276; horizontalAlignment: Text.AlignRight; text: "gregl83.plancks"; color: Commons.Color.muted; font.family: Style.font.family; font.pixelSize: 14 }
+      Rectangle { x: 64; y: 890; height: 2; width: 1152 * demo.frame / (demo.duration * DEMO_FPS); color: Commons.Color.accent }
       Rectangle {
-        anchors.fill: parent; z: 200; color: Color.background
+        anchors.fill: parent; z: 200; color: Commons.Color.background
         opacity: demo.frame < DEMO_FPS * 0.5 ? 1 - demo.frame / (DEMO_FPS * 0.5)
           : demo.frame > (demo.duration - 0.5) * DEMO_FPS ? (demo.frame - (demo.duration - 0.5) * DEMO_FPS) / (DEMO_FPS * 0.5) : 0
       }

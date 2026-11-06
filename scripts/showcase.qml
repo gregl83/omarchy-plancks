@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Window
 import Quickshell
 import qs.Commons
+import qs.Commons as Commons
 import "Plancks" as Plancks
 import "Plancks/Graphics.js" as Graphics
 import "PreviewContext.js" as Desktop
@@ -9,9 +10,9 @@ import "PreviewContext.js" as Desktop
 ShellRoot {
   id: capture
   property string fontFamily: Style.font.family
-  property color ink: Color.foreground
-  property color muted: Color.muted
-  property color accent: Color.accent
+  property color ink: Commons.Color.foreground
+  property color muted: Commons.Color.muted
+  property color accent: Commons.Color.accent
   property var hours: [7.5, 8.5, 7.75, 8.25, 8, 8]
   PanelWindow {
     id: window
@@ -58,7 +59,7 @@ ShellRoot {
       }
       Rectangle {
         x: 52; y: 276; width: 402; height: 452
-        color: Color.popups.background
+        color: Commons.Color.popups.background
         radius: 8
       }
       Column {
@@ -92,7 +93,7 @@ ShellRoot {
       // The main panel is a real frozen production capture, including bar context.
       Rectangle {
         x: 478; y: 233; width: 512; height: 654
-        color: Color.popups.background
+        color: Commons.Color.popups.background
         border.color: Qt.rgba(capture.ink.r, capture.ink.g, capture.ink.b, 0.4)
         border.width: 1
         radius: 8
@@ -100,7 +101,7 @@ ShellRoot {
           x: 14; y: 14; width: parent.width; height: parent.height
           z: -1
           radius: 8
-          color: Color.background
+          color: Commons.Color.background
           opacity: 0.6
         }
         Image {
@@ -116,7 +117,7 @@ ShellRoot {
         spacing: 24
         Rectangle {
           width: parent.width; height: 220
-          color: Color.popups.background
+          color: Commons.Color.popups.background
           border.color: Qt.rgba(capture.ink.r, capture.ink.g, capture.ink.b, 0.2)
           radius: 8
           Column {
@@ -144,7 +145,7 @@ ShellRoot {
         }
         Rectangle {
           width: parent.width; height: 220
-          color: Color.popups.background
+          color: Commons.Color.popups.background
           border.color: Qt.rgba(capture.ink.r, capture.ink.g, capture.ink.b, 0.2)
           radius: 8
           Text {
@@ -183,7 +184,7 @@ ShellRoot {
         }
         Rectangle {
           width: parent.width; height: 173
-          color: Color.popups.background
+          color: Commons.Color.popups.background
           border.color: Qt.rgba(capture.ink.r, capture.ink.g, capture.ink.b, 0.4)
           radius: 8
           Rectangle { x: 0; y: 20; width: 3; height: parent.height - 40; color: capture.accent }

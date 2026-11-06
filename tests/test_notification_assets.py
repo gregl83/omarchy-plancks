@@ -9,7 +9,10 @@ class NotificationAssetsTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1] / 'assets/notifications'
         for graphic in ('sun-moon', 'coffee', 'starship', 'roadster'):
             for phase in ('active', 'off-time'):
-                paths = [f'{phase}/fill-{level:03}.png' for level in range(0, 101, 5)]
+                levels = set(range(0, 101, 5))
+                if graphic == 'roadster' and phase == 'active':
+                    levels.update(range(45, 56))
+                paths = [f'{phase}/fill-{level:03}.png' for level in sorted(levels)]
                 paths += [f'{state}/{phase}.png' for state in ('learning', 'overtime')]
                 for path in paths:
                     with self.subTest(graphic=graphic, path=path):

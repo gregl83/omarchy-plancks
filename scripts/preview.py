@@ -80,7 +80,7 @@ with tempfile.TemporaryDirectory(prefix='plancks-preview-') as directory:
         (root / name).symlink_to(shell / name)
     plugin = root / 'Plancks'
     plugin.mkdir()
-    for name in ('qmldir', 'Widget.qml', 'EpochPanel.qml', 'HistoryView.qml', 'HistoryTrend.qml', 'AnimatedGraphic.qml', 'CoffeeGraphic.qml', 'StarshipGraphic.qml', 'SunMoonGraphic.qml', 'RoadsterGraphic.qml', 'InsightsSettings.qml', 'insights.py', 'GraphicPreview.qml', 'Graphics.js', 'plancks.py', 'sessions.py', 'SessionConfig.qml', 'SessionHistory.qml', 'SessionActivity.qml', 'BoundedTextField.qml', 'clipboard_read.py', 'assets'):
+    for name in ('qmldir', 'TimerOverlay.qml', 'OverlaySettings.qml', 'OverlayLogic.js', 'Widget.qml', 'EpochPanel.qml', 'HistoryView.qml', 'HistoryTrend.qml', 'AnimatedGraphic.qml', 'CoffeeGraphic.qml', 'StarshipGraphic.qml', 'SunMoonGraphic.qml', 'RoadsterGraphic.qml', 'InsightsSettings.qml', 'insights.py', 'GraphicPreview.qml', 'Graphics.js', 'plancks.py', 'sessions.py', 'SessionConfig.qml', 'SessionHistory.qml', 'SessionActivity.qml', 'BoundedTextField.qml', 'clipboard_read.py', 'assets'):
         (plugin / name).symlink_to(REPO / name)
     controller = (REPO / 'EpochController.qml').read_text()
     command = next(line for line in controller.splitlines() if line.strip().startswith('command: ["python3"'))
@@ -91,6 +91,7 @@ import QtQuick.Window
 import Quickshell
 import QtTest
 import qs.Commons
+import qs.Commons as Commons
 import "Plancks" as Plancks
 import "PreviewContext.js" as Desktop
 ShellRoot {
@@ -102,9 +103,9 @@ ShellRoot {
     id: bar
     property bool vertical: false
     property int barSize: Style.bar.sizeHorizontal
-    property color foreground: Color.foreground
-    property color barForeground: Color.foreground
-    property color urgent: Color.urgent
+    property color foreground: Commons.Color.foreground
+    property color barForeground: Commons.Color.foreground
+    property color urgent: Commons.Color.urgent
     property string position: "top"
     property bool foregroundAnimationEnabled: false
     property bool hidden: false
@@ -136,7 +137,7 @@ ShellRoot {
       Rectangle {
         width: parent.width
         height: bar.barSize
-        color: Color.bar.background
+        color: Commons.Color.bar.background
         Item {
           anchors.fill: parent
           Text {
@@ -144,7 +145,7 @@ ShellRoot {
             text: CLOCK
             anchors.right: widget.left
             anchors.rightMargin: Style.space(8)
-            color: Color.foreground
+            color: Commons.Color.foreground
             verticalAlignment: Text.AlignVCenter
             font.family: Style.font.family
             font.pixelSize: Style.font.body
@@ -161,7 +162,7 @@ ShellRoot {
               width: widget.openPanelIndicatorWidth
               height: Style.space(2)
               radius: 1
-              color: Color.accent
+              color: Commons.Color.accent
             }
           }
           Text {
@@ -169,7 +170,7 @@ ShellRoot {
             text: "☼"
             anchors.left: widget.right
             anchors.leftMargin: Style.space(8)
-            color: Color.foreground
+            color: Commons.Color.foreground
             verticalAlignment: Text.AlignVCenter
             font.family: Style.font.family
             font.pixelSize: Style.font.icon

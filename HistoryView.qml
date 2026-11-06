@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "."
 
@@ -7,7 +8,7 @@ Column {
   id: root
   spacing: Style.space(14)
   property bool tooltipsEnabled: true
-  property color foreground: Color.foreground
+  property color foreground: Commons.Color.foreground
   property string fontFamily: Style.font.family
   property Item backControl: null
   readonly property var history: EpochController.history

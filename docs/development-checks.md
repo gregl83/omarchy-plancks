@@ -6,6 +6,7 @@ omarchy plugin validate .
 python3 tests/smoke_qml.py
 python3 tests/smoke_roadster.py
 python3 tests/smoke_notification_quotes.py
+python3 tests/smoke_overlay.py
 ```
 
 The notification quote fit check needs Quickshell and Liberation Sans (`ttf-liberation`); it runs offscreen.
@@ -26,4 +27,4 @@ Edit the `scenes` array in `scripts/demo.qml` to change captions, durations, or 
 
 See [Notifications: maintaining the assets](notifications.md#maintaining-the-assets) for the regeneration command, dependencies, image format, and packaging checks.
 
-All current and future animated graphics **must horizontally center their complete visible silhouette within their canvas**, including handles, bases, flames, and other attachments. Use the midpoint of the full rendered horizontal bounds, not just the main body or control points. Maintain this alignment through every state and animation frame; allow at most one rendered pixel of rasterization error. Correct the drawing itself, never compensate with offsets in the panel or settings previews. Notification exports separately crop and fit each still to the square icon slot. Verify transparent-image bounds across states and regenerate notification assets after geometry changes.
+All current and future animated graphics **must horizontally center their complete visible silhouette within their canvas**, including handles, bases, flames, and other attachments. Use the midpoint of the full rendered horizontal bounds, not just the main body or control points. Maintain this alignment through every state and animation frame; allow at most one rendered pixel of rasterization error. Correct the drawing itself, never compensate with offsets in the panel or settings previews. Notification exports crop and fit stills to the square icon slot; Roadster predicted flight frames share one crop to preserve scale and placement through the flip. Verify transparent-image bounds across states and regenerate notification assets after geometry changes.

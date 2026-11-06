@@ -2,13 +2,14 @@ import QtQuick
 import QtQuick.Controls as QQC
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 // TextArea checks clipboard formats without TextField's automatic payload read.
 QQC.TextArea {
   id: root
-  property color foreground: Color.foreground
-  property color accent: Color.accent
+  property color foreground: Commons.Color.foreground
+  property color accent: Commons.Color.accent
   property int maximumLength: 256
   signal accepted()
 
