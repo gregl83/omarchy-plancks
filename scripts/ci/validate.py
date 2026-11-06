@@ -12,6 +12,20 @@ def validate(tag=None):
     for key in ('id', 'name', 'version', 'author', 'description'):
         if not isinstance(manifest.get(key), str) or not manifest[key].strip():
             raise ValueError(f'manifest.json requires a nonempty {key}')
+    # Marketplace limits are stricter than the desktop's plugin validator.
+    limits = {'id': 128, 'name': 120, 'version': 64, 'author': 120,
+              'description': 500, 'license': 120}
+    for key, limit in limits.items():
+        value = manifest.get(key)
+        if key == 'license' and value is None:
+            continue
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f'manifest.json requires a nonempty {key}')
+        normalized = value.strip()
+        if len(normalized.encode('utf-16-le')) // 2 > limit:
+            raise ValueError(f'manifest.json {key} exceeds marketplace limit of {limit} characters')
+        if re.search(r'[\x00-\x1f\x7f-\x9f]', normalized):
+            raise ValueError(f'manifest.json {key} contains control characters')
     version = manifest['version']
     if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version):
         raise ValueError('Use a stable MAJOR.MINOR.PATCH manifest version')
