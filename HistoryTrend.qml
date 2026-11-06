@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 Column {
@@ -9,7 +10,7 @@ Column {
   property real plotHeight: Style.space(68)
   property bool sessionTrend: false
   property bool tooltipsEnabled: true
-  property color foreground: Color.foreground
+  property color foreground: Commons.Color.foreground
   property string fontFamily: Style.font.family
   visible: points.length > 0
   spacing: Style.space(4)

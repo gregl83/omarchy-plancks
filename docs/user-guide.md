@@ -71,7 +71,7 @@ The overlay follows the same notation and priority as the bar: `t_A` for activit
 Configure optional insights and finish alerts in Settings. See [Notifications](notifications.md) for all variations, message examples, scheduling, session target alerts, and image formats.
 
 <p align="center">
-  <img src="../assets/preview-settings.png" width="320" alt="Plancks settings with graphic selection and notification controls">
+  <img src="../assets/preview-settings.png" width="320" alt="Plancks Appearance settings with graphic selection and tabs for Overlay and Notifications">
   <br>
   <em>Make it feel like yours with Sun and moon, Coffee cup, Starship, or Roadster and optional insights.</em>
 </p>

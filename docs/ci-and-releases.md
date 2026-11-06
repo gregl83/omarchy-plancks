@@ -22,3 +22,7 @@ To release:
 Use the tag workflow to publish releases; manually creating a release in GitHub bypasses this gate. Existing releases are left unchanged on reruns. The release badge shows the latest published GitHub release once the first release exists.
 
 Marketplace submission and approval are separate from this workflow. Omarchy's Git-based installer follows the repository's current code, not the release badge or tag, so protect `main` as well as validating releases.
+
+For an existing marketplace listing, request verification of the **new upstream commit** using the [verification workflow](https://github.com/omacom/omarchy-plugin-marketplace/blob/main/VERIFICATION.md). Submit the final, pushed commit SHA after CI passes. An older verification does not cover a new release; changing the target commit during review requires fresh validation and approval.
+
+The marketplace baseline detects `package-manager` in `scripts/ci/Containerfile`. Those package commands run only while building the isolated test container; the installed plugin never invokes them. This capability required and received maintainer review for [Plancks 1.7.0](https://github.com/omacom/omarchy-plugin-marketplace/issues/11860), and must be reviewed again against each new snapshot. A local baseline check is preparation, not marketplace approval.

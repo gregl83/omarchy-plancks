@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "."
 import "Graphics.js" as Graphics
@@ -124,7 +125,7 @@ Panel {
     }
   }
   Component.onDestruction: { EpochController.unregisterPanel(root); if (detailSubscription) EpochController.setPanelOpen(false) }
-  readonly property color foreground: bar ? bar.foreground : Color.foreground
+  readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
 
   function stamp(value) {
     return value === null || value === undefined ? "Not enough history" : Qt.formatDateTime(new Date(value), "ddd, MMM d, yyyy · HH:mm:ss")
@@ -1438,7 +1439,7 @@ Panel {
                 enabled: !EpochController.busy
                 focusable: true
                 bordered: true
-                foreground: root.bar ? root.bar.urgent : Color.urgent
+                foreground: root.bar ? root.bar.urgent : Commons.Color.urgent
                 Accessible.name: text
                 Accessible.description: helpText
                 KeyNavigation.tab: cancelButton

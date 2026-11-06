@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "."
 
@@ -16,7 +17,7 @@ Column {
     EpochController.requestSessionHistory(page)
     pageChanged()
   }
-  property color foreground: Color.foreground
+  property color foreground: Commons.Color.foreground
   property var detail: null
   property string focusSessionId: ""
   onHistoryChanged: {

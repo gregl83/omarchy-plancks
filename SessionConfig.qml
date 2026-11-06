@@ -1,12 +1,13 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "."
 
 Column {
   id: root
-  property color foreground: Color.foreground
+  property color foreground: Commons.Color.foreground
   property string fontFamily: Style.font.family
   property bool tooltipsEnabled: true
   property var draft: defaults()
