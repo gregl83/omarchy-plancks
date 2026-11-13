@@ -28,7 +28,10 @@ def send(payload):
     arguments = GLib.Variant("(susssasa{sv}i)", (
         "Plancks", 0, payload["image"], "Plancks",
         html.escape(payload["message"], quote=False), [],
-        {"urgency": GLib.Variant("y", 1),
+        # Keep the snapshot explicit: modern notification shells resolve app_icon
+        # as a theme name and use image-path for a sender-provided picture.
+        {"image-path": GLib.Variant("s", payload["image"]),
+         "urgency": GLib.Variant("y", 1),
          "suppress-sound": GLib.Variant("b", True)}, 8000))
     bus.call_sync("org.freedesktop.Notifications", "/org/freedesktop/Notifications",
                   "org.freedesktop.Notifications", "Notify", arguments,
