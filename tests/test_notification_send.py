@@ -74,7 +74,7 @@ def probe():
             assert values[:4] == ("Plancks", 0, icon, "Plancks"), values[:4]
             assert values[4] == "Private client &lt;img src='https://example.invalid/secret'&gt; &amp; planning"
             assert values[5] == []
-            assert values[6] == {"urgency": 1, "suppress-sound": True}
+            assert values[6] == {"image-path": icon, "urgency": 1, "suppress-sound": True}
             assert values[7] == 8000
             arguments = Path(f"/proc/{client.pid}/cmdline").read_bytes()
             assert message.encode() not in arguments and icon.encode() not in arguments

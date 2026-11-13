@@ -45,7 +45,7 @@ Settings opens on **Appearance**. Use the **Appearance**, **Overlay**, and **Not
 | Tab | Controls |
 | --- | --- |
 | Appearance | Tooltips and animated graphic selection. |
-| Overlay | Clock mode, countdown lead time, size, opacity, and background. |
+| Overlay | Clock mode, countdown lead and after-target times, size, opacity, and background. |
 | Notifications | Occasional insights, frequency, preview, motivational quotes, and finish warnings. |
 
 ## Overlay clock
@@ -58,11 +58,11 @@ Settings → **Overlay** provides a small, click-through clock at the bottom cen
 | --- | --- |
 | Off (default) | No overlay. |
 | Always | Shows the bar's current timer, including learning and paused sessions. |
-| Final countdown | Appears in the final **60 seconds** before the interval target, then remains through overrun until the interval changes. |
+| Final countdown | Appears in the final **60 seconds** before the interval target, then stays for **15 seconds after the target** and hides. |
 
 Choose **Small (75%)**, **Medium (100%, default)**, **Large (125%)**, or **Extra large (175%)**. Medium preserves the original size; each preset scales the digits, glass, and bottom spacing together while keeping the clock centered above the bar. Sizing respects the shell’s UI scale. The overlay follows monitor focus; it is not pinned to the main monitor.
 
-Set the countdown lead time from **1–600 seconds**. Choose **40%, 65% (default), or 85%** opacity and **None** or **Smoked glass (default)** background. Smoked glass uses shallow chamfered corners, a translucent neutral center, restrained reflections, and fine edge highlights. The glass appearance is drawn locally; it does not blur or refract the desktop behind it. Opacity coordinates the backing, highlights, and text. Text stays 15 percentage points stronger (up to 100%) for readability: the 40%, 65%, and 85% presets use 55%, 80%, and 100% text opacity respectively. Without a background, the same control still adjusts text opacity. The digits, notation, and pause marker use the shell theme font (`Style.font.family`), matching the taskbar. Text uses antialiased edges and a subtle dark shadow, slightly stronger without a background for contrast; it has no hard outline. The reflection stays still; the clock fades in without flashing or pulsing. Unset background preferences use Smoked glass; an explicit None preference is preserved. Existing translucent-background preferences select Smoked glass automatically.
+Set the countdown lead time from **1–600 seconds** and **Countdown overtime** from **0–600 seconds** (default **15**; **0** hides immediately at the target). These limits apply to epoch, off-time, and session intervals in Final countdown mode; Always mode stays visible. Choose **40%, 65% (default), or 85%** opacity and **None** or **Smoked glass (default)** background. Smoked glass uses shallow chamfered corners, a translucent neutral center, restrained reflections, and fine edge highlights. The glass appearance is drawn locally; it does not blur or refract the desktop behind it. Opacity coordinates the backing, highlights, and text. Text stays 15 percentage points stronger (up to 100%) for readability: the 40%, 65%, and 85% presets use 55%, 80%, and 100% text opacity respectively. Without a background, the same control still adjusts text opacity. The digits, notation, and pause marker use the shell theme font (`Style.font.family`), matching the taskbar. Text uses antialiased edges and a subtle dark shadow, slightly stronger without a background for contrast; it has no hard outline. The reflection stays still; the clock fades in without flashing or pulsing. Unset background preferences use Smoked glass; an explicit None preference is preserved. Existing translucent-background preferences select Smoked glass automatically.
 
 The overlay follows the same notation and priority as the bar: `t_A` for activity and `t_R` for rest/long rest when a session exists; otherwise `t_E` for an epoch or `t_O` for off-time. A paused session freezes the timer and shows a pause marker. Final countdown requires a valid target; elapsed time during epoch learning does not trigger it. Loading or timer errors hide the overlay. This display does not send notifications or advance stages automatically.
 
@@ -144,6 +144,14 @@ The search box matches across all completed history before pagination. Search ei
   <br>
   <em>Spot patterns in your days and choose which intervals shape your predictions.</em>
 </p>
+
+### Correcting history times
+
+Select **Edit**, just left of an interval’s Include/Exclude toggle in **History → Epochs**. **Edit interval** shows both times and initially focuses the start field. Enter the date, time including seconds, and UTC offset, for example `2026-11-12T09:00:00-08:00`. The duration updates as you type. **Save changes** applies the correction; **Cancel** or Escape discards the draft.
+
+Shared boundaries stay connected: an epoch’s end is also the next off-time’s start. Corrections update adjacent intervals, predictions, and trends together. Editing the latest completed boundary also adjusts the current open interval’s starting time. The editor rejects invalid dates, end-before-start, future completion, or a boundary that would cross the neighboring interval. If history changes while you edit, cancel and reopen the interval before saving.
+
+**Restore original times** fills the original values into the editor for review; save to apply them. The journal retains the original timestamps and each correction. Once corrections are saved, that history requires Plancks 1.9.0 or later to replay. Include/Exclude stays as selected, and sessions retain their own recorded times. A repaired clock-error interval becomes eligible for predictions unless explicitly excluded. Restored values must satisfy the same validation as any other edit.
 
 ## Sessions
 

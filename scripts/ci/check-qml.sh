@@ -32,6 +32,7 @@ for ((attempt=0; attempt<100; attempt++)); do
   for socket in "$XDG_RUNTIME_DIR"/wayland-*; do
     if [[ -S $socket ]]; then
       export WAYLAND_DISPLAY=${socket##*/}
+      python3 tests/smoke_history_edit.py
       python3 tests/smoke_overlay.py
       python3 tests/smoke_qml.py --preview
       exit 0

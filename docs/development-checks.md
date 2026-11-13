@@ -7,7 +7,10 @@ python3 tests/smoke_qml.py
 python3 tests/smoke_roadster.py
 python3 tests/smoke_notification_quotes.py
 python3 tests/smoke_overlay.py
+python3 tests/smoke_history_edit.py
 ```
+
+The history editor check uses isolated sample storage and tests field focus, date validation, shared-boundary corrections, restoring original timestamps, and cancel without a journal write.
 
 The notification quote fit check needs Quickshell and Liberation Sans (`ttf-liberation`); it runs offscreen.
 

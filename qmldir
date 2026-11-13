@@ -16,3 +16,4 @@ SunMoonGraphic 1.0 SunMoonGraphic.qml
 RoadsterGraphic 1.0 RoadsterGraphic.qml
 TimerOverlay 1.0 TimerOverlay.qml
 OverlaySettings 1.0 OverlaySettings.qml
+HistoryTimeEditor 1.0 HistoryTimeEditor.qml

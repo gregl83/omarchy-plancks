@@ -109,7 +109,7 @@ The icon follows the selected Sun and moon, Coffee cup, Starship, or Roadster gr
 
 Predicted fill is rounded to the nearest 5%, except Roadster’s 45%–55% flip interval, which uses 1% steps (36° per step) to follow the live angle. Learning and overtime use dedicated stills. Each PNG has a white foreground with the drawing’s intentional transparency and a transparent background. The exporter renders at 4× resolution, trims unused canvas margins, fits the complete silhouette proportionally within 108 × 108 pixels, and centers it on a 116 × 116 canvas. Roadster’s predicted active frames share one crop across the entire flight, preserving the live scale and position instead of independently enlarging the car when its plume contracts during a flip. This leaves a small border while making use of Omarchy’s 40 × 40 notification icon slot. Tall or wide shapes retain their proportions.
 
-The snapshot is captured from the current state when the alert is queued. It is static, so moving exhaust and other motion appear at a representative frame. Snapshot fitting is separate from the fixed live animation canvas.
+The sender supplies the snapshot through the standard D-Bus `image-path` hint, as well as the application-icon field for compatibility. The snapshot is captured from the current state when the alert is queued. It is static, so moving exhaust and other motion appear at a representative frame. Snapshot fitting is separate from the fixed live animation canvas.
 
 ## Delivery and recovery
 

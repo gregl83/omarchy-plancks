@@ -32,7 +32,17 @@ ShellRoot {
         state.timer = "+00:00:00"
         check(Logic.view(state, config).show, "zero visible")
         state.timer = "+00:15:00"
-        check(Logic.view(state, config).show, "overrun visible")
+        check(!Logic.view(state, config).show, "extended overrun hidden")
+        state.timer = "+00:00:14"
+        check(Logic.view(state, config).show, "visible during default 15-second hold")
+        state.timer = "+00:00:15"
+        check(!Logic.view(state, config).show, "hidden at 15 seconds overtime")
+        check(Logic.view(state, {overlayMode: "always"}).show, "always ignores hold limit")
+        check(Logic.view(state, {overlayMode: "countdown", overlayAfterSeconds: 30}).show, "custom hold")
+        state.timer = "+00:00:00"
+        check(!Logic.view(state, {overlayMode: "countdown", overlayAfterSeconds: 0}).show, "zero hides at target")
+        check(Logic.afterTarget({overlayAfterSeconds: -1}) === 15, "invalid hold defaults to 15")
+        check(Logic.afterTarget({overlayAfterSeconds: 601}) === 15, "hold limit enforced")
         state.timer = "--:--:--"
         check(!Logic.view(state, config).show, "learning has no final countdown")
         check(Logic.view(state, {overlayMode: "always"}).show, "always includes learning")
@@ -50,6 +60,10 @@ ShellRoot {
         state.session = {kind: "focus", timer: "−00:00:40", status: "paused"}
         check(Logic.view(state, config).paused && Logic.view(state, config).show, "paused countdown preserved")
         check(Logic.view(state, config).symbol === "A", "activity symbol")
+        state.session.timer = "+00:00:14"
+        check(Logic.view(state, config).show, "session hold visible before cutoff")
+        state.session.timer = "+00:00:15"
+        check(!Logic.view(state, config).show, "session hold expires")
         for (var kind of ["rest", "long_rest"]) {
           state.session = {kind: kind, timer: "−00:05:00", status: "active"}
           check(Logic.view(state, config).symbol === "R", "both rest symbols")

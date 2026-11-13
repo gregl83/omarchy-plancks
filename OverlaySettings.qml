@@ -33,7 +33,7 @@ Column {
   Text {
     width: parent.width
     textFormat: Text.PlainText
-    text: "A click-through clock on the focused screen. Follows the bar timer and stays visible through overrun."
+    text: "A click-through clock on the focused screen. Follows the bar timer. Final countdown hides shortly after the target."
     wrapMode: Text.WordWrap
     color: root.foreground; opacity: 0.6
     font.family: root.fontFamily; font.pixelSize: Style.font.caption
@@ -54,8 +54,27 @@ Column {
       else text = String(root.config.overlaySeconds || 60)
     }
     KeyNavigation.backtab: mode
-    KeyNavigation.tab: sizeChoice
+    KeyNavigation.tab: afterSeconds
     onActiveFocusChanged: if (activeFocus) root.revealRequested(seconds)
+    Keys.onEscapePressed: root.backRequested()
+  }
+  Text { textFormat: Text.PlainText; text: "Countdown overtime (seconds, 0–600)"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+  BoundedTextField {
+    id: afterSeconds
+    objectName: "plancks_overlayAfterSeconds"
+    width: parent.width; maximumLength: 3
+    text: String(OverlayLogic.afterTarget(root.config))
+    foreground: root.foreground
+    font.family: root.fontFamily; font.pixelSize: Style.font.caption
+    Accessible.name: "Countdown overtime seconds, zero hides immediately"
+    onEditingFinished: {
+      var value = Number(text)
+      if (/^\d+$/.test(text) && value >= 0 && value <= 600) root.save("overlayAfterSeconds", value)
+      else text = String(OverlayLogic.afterTarget(root.config))
+    }
+    KeyNavigation.backtab: seconds
+    KeyNavigation.tab: sizeChoice
+    onActiveFocusChanged: if (activeFocus) root.revealRequested(afterSeconds)
     Keys.onEscapePressed: root.backRequested()
   }
   Text { textFormat: Text.PlainText; text: "Size"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
@@ -66,7 +85,7 @@ Column {
     value: OverlayLogic.size(root.config)
     foreground: root.foreground; fontFamily: root.fontFamily; fontSize: Style.font.caption
     onChanged: function(value) { root.save("overlaySize", value) }
-    KeyNavigation.backtab: seconds
+    KeyNavigation.backtab: afterSeconds
     KeyNavigation.tab: opacityChoice
     onActiveFocusChanged: if (activeFocus) root.revealRequested(sizeChoice)
   }
