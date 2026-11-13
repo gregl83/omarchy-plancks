@@ -151,7 +151,7 @@ Select **Edit**, just left of an interval’s Include/Exclude toggle in **Histor
 
 Shared boundaries stay connected: an epoch’s end is also the next off-time’s start. Corrections update adjacent intervals, predictions, and trends together. Editing the latest completed boundary also adjusts the current open interval’s starting time. The editor rejects invalid dates, end-before-start, future completion, or a boundary that would cross the neighboring interval. If history changes while you edit, cancel and reopen the interval before saving.
 
-**Restore original times** fills the original values into the editor for review; save to apply them. The journal retains the original timestamps and each correction. Include/Exclude stays as selected, and sessions retain their own recorded times. A repaired clock-error interval becomes eligible for predictions unless explicitly excluded. Restored values must satisfy the same validation as any other edit.
+**Restore original times** fills the original values into the editor for review; save to apply them. The journal retains the original timestamps and each correction. Once corrections are saved, that history requires Plancks 1.9.0 or later to replay. Include/Exclude stays as selected, and sessions retain their own recorded times. A repaired clock-error interval becomes eligible for predictions unless explicitly excluded. Restored values must satisfy the same validation as any other edit.
 
 ## Sessions
 

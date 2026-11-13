@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "gregl83.plancks",
   "name": "Plancks",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "author": "gregl83",
   "license": "Apache-2.0",
   "description": "A second clock for Omarchy, tuned to your daily rhythm. This productivity and time-tracking widget learns when your day ends and the next begins, showing a countdown of the time ahead. Add a NASA-inspired countdown overlay, notifications, searchable history and trends, and animated Sun and moon, Coffee cup, Starship, or Roadster companions. Includes a Pomodoro timer and custom focus, study, exercise, and rest sessions. Local storage; no account or cloud service.",

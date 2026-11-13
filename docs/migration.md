@@ -12,7 +12,7 @@ Copy the **entire `gregl83.plancks` directory**, including hidden files:
 
 If you set an absolute `$XDG_STATE_HOME`, the directory is `$XDG_STATE_HOME/omarchy/gregl83.plancks/` instead. Check the location on each machine; they can differ.
 
-This carries over epoch and session history, inclusion choices, the history used for predictions, and active or paused timers. Keep all files together: `state.json` alone is not a backup. The `events/` directory is the authoritative history.
+This carries over epoch and session history, inclusion choices, the history used for predictions, and active or paused timers. Keep all files together: `state.json` alone is not a backup. The `events/` directory is the authoritative history. If you have saved timestamp corrections, use Plancks **1.9.0 or later** on the destination: earlier releases cannot replay correction events.
 
 ## Transfer your data
 
