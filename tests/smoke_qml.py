@@ -488,6 +488,14 @@ ShellRoot {
       overlaySeconds.text = "0"
       overlaySeconds.editingFinished()
       compare(widget.settings.overlaySeconds, 30, "Invalid countdown seconds rejected")
+      var afterSeconds = findChild(panel, "plancks_overlayAfterSeconds")
+      compare(afterSeconds.text, "15", "After-target display defaults to 15 seconds")
+      afterSeconds.text = "0"
+      afterSeconds.editingFinished()
+      compare(widget.settings.overlayAfterSeconds, 0, "Zero after-target hold saved")
+      afterSeconds.text = "601"
+      afterSeconds.editingFinished()
+      compare(afterSeconds.text, "0", "Invalid hold restores saved zero")
       widget.setOverlayPreference("overlayMode", "off")
       notificationsTab.clicked()
       reset.forceActiveFocus()

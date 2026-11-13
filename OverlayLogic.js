@@ -9,6 +9,11 @@ function lead(settings) {
   return typeof value === "number" && isFinite(value) && value >= 1 && value <= 600
     ? Math.round(value) : 60
 }
+function afterTarget(settings) {
+  var value = settings.overlayAfterSeconds
+  return typeof value === "number" && isFinite(value) && value >= 0 && value <= 600
+    ? Math.round(value) : 15
+}
 function background(settings) {
   return settings.overlayBackground !== false
 }
@@ -30,7 +35,7 @@ function view(state, settings) {
   var seconds = match ? Number(match[2]) * 3600 + Number(match[3]) * 60 + Number(match[4]) : NaN
   var prediction = state.phase === "active" ? state.predictedEndUtcMs : state.predictedStartUtcMs
   var hasTarget = !!session || typeof prediction === "number" && isFinite(prediction)
-  var due = hasTarget && match && (match[1] === "+" || seconds <= lead(settings))
+  var due = hasTarget && match && (match[1] === "+" ? seconds < afterTarget(settings) : seconds <= lead(settings))
   return {timer: timer, symbol: session ? (session.kind === "focus" ? "A" : "R") : (state.phase === "active" ? "E" : "O"),
     paused: !!session && session.status === "paused",
     show: mode(settings) === "always" || mode(settings) === "countdown" && !!due}
