@@ -145,6 +145,14 @@ The search box matches across all completed history before pagination. Search ei
   <em>Spot patterns in your days and choose which intervals shape your predictions.</em>
 </p>
 
+### Correcting history times
+
+Select **Edit**, just left of an interval’s Include/Exclude toggle in **History → Epochs**. **Edit interval** shows both times and initially focuses the start field. Enter the date, time including seconds, and UTC offset, for example `2026-11-12T09:00:00-08:00`. The duration updates as you type. **Save changes** applies the correction; **Cancel** or Escape discards the draft.
+
+Shared boundaries stay connected: an epoch’s end is also the next off-time’s start. Corrections update adjacent intervals, predictions, and trends together. Editing the latest completed boundary also adjusts the current open interval’s starting time. The editor rejects invalid dates, end-before-start, future completion, or a boundary that would cross the neighboring interval. If history changes while you edit, cancel and reopen the interval before saving.
+
+**Restore original times** fills the original values into the editor for review; save to apply them. The journal retains the original timestamps and each correction. Include/Exclude stays as selected, and sessions retain their own recorded times. A repaired clock-error interval becomes eligible for predictions unless explicitly excluded. Restored values must satisfy the same validation as any other edit.
+
 ## Sessions
 
 Within an active epoch, select the **Configure session** timer icon immediately left of Settings in the panel header. Pomodoro supplies 25-minute activity, 5-minute short rests, 15-minute long rests every four rounds, four rounds, and **Include final rest** enabled. Custom configurations support 1–180 whole minutes and 1–12 rounds/cadence. One round with no final rest is a standalone activity timer. The summary reflects the actual rest sequence; the final rest uses the same short/long cadence as other rests.

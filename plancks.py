@@ -23,6 +23,7 @@ import uuid
 
 from insights import Insights
 import sessions
+import history_edit
 
 VERSION = 1
 SNAPSHOT_VERSION = 2
@@ -148,6 +149,14 @@ def apply(state, event):
         raise ValueError("Invalid journal event ID")
     if event.get("schemaVersion") not in (1, 2) or event.get("sequence") != state["sequence"] + 1:
         raise ValueError("Unsupported journal version or missing/out-of-order event")
+    if event['type'] == 'sample_times_changed':
+        if event['schemaVersion'] != 2:
+            raise ValueError('Time corrections require journal version 2')
+        history_edit.correct(state, event['sampleId'], event['startUtcMs'], event['endUtcMs'], stamp['utcMs'])
+        rebuild_samples(state)
+        state.update(sequence=event['sequence'], lastEventId=event['eventId'],
+                     predictionMs=prediction, deadlineUtcMs=event['deadlineUtcMs'])
+        return
     if event["type"] == "sample_inclusion_changed":
         target = event["sampleId"]
         excluded = event["excludedFromLearning"]
@@ -316,6 +325,8 @@ class Store:
                     exclusion = sample.get("excludedFromLearning", False) if sample is not None else None
                     if event["type"] == "sample_inclusion_changed":
                         exclusion = (event["sampleId"], event["excludedFromLearning"])
+                    if event['type'] == 'sample_times_changed':
+                        exclusion = (event['sampleId'], event['startUtcMs'], event['endUtcMs'])
                     if event['type'].startswith('session_'):
                         exclusion = (event.get('sessionId'), event.get('stageId'), event.get('config'))
                     if event['type'] == 'session_inclusion_changed':
@@ -625,6 +636,41 @@ class Store:
             self._signature = None
             return state, self.snapshot_warning(state)
 
+    def edit_times(self, sample_id, start_ms, end_ms, event_id, expected_sequence,
+                   expected_generation='', initial_ms=None, rotate_bytes=DEFAULT_ROTATE_BYTES):
+        if (not isinstance(sample_id, str) or not 1 <= len(sample_id) <= 128
+                or not isinstance(event_id, str) or not 1 <= len(event_id) <= 128
+                or type(rotate_bytes) is not int or rotate_bytes < 1):
+            raise ValueError('Invalid time correction request')
+        with self.locked():
+            state = self.load()
+            if state['generation'] != expected_generation:
+                raise ValueError('Data was reset. Reopen history before editing.')
+            if event_id in self._ids:
+                kind, segment, payload = self._ids[event_id]
+                if kind != 'sample_times_changed' or payload != (sample_id, start_ms, end_ms):
+                    raise ValueError('Event ID already used for another action')
+                with (self.events / segment).open('rb') as stream:
+                    os.fsync(stream.fileno())
+                sync_dir(self.events)
+                return state, self.snapshot_warning(state)
+            if state['sequence'] != expected_sequence:
+                raise ValueError('History changed. Cancel and reopen this interval before saving.')
+            now = clock()
+            candidate = copy.deepcopy(state)
+            history_edit.correct(candidate, sample_id, start_ms, end_ms, now['utcMs'])
+            rebuild_samples(candidate)
+            key = 'workSamples' if state['phase'] == 'active' else 'gapSamples'
+            prediction = estimate(candidate[key], initial_ms if state['phase'] == 'active' else None)
+            event = dict(schemaVersion=2, sequence=state['sequence'] + 1, eventId=event_id,
+                         type='sample_times_changed', clock=now, sampleId=sample_id,
+                         startUtcMs=start_ms, endUtcMs=end_ms, predictionMs=prediction,
+                         deadlineUtcMs=candidate['anchor']['utcMs'] + prediction if prediction is not None else None)
+            apply(state, event)
+            state['cursor'] = self.append(event, rotate_bytes)
+            self._signature = None
+            return state, self.snapshot_warning(state)
+
     def snapshot_warning(self, state):
         try:
             self.snapshot(state)
@@ -872,6 +918,11 @@ def serve(store):
                     request["sampleId"], request["excludedFromLearning"], request["requestId"],
                     request["sequence"], request.get("generation", ""), initial_ms,
                     request.get("rotateBytes", DEFAULT_ROTATE_BYTES))
+            elif action == 'edit_times':
+                _, persistent_warning = store.edit_times(
+                    request['sampleId'], request['startUtcMs'], request['endUtcMs'],
+                    request['requestId'], request['sequence'], request.get('generation', ''),
+                    initial_ms, request.get('rotateBytes', DEFAULT_ROTATE_BYTES))
             elif action == "reset":
                 store.reset(request["requestId"], request["generation"], request["sequence"])
                 persistent_warning = None

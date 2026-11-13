@@ -30,7 +30,7 @@ def validate(tag=None):
     if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version):
         raise ValueError('Use a stable MAJOR.MINOR.PATCH manifest version')
     for name in ('README.md', 'LICENSE', 'assets/preview-main.png', 'assets/preview-history.png', 'assets/preview-settings.png', 'assets/preview-session.png', 'assets/preview-session-config.png', 'assets/preview-session-history.png', 'preview.png', 'qmldir', 'plancks.py',
-                 'Widget.qml', 'EpochPanel.qml', 'EpochController.qml', 'HistoryView.qml', 'HistoryTrend.qml', 'AnimatedGraphic.qml', 'CoffeeGraphic.qml', 'StarshipGraphic.qml', 'SunMoonGraphic.qml', 'RoadsterGraphic.qml', 'InsightsSettings.qml', 'insights.py', 'GraphicPreview.qml', 'Graphics.js', 'sessions.py', 'SessionConfig.qml', 'SessionHistory.qml', 'SessionActivity.qml', 'BoundedTextField.qml', 'clipboard_read.py', 'notification_send.py', 'TimerOverlay.qml', 'OverlaySettings.qml', 'OverlayLogic.js'):
+                 'Widget.qml', 'EpochPanel.qml', 'EpochController.qml', 'HistoryView.qml', 'HistoryTimeEditor.qml', 'history_edit.py', 'HistoryTrend.qml', 'AnimatedGraphic.qml', 'CoffeeGraphic.qml', 'StarshipGraphic.qml', 'SunMoonGraphic.qml', 'RoadsterGraphic.qml', 'InsightsSettings.qml', 'insights.py', 'GraphicPreview.qml', 'Graphics.js', 'sessions.py', 'SessionConfig.qml', 'SessionHistory.qml', 'SessionActivity.qml', 'BoundedTextField.qml', 'clipboard_read.py', 'notification_send.py', 'TimerOverlay.qml', 'OverlaySettings.qml', 'OverlayLogic.js'):
         if not Path(name).is_file() or Path(name).stat().st_size == 0:
             raise ValueError(f'Missing or empty package file: {name}')
     if tag is not None:

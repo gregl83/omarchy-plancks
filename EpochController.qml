@@ -60,6 +60,13 @@ QtObject {
       {sampleId: sampleId, excludedFromLearning: excluded})
   }
 
+  signal historyTimesSaved()
+  function editHistoryTimes(sampleId, startMs, endMs, generation, sequence) {
+    if (!ready || busy) return
+    sendAction("edit_times", generation, sequence, false,
+      {sampleId: sampleId, startUtcMs: startMs, endUtcMs: endMs})
+  }
+
   property Timer historyWatchdog: Timer {
     interval: 10000
     onTriggered: {
@@ -345,6 +352,7 @@ QtObject {
             if (result.ok) {
               if (root.pendingCommand && root.pendingCommand.action === "session_started") root.sessionStarted(root.pendingCommand.config)
               if (root.endIntent && root.pendingCommand && root.pendingCommand.action === "end") root.endIntent.panel.cancelEpochEndConfirmation()
+              if (root.pendingCommand && root.pendingCommand.action === "edit_times") root.historyTimesSaved()
               root.pendingCommand = null
               root.pendingId = ""
               root.error = ""
